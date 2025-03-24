@@ -1,145 +1,131 @@
-import { Component, AfterViewInit } from '@angular/core';
+import { Component, AfterViewInit, Input, ViewChild, ElementRef } from '@angular/core';
 import * as d3 from 'd3';
 
 @Component({
-  selector: 'app-flow-map',
-  template: '<div id="flow-map-container"></div>',
+  selector: 'app-dependency-graph',
+  template: `
+    <div class="container">
+      <svg #graphSvg></svg>
+    </div>
+  `,
   styles: [`
-    #flow-map-container {
+    .container {
       width: 100%;
-      height: 700px;
+      height: 100%;
     }
-    .node-app { fill: #69b3a2 !important; stroke: #fff; stroke-width: 1.5px; }
-    .node-component { fill: #ff9999 !important; stroke: #fff; stroke-width: 1.5px; }
-    .node-external { fill: #9999ff !important; stroke: #fff; stroke-width: 1.5px; }
-    .link { fill: none; stroke: #ccc; stroke-opacity: 0.6; }
-    .link-internal { stroke: #69b3a2 !important; }
-    .link-external { stroke: #9999ff !important; stroke-dasharray: 5; }
-    text { fill: white !important; font-size: 12px; pointer-events: none; }
+    .link {
+      stroke-width: 1.5px;
+    }
+    .node circle {
+      stroke: #fff;
+      stroke-width: 1.5px;
+    }
+    .node text {
+      font-size: 12px;
+      fill: #333;
+    }
   `]
 })
-export class FlowMapComponent implements AfterViewInit {
+export class DependencyGraphComponent implements AfterViewInit {
+  @Input() nodes: any[] = [];
+  @Input() links: any[] = [];
+  @ViewChild('graphSvg', { static: false }) graphSvg!: ElementRef<SVGSVGElement>;
+
+  private width = 960;
+  private height = 600;
+  private simulation: any;
+  private svg: any;
+  private zoomLayer: any;
+  private node: any;
+  private link: any;
+
   constructor() {}
 
   ngAfterViewInit(): void {
-    this.createFlowMap();
+    this.initializeGraph();
   }
 
-  private createFlowMap(): void {
-    // Sample data representing an application ecosystem
-    const nodes = [
-      { id: 'WebServer', type: 'component', app: 'MainApp', x: 100, y: 300 },
-      { id: 'AuthService', type: 'component', app: 'MainApp', x: 300, y: 200 },
-      { id: 'Database', type: 'component', app: 'MainApp', x: 300, y: 400 },
-      { id: 'API', type: 'component', app: 'MainApp', x: 500, y: 300 },
-      { id: 'PaymentService', type: 'external', app: 'PaymentApp', x: 700, y: 200 },
-      { id: 'NotificationService', type: 'external', app: 'NotifyApp', x: 700, y: 400 }
-    ];
+  private initializeGraph(): void {
+    this.svg = d3.select(this.graphSvg.nativeElement)
+      .attr('width', this.width)
+      .attr('height', this.height);
 
-    const links = [
-      { source: 'WebServer', target: 'AuthService', type: 'internal' },
-      { source: 'WebServer', target: 'Database', type: 'internal' },
-      { source: 'AuthService', target: 'API', type: 'internal' },
-      { source: 'Database', target: 'API', type: 'internal' },
-      { source: 'API', target: 'PaymentService', type: 'external' },
-      { source: 'API', target: 'NotificationService', type: 'external' }
-    ];
+    this.zoomLayer = this.svg.append('g');
 
-    // SVG setup
-    const width = 900;
-    const height = 700;
-    const svg = d3.select('#flow-map-container')
-      .append('svg')
-      .attr('width', width)
-      .attr('height', height)
-      .style('background', '#f0f0f0'); // Light gray background for visibility
+    this.simulation = d3.forceSimulation(this.nodes)
+      .force('link', d3.forceLink(this.links).id((d: any) => d.id).distance(100))
+      .force('charge', d3.forceManyBody().strength(-100))
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+      .on('tick', this.ticked.bind(this));
 
-    // Arrow marker for links
-    svg.append('defs').append('marker')
-      .attr('id', 'arrow')
-      .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 15)
-      .attr('markerWidth', 6)
-      .attr('markerHeight', 6)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', '#999');
-
-    // Draw links
-    const link = svg.selectAll('.link')
-      .data(links)
+    this.link = this.zoomLayer.selectAll('.link')
+      .data(this.links)
       .enter()
-      .append('path')
-      .attr('class', d => `link link-${d.type}`)
-      .attr('d', (d: any) => {
-        const source = nodes.find(n => n.id === d.source);
-        const target = nodes.find(n => n.id === d.target);
-        return this.diagonalPath(source, target);
-      })
-      .attr('fill', 'none') // Explicitly prevent fill
-      .attr('marker-end', 'url(#arrow)')
-      .attr('stroke-width', 2);
+      .append('line')
+      .attr('class', 'link')
+      .attr('stroke', '#999')
+      .attr('stroke-opacity', '0.6');
 
-    // Draw nodes
-    const node = svg.selectAll('.node')
-      .data(nodes)
+    this.node = this.zoomLayer.selectAll('.node')
+      .data(this.nodes)
       .enter()
       .append('g')
-      .attr('class', d => `node node-${d.type}`)
-      .attr('transform', d => `translate(${d.x},${d.y})`);
+      .attr('class', 'node')
+      .call(d3.drag()
+        .on('start', this.dragStarted.bind(this))
+        .on('drag', this.dragged.bind(this))
+        .on('end', this.dragEnded.bind(this)));
 
-    node.append('circle')
-      .attr('r', 25)
-      .attr('stroke', '#fff') // Explicit white border
-      .attr('stroke-width', '1.5px') // Explicit border width
-      .on('mouseover', function(event, d) {
-        d3.select(this).transition().attr('r', 30);
-        tooltip.style('visibility', 'visible').text(`${d.id} (${d.app})`);
-      })
-      .on('mousemove', (event) => {
-        tooltip.style('top', (event.pageY - 10) + 'px')
-               .style('left', (event.pageX + 10) + 'px');
-      })
-      .on('mouseout', function() {
-        d3.select(this).transition().attr('r', 25);
-        tooltip.style('visibility', 'hidden');
-      });
+    this.node.append('circle')
+      .attr('r', 5)
+      .attr('fill', '#69b3a2');
 
-    node.append('text')
-      .attr('dy', 4)
-      .attr('text-anchor', 'middle')
-      .text(d => d.id);
+    this.node.append('text')
+      .attr('dx', 12)
+      .attr('dy', '.35em')
+      .text((d: any) => d.id);
 
-    // Tooltip
-    const tooltip = d3.select('body')
-      .append('div')
-      .style('position', 'absolute')
-      .style('background', '#f9f9f9')
-      .style('padding', '5px')
-      .style('border', '1px solid #ccc')
-      .style('border-radius', '3px')
-      .style('visibility', 'hidden');
-
-    // Dragging behavior
-    node.call(d3.drag()
-      .on('drag', (event: any, d: any) => {
-        d.x = event.x;
-        d.y = event.y;
-        d3.select(event.sourceEvent.target.parentNode)
-          .attr('transform', `translate(${d.x},${d.y})`);
-        link.attr('d', (l: any) => {
-          const source = nodes.find(n => n.id === l.source);
-          const target = nodes.find(n => n.id === l.target);
-          return this.diagonalPath(source, target);
-        });
+    this.svg.call(d3.zoom()
+      .extent([[0, 0], [this.width, this.height]])
+      .scaleExtent([0.1, 8])
+      .on('zoom', (event: any) => {
+        this.zoomLayer.attr('transform', event.transform);
       }));
   }
 
-  private diagonalPath(source: any, target: any): string {
-    const dx = target.x - source.x;
-    const dy = target.y - source.y;
-    const dr = Math.sqrt(dx * dx + dy * dy);
-    return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
+  private ticked(): void {
+    this.link
+      .attr('x1', (d: any) => d.source.x)
+      .attr('y1', (d: any) => d.source.y)
+      .attr('x2', (d: any) => d.target.x)
+      .attr('y2', (d: any) => d.target.y);
+
+    this.node
+      .attr('transform', (d: any) => `translate(${d.x},${d.y})`);
+  }
+
+  private dragStarted(event: any, d: any): void {
+    if (!event.active) this.simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  private dragged(event: any, d: any): void {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  private dragEnded(event: any, d: any): void {
+    if (!event.active) this.simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+
+  // Watch for changes in inputs (equivalent to Vue's watch)
+  ngOnChanges(): void {
+    if (this.svg) {
+      this.svg.selectAll('*').remove(); // Clear existing graph
+      this.initializeGraph();
+    }
   }
 }
