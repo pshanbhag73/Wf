@@ -1,0 +1,123 @@
+import { Component, OnInit } from '@angular/core';
+import * as d3 from 'd3';
+
+@Component({
+  selector: 'app-flow-map',
+  template: '<div id="flow-map-container"></div>',
+  styles: [`
+    #flow-map-container {
+      width: 100%;
+      height: 600px;
+    }
+    .node {
+      stroke: #fff;
+      stroke-width: 1.5px;
+    }
+    .link {
+      fill: none;
+      stroke: #ccc;
+      stroke-opacity: 0.6;
+    }
+  `]
+})
+export class FlowMapComponent implements OnInit {
+  constructor() {}
+
+  ngOnInit(): void {
+    this.createFlowMap();
+  }
+
+  private createFlowMap(): void {
+    // Sample data
+    const nodes = [
+      { id: 'Login', x: 100, y: 300 },
+      { id: 'Dashboard', x: 300, y: 200 },
+      { id: 'Profile', x: 300, y: 400 },
+      { id: 'Settings', x: 500, y: 300 },
+      { id: 'Logout', x: 700, y: 300 }
+    ];
+
+    const links = [
+      { source: 'Login', target: 'Dashboard' },
+      { source: 'Dashboard', target: 'Profile' },
+      { source: 'Dashboard', target: 'Settings' },
+      { source: 'Profile', target: 'Settings' },
+      { source: 'Settings', target: 'Logout' }
+    ];
+
+    // Set up SVG
+    const width = 800;
+    const height = 600;
+
+    const svg = d3.select('#flow-map-container')
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height);
+
+    // Create arrow markers
+    svg.append('defs').append('marker')
+      .attr('id', 'arrow')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 8)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', '#999');
+
+    // Create links
+    const link = svg.selectAll('.link')
+      .data(links)
+      .enter()
+      .append('path')
+      .attr('class', 'link')
+      .attr('d', (d: any) => {
+        const source = nodes.find(n => n.id === d.source);
+        const target = nodes.find(n => n.id === d.target);
+        return this.diagonalPath(source, target);
+      })
+      .attr('marker-end', 'url(#arrow)')
+      .attr('stroke-width', 2);
+
+    // Create nodes
+    const node = svg.selectAll('.node')
+      .data(nodes)
+      .enter()
+      .append('g')
+      .attr('class', 'node')
+      .attr('transform', d => `translate(${d.x},${d.y})`);
+
+    node.append('circle')
+      .attr('r', 20)
+      .attr('fill', '#69b3a2');
+
+    node.append('text')
+      .attr('dy', 5)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'white')
+      .text(d => d.id);
+
+    // Enable dragging
+    node.call(d3.drag()
+      .on('drag', (event: any, d: any) => {
+        d.x = event.x;
+        d.y = event.y;
+        d3.select(event.sourceEvent.target.parentNode)
+          .attr('transform', `translate(${d.x},${d.y})`);
+        link.attr('d', (l: any) => {
+          const source = nodes.find(n => n.id === l.source);
+          const target = nodes.find(n => n.id === l.target);
+          return this.diagonalPath(source, target);
+        });
+      }));
+  }
+
+  // Function to create curved paths between nodes
+  private diagonalPath(source: any, target: any): string {
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const dr = Math.sqrt(dx * dx + dy * dy);
+    return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
+  }
+}
