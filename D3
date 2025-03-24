@@ -7,17 +7,15 @@ import * as d3 from 'd3';
   styles: [`
     #flow-map-container {
       width: 100%;
-      height: 600px;
+      height: 700px;
     }
-    .node {
-      stroke: #fff;
-      stroke-width: 1.5px;
-    }
-    .link {
-      fill: none;
-      stroke: #ccc;
-      stroke-opacity: 0.6;
-    }
+    .node-app { fill: #69b3a2; }
+    .node-component { fill: #ff9999; }
+    .node-external { fill: #9999ff; }
+    .link { fill: none; stroke: #ccc; stroke-opacity: 0.6; }
+    .link-internal { stroke: #69b3a2; }
+    .link-external { stroke: #9999ff; stroke-dasharray: 5; }
+    text { fill: white; font-size: 12px; pointer-events: none; }
   `]
 })
 export class FlowMapComponent implements OnInit {
@@ -28,37 +26,42 @@ export class FlowMapComponent implements OnInit {
   }
 
   private createFlowMap(): void {
-    // Sample data
+    // Sample data representing an application ecosystem
     const nodes = [
-      { id: 'Login', x: 100, y: 300 },
-      { id: 'Dashboard', x: 300, y: 200 },
-      { id: 'Profile', x: 300, y: 400 },
-      { id: 'Settings', x: 500, y: 300 },
-      { id: 'Logout', x: 700, y: 300 }
+      // Main application components
+      { id: 'WebServer', type: 'component', app: 'MainApp', x: 100, y: 300 },
+      { id: 'AuthService', type: 'component', app: 'MainApp', x: 300, y: 200 },
+      { id: 'Database', type: 'component', app: 'MainApp', x: 300, y: 400 },
+      { id: 'API', type: 'component', app: 'MainApp', x: 500, y: 300 },
+      // External application
+      { id: 'PaymentService', type: 'external', app: 'PaymentApp', x: 700, y: 200 },
+      { id: 'NotificationService', type: 'external', app: 'NotifyApp', x: 700, y: 400 }
     ];
 
     const links = [
-      { source: 'Login', target: 'Dashboard' },
-      { source: 'Dashboard', target: 'Profile' },
-      { source: 'Dashboard', target: 'Settings' },
-      { source: 'Profile', target: 'Settings' },
-      { source: 'Settings', target: 'Logout' }
+      // Internal dependencies
+      { source: 'WebServer', target: 'AuthService', type: 'internal' },
+      { source: 'WebServer', target: 'Database', type: 'internal' },
+      { source: 'AuthService', target: 'API', type: 'internal' },
+      { source: 'Database', target: 'API', type: 'internal' },
+      // External dependencies
+      { source: 'API', target: 'PaymentService', type: 'external' },
+      { source: 'API', target: 'NotificationService', type: 'external' }
     ];
 
-    // Set up SVG
-    const width = 800;
-    const height = 600;
-
+    // SVG setup
+    const width = 900;
+    const height = 700;
     const svg = d3.select('#flow-map-container')
       .append('svg')
       .attr('width', width)
       .attr('height', height);
 
-    // Create arrow markers
+    // Arrow marker for links
     svg.append('defs').append('marker')
       .attr('id', 'arrow')
       .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 8)
+      .attr('refX', 15)
       .attr('markerWidth', 6)
       .attr('markerHeight', 6)
       .attr('orient', 'auto')
@@ -66,12 +69,12 @@ export class FlowMapComponent implements OnInit {
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#999');
 
-    // Create links
+    // Draw links
     const link = svg.selectAll('.link')
       .data(links)
       .enter()
       .append('path')
-      .attr('class', 'link')
+      .attr('class', d => `link link-${d.type}`)
       .attr('d', (d: any) => {
         const source = nodes.find(n => n.id === d.source);
         const target = nodes.find(n => n.id === d.target);
@@ -80,25 +83,45 @@ export class FlowMapComponent implements OnInit {
       .attr('marker-end', 'url(#arrow)')
       .attr('stroke-width', 2);
 
-    // Create nodes
+    // Draw nodes
     const node = svg.selectAll('.node')
       .data(nodes)
       .enter()
       .append('g')
-      .attr('class', 'node')
+      .attr('class', d => `node node-${d.type}`)
       .attr('transform', d => `translate(${d.x},${d.y})`);
 
     node.append('circle')
-      .attr('r', 20)
-      .attr('fill', '#69b3a2');
+      .attr('r', 25)
+      .on('mouseover', function(event, d) {
+        d3.select(this).transition().attr('r', 30);
+        tooltip.style('visibility', 'visible').text(`${d.id} (${d.app})`);
+      })
+      .on('mousemove', (event) => {
+        tooltip.style('top', (event.pageY - 10) + 'px')
+               .style('left', (event.pageX + 10) + 'px');
+      })
+      .on('mouseout', function() {
+        d3.select(this).transition().attr('r', 25);
+        tooltip.style('visibility', 'hidden');
+      });
 
     node.append('text')
-      .attr('dy', 5)
+      .attr('dy', 4)
       .attr('text-anchor', 'middle')
-      .attr('fill', 'white')
       .text(d => d.id);
 
-    // Enable dragging
+    // Tooltip
+    const tooltip = d3.select('body')
+      .append('div')
+      .style('position', 'absolute')
+      .style('background', '#f9f9f9')
+      .style('padding', '5px')
+      .style('border', '1px solid #ccc')
+      .style('border-radius', '3px')
+      .style('visibility', 'hidden');
+
+    // Dragging behavior
     node.call(d3.drag()
       .on('drag', (event: any, d: any) => {
         d.x = event.x;
@@ -113,7 +136,6 @@ export class FlowMapComponent implements OnInit {
       }));
   }
 
-  // Function to create curved paths between nodes
   private diagonalPath(source: any, target: any): string {
     const dx = target.x - source.x;
     const dy = target.y - source.y;
