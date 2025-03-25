@@ -1,42 +1,3 @@
-export interface MicroserviceNode {
-  id: string;
-  name: string;
-  type: string; // e.g., 'service', 'database', 'queue', 'external'
-  app: string; // Group services by app
-}
-
-export interface MicroserviceLink {
-  source: string;
-  target: string;
-  interaction: string; // e.g., 'http', 'queue', 'db'
-}
-
-export const microservicesData = {
-  nodes: [
-    { id: 'ms1', name: 'AuthService', type: 'service', app: 'AuthApp' },
-    { id: 'db1', name: 'AuthDB', type: 'database', app: 'AuthApp' },
-    { id: 'ms2', name: 'ProductService', type: 'service', app: 'ProductApp' },
-    { id: 'db2', name: 'ProductDB', type: 'database', app: 'ProductApp' },
-    { id: 'ms3', name: 'OrderService', type: 'service', app: 'OrderApp' },
-    { id: 'queue1', name: 'OrderQueue', type: 'queue', app: 'OrderApp' },
-    { id: 'ext1', name: 'PaymentGateway', type: 'external', app: 'OrderApp' },
-    // New standalone app and its dependency
-    { id: 'ms4', name: 'NotificationService', type: 'service', app: 'ExternalApp' },
-    { id: 'queue2', name: 'NotifyQueue', type: 'queue', app: 'ExternalApp' },
-  ],
-  links: [
-    { source: 'ms1', target: 'db1', interaction: 'db' },
-    { source: 'ms2', target: 'db2', interaction: 'db' },
-    { source: 'ms3', target: 'queue1', interaction: 'queue' },
-    { source: 'ms3', target: 'ms2', interaction: 'http' },
-    { source: 'ms3', target: 'ext1', interaction: 'http' },
-    // New links for ExternalApp
-    { source: 'ms4', target: 'queue2', interaction: 'queue' },
-    { source: 'ms3', target: 'ms4', interaction: 'http' }, // OrderService depends on NotificationService
-  ],
-};
-
-
 import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
 import { microservicesData, MicroserviceNode, MicroserviceLink } from '../microservices-data';
@@ -64,6 +25,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
   private width = 800;
   private height = 600;
   private svg: any;
+  private zoom: any;
 
   ngAfterViewInit() {
     this.initializeSvg();
@@ -76,9 +38,22 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .append('svg')
       .attr('width', this.width)
       .attr('height', this.height);
+
+    // Add zoom behavior
+    this.zoom = d3.zoom()
+      .scaleExtent([0.1, 10]) // Min and max zoom levels
+      .on('zoom', (event) => {
+        this.svg.select('.content').attr('transform', event.transform);
+      });
+
+    this.svg.call(this.zoom);
+
+    // Create a group for zoomable content
+    this.svg.append('g').attr('class', 'content');
   }
 
   private renderFlowmap() {
+    const content = this.svg.select('.content');
     const nodes = microservicesData.nodes;
     const links = microservicesData.links;
 
@@ -97,7 +72,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .force('collision', d3.forceCollide(20));
 
     // Draw links
-    const link = this.svg
+    const link = content
       .append('g')
       .attr('class', 'links')
       .selectAll('line')
@@ -105,10 +80,12 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .enter()
       .append('line')
       .attr('stroke', (d) => this.getLinkColor(d.interaction))
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .on('click', (event, d) => console.log('Clicked link:', d))
+      .on('dblclick', (event, d) => console.log('Double-clicked link:', d));
 
-    // Draw link labels, aligned with the line
-    const linkLabels = this.svg
+    // Draw link labels
+    const linkLabels = content
       .append('g')
       .attr('class', 'link-labels')
       .selectAll('text')
@@ -118,16 +95,20 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('text-anchor', 'middle')
       .attr('fill', '#333')
       .attr('font-size', '12px')
-      .text((d) => d.interaction);
+      .text((d) => d.interaction)
+      .on('click', (event, d) => console.log('Clicked link label:', d))
+      .on('dblclick', (event, d) => console.log('Double-clicked link label:', d));
 
     // Draw nodes
-    const node = this.svg
+    const node = content
       .append('g')
       .attr('class', 'nodes')
       .selectAll('g')
       .data(nodes)
       .enter()
-      .append('g');
+      .append('g')
+      .on('click', (event, d) => console.log('Clicked node:', d))
+      .on('dblclick', (event, d) => console.log('Double-clicked node:', d));
 
     // Add smaller circles for nodes
     node
@@ -165,7 +146,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         const y1 = d.source.y;
         const x2 = d.target.x;
         const y2 = d.target.y;
-        const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI); // Convert to degrees
+        const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
         d3.select(this)
           .attr('x', (x1 + x2) / 2)
           .attr('y', (y1 + y2) / 2)
@@ -175,7 +156,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
 
-    // Add legend
+    // Add legend (not zoomed)
     this.addLegend();
   }
 
@@ -231,7 +212,9 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .enter()
       .append('g')
       .attr('class', 'node-legend')
-      .attr('transform', (d, i) => `translate(0, ${i * 25})`);
+      .attr('transform', (d, i) => `translate(0, ${i * 25})`)
+      .on('click', (event, d) => console.log('Clicked node legend:', d.label))
+      .on('dblclick', (event, d) => console.log('Double-clicked node legend:', d.label));
 
     nodeLegend
       .append('circle')
@@ -253,7 +236,9 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .enter()
       .append('g')
       .attr('class', 'link-legend')
-      .attr('transform', (d, i) => `translate(0, ${(i + nodeLegendData.length + 1) * 25})`);
+      .attr('transform', (d, i) => `translate(0, ${(i + nodeLegendData.length + 1) * 25})`)
+      .on('click', (event, d) => console.log('Clicked link legend:', d.label))
+      .on('dblclick', (event, d) => console.log('Double-clicked link legend:', d.label));
 
     linkLegend
       .append('line')
