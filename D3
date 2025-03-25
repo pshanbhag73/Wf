@@ -1,3 +1,36 @@
+export interface MicroserviceNode {
+  id: string;
+  name: string;
+  type: string; // e.g., 'service', 'database', 'queue', 'external'
+  app: string; // New property to group services by app
+}
+
+export interface MicroserviceLink {
+  source: string;
+  target: string;
+  interaction: string; // e.g., 'http', 'queue', 'db'
+}
+
+export const microservicesData = {
+  nodes: [
+    { id: 'ms1', name: 'AuthService', type: 'service', app: 'AuthApp' },
+    { id: 'db1', name: 'AuthDB', type: 'database', app: 'AuthApp' },
+    { id: 'ms2', name: 'ProductService', type: 'service', app: 'ProductApp' },
+    { id: 'db2', name: 'ProductDB', type: 'database', app: 'ProductApp' },
+    { id: 'ms3', name: 'OrderService', type: 'service', app: 'OrderApp' },
+    { id: 'queue1', name: 'OrderQueue', type: 'queue', app: 'OrderApp' },
+    { id: 'ext1', name: 'PaymentGateway', type: 'external', app: 'OrderApp' },
+  ],
+  links: [
+    { source: 'ms1', target: 'db1', interaction: 'db' },
+    { source: 'ms2', target: 'db2', interaction: 'db' },
+    { source: 'ms3', target: 'queue1', interaction: 'queue' },
+    { source: 'ms3', target: 'ms2', interaction: 'http' },
+    { source: 'ms3', target: 'ext1', interaction: 'http' },
+  ],
+};
+
+
 import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
 import { microservicesData, MicroserviceNode, MicroserviceLink } from '../microservices-data';
@@ -40,11 +73,10 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
   }
 
   private renderFlowmap() {
-    // Use all nodes and links from the data
     const nodes = microservicesData.nodes;
     const links = microservicesData.links;
 
-    // Force simulation
+    // Force simulation with clustering by app
     const simulation = d3
       .forceSimulation<MicroserviceNode>(nodes)
       .force(
@@ -52,10 +84,11 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         d3
           .forceLink<MicroserviceNode, MicroserviceLink>(links)
           .id((d) => d.id)
-          .distance(150)
+          .distance(100)
       )
-      .force('charge', d3.forceManyBody().strength(-400))
-      .force('center', d3.forceCenter(this.width / 2 - 100, this.height / 2)); // Shift left to make room for legend
+      .force('charge', d3.forceManyBody().strength(-200))
+      .force('center', d3.forceCenter(this.width / 2 - 100, this.height / 2))
+      .force('collision', d3.forceCollide(20)); // Prevent overlap with smaller dots
 
     // Draw links
     const link = this.svg
@@ -93,16 +126,25 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
     // Add smaller circles for nodes
     node
       .append('circle')
-      .attr('r', 10) // Smaller radius
+      .attr('r', 5) // Even smaller radius
       .attr('fill', (d) => this.getNodeColor(d.type));
 
     // Add node labels below the circles
     node
       .append('text')
-      .attr('dy', 20) // Adjusted for smaller radius (10 + offset)
+      .attr('dy', 15) // Adjusted for smaller radius (5 + offset)
       .attr('text-anchor', 'middle')
       .attr('fill', '#000')
       .text((d) => d.name);
+
+    // Add app labels (positioned slightly below the node name)
+    node
+      .append('text')
+      .attr('dy', 30) // Below the node name
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#666') // Lighter gray for app names
+      .attr('font-size', '12px')
+      .text((d) => d.app);
 
     // Update positions on each tick
     simulation.on('tick', () => {
@@ -154,9 +196,8 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
   private addLegend() {
     const legend = this.svg.append('g')
       .attr('class', 'legend')
-      .attr('transform', `translate(${this.width - 150}, 20)`); // Position on the right
+      .attr('transform', `translate(${this.width - 150}, 20)`);
 
-    // Node legend items
     const nodeLegendData = [
       { label: 'Service', color: '#1f77b4' },
       { label: 'Database', color: '#ff7f0e' },
@@ -164,7 +205,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       { label: 'External', color: '#d62728' },
     ];
 
-    // Link legend items
     const linkLegendData = [
       { label: 'HTTP', color: '#1f77b4' },
       { label: 'Queue', color: '#2ca02c' },
@@ -193,7 +233,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('fill', '#000')
       .text((d) => d.label);
 
-    // Draw link legend below node legend
+    // Draw link legend
     const linkLegend = legend.selectAll('.link-legend')
       .data(linkLegendData)
       .enter()
