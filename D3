@@ -1,145 +1,32 @@
-import { Component, OnInit } from '@angular/core';
-import * as d3 from 'd3';
-import { treeData } from '../data/tree-data';
-
-@Component({
-  selector: 'app-tree-visualization',
-  template: `
-    <div>
-      <button (click)="levelUp()" [disabled]="!currentNode.parent">Level Up</button>
-      <button (click)="levelDown()" [disabled]="!currentNode.children || currentNode.children.length === 0">Level Down</button>
-      <div id="tree-container"></div>
-    </div>
-  `,
-  styles: [`#tree-container { width: 100%; height: 600px; }`]
-})
-export class TreeVisualizationComponent implements OnInit {
-  private svg: any;
-  private g: any;
-  private currentNode: any;
-  private zoom: any; // Store zoom behavior for later use
-
-  ngOnInit() {
-    this.currentNode = d3.hierarchy(treeData);
-    this.createTree();
-  }
-
-  createTree() {
-    const width = 800;
-    const height = 600;
-
-    // Clear previous SVG
-    d3.select('#tree-container').select('svg').remove();
-
-    // Create SVG with zoom
-    this.svg = d3.select('#tree-container')
-      .append('svg')
-      .attr('width', width)
-      .attr('height', height);
-
-    // Define zoom behavior
-    this.zoom = d3.zoom()
-      .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
-        this.g.attr('transform', event.transform);
-      });
-    this.svg.call(this.zoom);
-
-    // Add group for tree content
-    this.g = this.svg.append('g')
-      .attr('transform', 'translate(50,50)');
-
-    // Define tree layout with currentNode as root
-    const treeLayout = d3.tree().size([height - 100, width - 100]);
-    treeLayout(this.currentNode);
-
-    // Draw links
-    this.g.selectAll('.link')
-      .data(this.currentNode.links())
-      .enter()
-      .append('path')
-      .attr('class', 'link')
-      .attr('d', d3.linkHorizontal()
-        .x(d => d.y)
-        .y(d => d.x))
-      .attr('fill', 'none')
-      .attr('stroke', '#ccc');
-
-    // Draw nodes
-    const node = this.g.selectAll('.node')
-      .data(this.currentNode.descendants())
-      .enter()
-      .append('g')
-      .attr('class', 'node')
-      .attr('transform', d => `translate(${d.y},${d.x})`)
-      .on('click', (event, d) => this.handleNodeClick(event, d))
-      .on('dblclick', (event, d) => this.handleNodeDoubleClick(event, d)); // Add double-click handler
-
-    // Add circles with type-based colors
-    node.append('circle')
-      .attr('r', 5)
-      .attr('fill', d => {
-        if (d.data.type === 'app') return '#1f77b4';
-        if (d.data.type === 'service') return '#ff7f0e';
-        return '#2ca02c'; // dependencies
-      });
-
-    // Add labels
-    node.append('text')
-      .attr('dy', 3)
-      .attr('x', d => d.children ? -10 : 10)
-      .attr('text-anchor', d => d.children ? 'end' : 'start')
-      .text(d => d.data.name);
-  }
-
-  private handleNodeClick(event: any, d: any) {
-    event.stopPropagation();
-
-    if (d.data.type === 'app') {
-      // Toggle collapse/expand for apps
-      if (d.children) {
-        d._children = d.children;
-        d.children = null;
-      } else if (d._children) {
-        d.children = d._children;
-        d._children = null;
-      }
-      this.createTree();
-    } else if (d.data.type === 'dependency') {
-      alert(`Clicked dependency: ${d.data.name}`);
-    }
-  }
-
-  private handleNodeDoubleClick(event: any, d: any) {
-    event.stopPropagation();
-
-    if (d.data.type === 'app') {
-      // Center the double-clicked app
-      const scale = 1; // Default scale (adjustable)
-      const x = -d.y * scale + this.svg.attr('width') / 2; // Center horizontally
-      const y = -d.x * scale + this.svg.attr('height') / 2; // Center vertically
-      const transform = d3.zoomIdentity.translate(x, y).scale(scale);
-
-      this.svg.transition()
-        .duration(750) // Smooth transition
-        .call(this.zoom.transform, transform);
-    }
-  }
-
-  levelUp() {
-    if (this.currentNode.parent) {
-      this.currentNode = this.currentNode.parent;
-      this.createTree();
-    }
-  }
-
-  levelDown() {
-    if (this.currentNode.children && this.currentNode.children.length > 0) {
-      this.currentNode = this.currentNode.children[0];
-      this.createTree();
-    }
-  }
-}
-
-
-
+export const treeData = {
+  name: "RootApp",
+  type: "app",
+  children: [
+    {
+      name: "App1",
+      type: "app",
+      children: [
+        {
+          name: "ServiceA",
+          type: "service",
+          children: [{ name: "DependencyX", type: "dependency" }]
+        },
+        { name: "ServiceB", type: "service" }
+      ]
+    },
+    {
+      name: "App2",
+      type: "app",
+      children: [
+        {
+          name: "ServiceC",
+          type: "service",
+          children: [{ name: "DependencyY", type: "dependency" }]
+        }
+      ]
+    },
+    // Adding dependencies directly under RootApp
+    { name: "RootDependency1", type: "dependency" },
+    { name: "RootDependency2", type: "dependency" }
+  ]
+};
