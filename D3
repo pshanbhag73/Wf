@@ -1,38 +1,41 @@
-export interface ServiceNode {
+export interface MicroserviceNode {
   id: string;
   name: string;
-  type: string; // e.g., 'app', 'database', 'queue'
+  type: string; // e.g., 'service', 'database', 'queue', 'external'
 }
 
-export interface ServiceLink {
+export interface MicroserviceLink {
   source: string;
   target: string;
-  type: string; // e.g., 'sync', 'async'
+  interaction: string; // e.g., 'http', 'queue', 'db'
 }
 
-export const serviceData = {
+export const microservicesData = {
   nodes: [
-    { id: 'app1', name: 'UserService', type: 'app' },
-    { id: 'app2', name: 'OrderService', type: 'app' },
-    { id: 'db1', name: 'UserDB', type: 'database' },
+    { id: 'ms1', name: 'AuthService', type: 'service' },
+    { id: 'ms2', name: 'ProductService', type: 'service' },
+    { id: 'ms3', name: 'OrderService', type: 'service' },
+    { id: 'db1', name: 'AuthDB', type: 'database' },
+    { id: 'db2', name: 'ProductDB', type: 'database' },
     { id: 'queue1', name: 'OrderQueue', type: 'queue' },
-    { id: 'app3', name: 'PaymentService', type: 'app' },
+    { id: 'ext1', name: 'PaymentGateway', type: 'external' },
   ],
   links: [
-    { source: 'app1', target: 'db1', type: 'sync' },
-    { source: 'app2', target: 'queue1', type: 'async' },
-    { source: 'queue1', target: 'app3', type: 'sync' },
-    { source: 'app3', target: 'app2', type: 'sync' },
+    { source: 'ms1', target: 'db1', interaction: 'db' }, // AuthService -> AuthDB
+    { source: 'ms2', target: 'db2', interaction: 'db' }, // ProductService -> ProductDB
+    { source: 'ms3', target: 'queue1', interaction: 'queue' }, // OrderService -> OrderQueue
+    { source: 'ms3', target: 'ms2', interaction: 'http' }, // OrderService -> ProductService (API call)
+    { source: 'ms3', target: 'ext1', interaction: 'http' }, // OrderService -> PaymentGateway
   ],
 };
 
 
-import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, AfterViewInit, ElementRef, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
 import * as d3 from 'd3';
-import { serviceData, ServiceNode, ServiceLink } from '../service-data';
+import { microservicesData, MicroserviceNode, MicroserviceLink } from '../microservices-data';
 
 @Component({
-  selector: 'app-service-flowmap',
+  selector: 'app-microservices-flowmap',
   template: '<div #flowmapContainer></div>',
   styles: [
     `
@@ -48,82 +51,130 @@ import { serviceData, ServiceNode, ServiceLink } from '../service-data';
     `,
   ],
 })
-export class ServiceFlowmapComponent implements AfterViewInit {
+export class MicroservicesFlowmapComponent implements AfterViewInit, OnChanges {
   @ViewChild('flowmapContainer') flowmapContainer!: ElementRef;
+  @Input() selectedMicroserviceId: string = 'ms1'; // Default to 'ms1' (AuthService)
 
   private width = 800;
   private height = 600;
+  private svg: any;
 
   ngAfterViewInit() {
-    this.createFlowmap();
+    this.initializeSvg();
+    this.updateFlowmap();
   }
 
-  private createFlowmap() {
-    const svg = d3
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['selectedMicroserviceId'] && this.svg) {
+      this.updateFlowmap();
+    }
+  }
+
+  private initializeSvg() {
+    this.svg = d3
       .select(this.flowmapContainer.nativeElement)
       .append('svg')
       .attr('width', this.width)
       .attr('height', this.height);
+  }
 
-    // Create a simulation for force-directed layout
+  private updateFlowmap() {
+    // Clear previous content
+    this.svg.selectAll('*').remove();
+
+    // Filter data for the selected microservice and its direct dependencies
+    const serviceNode = microservicesData.nodes.find((node) => node.id === this.selectedMicroserviceId);
+    if (!serviceNode) return;
+
+    const relatedLinks = microservicesData.links.filter(
+      (link) => link.source === this.selectedMicroserviceId || link.target === this.selectedMicroserviceId
+    );
+    const relatedNodeIds = new Set(
+      relatedLinks.flatMap((link) => [link.source, link.target])
+    );
+    const filteredNodes = microservicesData.nodes.filter((node) => relatedNodeIds.has(node.id));
+
+    // Create a simulation for layout
     const simulation = d3
-      .forceSimulation<ServiceNode>(serviceData.nodes)
+      .forceSimulation<MicroserviceNode>(filteredNodes)
       .force(
         'link',
         d3
-          .forceLink<ServiceNode, ServiceLink>(serviceData.links)
+          .forceLink<MicroserviceNode, MicroserviceLink>(relatedLinks)
           .id((d) => d.id)
-          .distance(150)
+          .distance(120)
       )
       .force('charge', d3.forceManyBody().strength(-300))
       .force('center', d3.forceCenter(this.width / 2, this.height / 2));
 
-    // Draw links (dependencies)
-    const link = svg
+    // Draw links with labels
+    const link = this.svg
       .append('g')
       .attr('class', 'links')
-      .selectAll('line')
-      .data(serviceData.links)
+      .selectAll('g')
+      .data(relatedLinks)
       .enter()
+      .append('g');
+
+    link
       .append('line')
-      .attr('stroke', (d) => (d.type === 'sync' ? '#999' : '#f66')) // Solid for sync, dashed for async
-      .attr('stroke-dasharray', (d) => (d.type === 'async' ? '5,5' : '0'))
+      .attr('stroke', (d) => {
+        switch (d.interaction) {
+          case 'http':
+            return '#1f77b4';
+          case 'queue':
+            return '#2ca02c';
+          case 'db':
+            return '#ff7f0e';
+          default:
+            return '#999';
+        }
+      })
       .attr('stroke-width', 2);
 
-    // Draw nodes (services)
-    const node = svg
+    link
+      .append('text')
+      .attr('dy', -5)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#333')
+      .text((d) => d.interaction);
+
+    // Draw nodes
+    const node = this.svg
       .append('g')
       .attr('class', 'nodes')
       .selectAll('g')
-      .data(serviceData.nodes)
+      .data(filteredNodes)
       .enter()
       .append('g')
       .call(
         d3
-          .drag<SVGGElement, ServiceNode>()
+          .drag<SVGGElement, MicroserviceNode>()
           .on('start', dragStarted)
           .on('drag', dragged)
           .on('end', dragEnded)
       );
 
-    // Add circles for nodes
+    // Add shapes based on type
     node
       .append('circle')
-      .attr('r', 20)
+      .attr('r', 25)
       .attr('fill', (d) => {
         switch (d.type) {
-          case 'app':
-            return '#1f77b4';
+          case 'service':
+            return '#1f77b4'; // Blue for microservices
           case 'database':
-            return '#ff7f0e';
+            return '#ff7f0e'; // Orange for databases
           case 'queue':
-            return '#2ca02c';
+            return '#2ca02c'; // Green for queues
+          case 'external':
+            return '#d62728'; // Red for external services
           default:
-            return '#d62728';
+            return '#999';
         }
       });
 
-    // Add labels to nodes
+    // Add labels
     node
       .append('text')
       .attr('dy', 4)
@@ -134,10 +185,16 @@ export class ServiceFlowmapComponent implements AfterViewInit {
     // Update positions on each tick
     simulation.on('tick', () => {
       link
+        .select('line')
         .attr('x1', (d) => (d.source as any).x)
         .attr('y1', (d) => (d.source as any).y)
         .attr('x2', (d) => (d.target as any).x)
         .attr('y2', (d) => (d.target as any).y);
+
+      link
+        .select('text')
+        .attr('x', (d) => ((d.source as any).x + (d.target as any).x) / 2)
+        .attr('y', (d) => ((d.source as any).y + (d.target as any).y) / 2);
 
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
