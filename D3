@@ -55,7 +55,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
           .distance(150)
       )
       .force('charge', d3.forceManyBody().strength(-400))
-      .force('center', d3.forceCenter(this.width / 2, this.height / 2));
+      .force('center', d3.forceCenter(this.width / 2 - 100, this.height / 2)); // Shift left to make room for legend
 
     // Draw links
     const link = this.svg
@@ -65,18 +65,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .data(links)
       .enter()
       .append('line')
-      .attr('stroke', (d) => {
-        switch (d.interaction) {
-          case 'http':
-            return '#1f77b4';
-          case 'queue':
-            return '#2ca02c';
-          case 'db':
-            return '#ff7f0e';
-          default:
-            return '#999';
-        }
-      })
+      .attr('stroke', (d) => this.getLinkColor(d.interaction))
       .attr('stroke-width', 2);
 
     // Draw link labels
@@ -101,31 +90,18 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .enter()
       .append('g');
 
-    // Add circles for nodes
+    // Add smaller circles for nodes
     node
       .append('circle')
-      .attr('r', 25)
-      .attr('fill', (d) => {
-        switch (d.type) {
-          case 'service':
-            return '#1f77b4';
-          case 'database':
-            return '#ff7f0e';
-          case 'queue':
-            return '#2ca02c';
-          case 'external':
-            return '#d62728';
-          default:
-            return '#999';
-        }
-      });
+      .attr('r', 10) // Smaller radius
+      .attr('fill', (d) => this.getNodeColor(d.type));
 
-    // Add node labels outside the circles (below)
+    // Add node labels below the circles
     node
       .append('text')
-      .attr('dy', 35) // Position below the circle (radius 25 + offset)
+      .attr('dy', 20) // Adjusted for smaller radius (10 + offset)
       .attr('text-anchor', 'middle')
-      .attr('fill', '#000') // Black text for visibility outside the circle
+      .attr('fill', '#000')
       .text((d) => d.name);
 
     // Update positions on each tick
@@ -142,5 +118,103 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
 
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
+
+    // Add legend
+    this.addLegend();
+  }
+
+  private getNodeColor(type: string): string {
+    switch (type) {
+      case 'service':
+        return '#1f77b4';
+      case 'database':
+        return '#ff7f0e';
+      case 'queue':
+        return '#2ca02c';
+      case 'external':
+        return '#d62728';
+      default:
+        return '#999';
+    }
+  }
+
+  private getLinkColor(interaction: string): string {
+    switch (interaction) {
+      case 'http':
+        return '#1f77b4';
+      case 'queue':
+        return '#2ca02c';
+      case 'db':
+        return '#ff7f0e';
+      default:
+        return '#999';
+    }
+  }
+
+  private addLegend() {
+    const legend = this.svg.append('g')
+      .attr('class', 'legend')
+      .attr('transform', `translate(${this.width - 150}, 20)`); // Position on the right
+
+    // Node legend items
+    const nodeLegendData = [
+      { label: 'Service', color: '#1f77b4' },
+      { label: 'Database', color: '#ff7f0e' },
+      { label: 'Queue', color: '#2ca02c' },
+      { label: 'External', color: '#d62728' },
+    ];
+
+    // Link legend items
+    const linkLegendData = [
+      { label: 'HTTP', color: '#1f77b4' },
+      { label: 'Queue', color: '#2ca02c' },
+      { label: 'DB', color: '#ff7f0e' },
+    ];
+
+    // Draw node legend
+    const nodeLegend = legend.selectAll('.node-legend')
+      .data(nodeLegendData)
+      .enter()
+      .append('g')
+      .attr('class', 'node-legend')
+      .attr('transform', (d, i) => `translate(0, ${i * 25})`);
+
+    nodeLegend
+      .append('circle')
+      .attr('r', 5)
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('fill', (d) => d.color);
+
+    nodeLegend
+      .append('text')
+      .attr('x', 15)
+      .attr('y', 5)
+      .attr('fill', '#000')
+      .text((d) => d.label);
+
+    // Draw link legend below node legend
+    const linkLegend = legend.selectAll('.link-legend')
+      .data(linkLegendData)
+      .enter()
+      .append('g')
+      .attr('class', 'link-legend')
+      .attr('transform', (d, i) => `translate(0, ${(i + nodeLegendData.length + 1) * 25})`);
+
+    linkLegend
+      .append('line')
+      .attr('x1', -5)
+      .attr('y1', 0)
+      .attr('x2', 10)
+      .attr('y2', 0)
+      .attr('stroke', (d) => d.color)
+      .attr('stroke-width', 2);
+
+    linkLegend
+      .append('text')
+      .attr('x', 15)
+      .attr('y', 5)
+      .attr('fill', '#000')
+      .text((d) => d.label);
   }
 }
