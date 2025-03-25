@@ -120,12 +120,12 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         }
       });
 
-    // Add node labels
+    // Add node labels outside the circles (below)
     node
       .append('text')
-      .attr('dy', 4)
+      .attr('dy', 35) // Position below the circle (radius 25 + offset)
       .attr('text-anchor', 'middle')
-      .attr('fill', '#fff')
+      .attr('fill', '#000') // Black text for visibility outside the circle
       .text((d) => d.name);
 
     // Update positions on each tick
