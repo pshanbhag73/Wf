@@ -1,36 +1,4 @@
-export interface MicroserviceNode {
-  id: string;
-  name: string;
-  type: string; // e.g., 'service', 'database', 'queue', 'external'
-}
-
-export interface MicroserviceLink {
-  source: string;
-  target: string;
-  interaction: string; // e.g., 'http', 'queue', 'db'
-}
-
-export const microservicesData = {
-  nodes: [
-    { id: 'ms1', name: 'AuthService', type: 'service' },
-    { id: 'ms2', name: 'ProductService', type: 'service' },
-    { id: 'ms3', name: 'OrderService', type: 'service' },
-    { id: 'db1', name: 'AuthDB', type: 'database' },
-    { id: 'db2', name: 'ProductDB', type: 'database' },
-    { id: 'queue1', name: 'OrderQueue', type: 'queue' },
-    { id: 'ext1', name: 'PaymentGateway', type: 'external' },
-  ],
-  links: [
-    { source: 'ms1', target: 'db1', interaction: 'db' }, // AuthService -> AuthDB
-    { source: 'ms2', target: 'db2', interaction: 'db' }, // ProductService -> ProductDB
-    { source: 'ms3', target: 'queue1', interaction: 'queue' }, // OrderService -> OrderQueue
-    { source: 'ms3', target: 'ms2', interaction: 'http' }, // OrderService -> ProductService (API call)
-    { source: 'ms3', target: 'ext1', interaction: 'http' }, // OrderService -> PaymentGateway
-  ],
-};
-
-
-import { Component, AfterViewInit, ElementRef, ViewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
 import { microservicesData, MicroserviceNode, MicroserviceLink } from '../microservices-data';
 
@@ -51,9 +19,8 @@ import { microservicesData, MicroserviceNode, MicroserviceLink } from '../micros
     `,
   ],
 })
-export class MicroservicesFlowmapComponent implements AfterViewInit, OnChanges {
+export class MicroservicesFlowmapComponent implements AfterViewInit {
   @ViewChild('flowmapContainer') flowmapContainer!: ElementRef;
-  @Input() selectedMicroserviceId: string = 'ms1'; // Default to 'ms1' (AuthService)
 
   private width = 800;
   private height = 600;
@@ -61,13 +28,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit, OnChanges {
 
   ngAfterViewInit() {
     this.initializeSvg();
-    this.updateFlowmap();
-  }
-
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes['selectedMicroserviceId'] && this.svg) {
-      this.updateFlowmap();
-    }
+    this.renderFlowmap();
   }
 
   private initializeSvg() {
@@ -78,45 +39,31 @@ export class MicroservicesFlowmapComponent implements AfterViewInit, OnChanges {
       .attr('height', this.height);
   }
 
-  private updateFlowmap() {
-    // Clear previous content
-    this.svg.selectAll('*').remove();
+  private renderFlowmap() {
+    // Use all nodes and links from the data
+    const nodes = microservicesData.nodes;
+    const links = microservicesData.links;
 
-    // Filter data for the selected microservice and its direct dependencies
-    const serviceNode = microservicesData.nodes.find((node) => node.id === this.selectedMicroserviceId);
-    if (!serviceNode) return;
-
-    const relatedLinks = microservicesData.links.filter(
-      (link) => link.source === this.selectedMicroserviceId || link.target === this.selectedMicroserviceId
-    );
-    const relatedNodeIds = new Set(
-      relatedLinks.flatMap((link) => [link.source, link.target])
-    );
-    const filteredNodes = microservicesData.nodes.filter((node) => relatedNodeIds.has(node.id));
-
-    // Create a simulation for layout
+    // Force simulation
     const simulation = d3
-      .forceSimulation<MicroserviceNode>(filteredNodes)
+      .forceSimulation<MicroserviceNode>(nodes)
       .force(
         'link',
         d3
-          .forceLink<MicroserviceNode, MicroserviceLink>(relatedLinks)
+          .forceLink<MicroserviceNode, MicroserviceLink>(links)
           .id((d) => d.id)
-          .distance(120)
+          .distance(150)
       )
-      .force('charge', d3.forceManyBody().strength(-300))
+      .force('charge', d3.forceManyBody().strength(-400))
       .force('center', d3.forceCenter(this.width / 2, this.height / 2));
 
-    // Draw links with labels
+    // Draw links
     const link = this.svg
       .append('g')
       .attr('class', 'links')
-      .selectAll('g')
-      .data(relatedLinks)
+      .selectAll('line')
+      .data(links)
       .enter()
-      .append('g');
-
-    link
       .append('line')
       .attr('stroke', (d) => {
         switch (d.interaction) {
@@ -132,7 +79,13 @@ export class MicroservicesFlowmapComponent implements AfterViewInit, OnChanges {
       })
       .attr('stroke-width', 2);
 
-    link
+    // Draw link labels
+    const linkLabels = this.svg
+      .append('g')
+      .attr('class', 'link-labels')
+      .selectAll('text')
+      .data(links)
+      .enter()
       .append('text')
       .attr('dy', -5)
       .attr('text-anchor', 'middle')
@@ -144,37 +97,30 @@ export class MicroservicesFlowmapComponent implements AfterViewInit, OnChanges {
       .append('g')
       .attr('class', 'nodes')
       .selectAll('g')
-      .data(filteredNodes)
+      .data(nodes)
       .enter()
-      .append('g')
-      .call(
-        d3
-          .drag<SVGGElement, MicroserviceNode>()
-          .on('start', dragStarted)
-          .on('drag', dragged)
-          .on('end', dragEnded)
-      );
+      .append('g');
 
-    // Add shapes based on type
+    // Add circles for nodes
     node
       .append('circle')
       .attr('r', 25)
       .attr('fill', (d) => {
         switch (d.type) {
           case 'service':
-            return '#1f77b4'; // Blue for microservices
+            return '#1f77b4';
           case 'database':
-            return '#ff7f0e'; // Orange for databases
+            return '#ff7f0e';
           case 'queue':
-            return '#2ca02c'; // Green for queues
+            return '#2ca02c';
           case 'external':
-            return '#d62728'; // Red for external services
+            return '#d62728';
           default:
             return '#999';
         }
       });
 
-    // Add labels
+    // Add node labels
     node
       .append('text')
       .attr('dy', 4)
@@ -185,36 +131,16 @@ export class MicroservicesFlowmapComponent implements AfterViewInit, OnChanges {
     // Update positions on each tick
     simulation.on('tick', () => {
       link
-        .select('line')
         .attr('x1', (d) => (d.source as any).x)
         .attr('y1', (d) => (d.source as any).y)
         .attr('x2', (d) => (d.target as any).x)
         .attr('y2', (d) => (d.target as any).y);
 
-      link
-        .select('text')
+      linkLabels
         .attr('x', (d) => ((d.source as any).x + (d.target as any).x) / 2)
         .attr('y', (d) => ((d.source as any).y + (d.target as any).y) / 2);
 
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
-
-    // Drag functions
-    function dragStarted(event: any, d: any) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    }
-
-    function dragged(event: any, d: any) {
-      d.fx = event.x;
-      d.fy = event.y;
-    }
-
-    function dragEnded(event: any, d: any) {
-      if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    }
   }
 }
