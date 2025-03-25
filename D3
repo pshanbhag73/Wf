@@ -1,213 +1,163 @@
-export const treeData = {
-  name: "RootApp",
-  type: "app",
-  children: [
-    {
-      name: "App1",
-      type: "app",
-      children: [
-        {
-          name: "ServiceA",
-          type: "service",
-          children: [{ name: "DependencyX", type: "dependency" }]
-        },
-        { name: "ServiceB", type: "service" }
-      ]
-    },
-    {
-      name: "App2",
-      type: "app",
-      children: [
-        {
-          name: "ServiceA", // Same name as in App1
-          type: "service",
-          children: [{ name: "DependencyY", type: "dependency" }]
-        },
-        { name: "ServiceC", type: "service" }
-      ]
-    },
-    { name: "RootService1", type: "service" },
-    { name: "RootService2", type: "service" },
-    { name: "RootDependency1", type: "dependency" },
-    { name: "RootDependency2", type: "dependency" }
-  ]
+export interface ServiceNode {
+  id: string;
+  name: string;
+  type: string; // e.g., 'app', 'database', 'queue'
+}
+
+export interface ServiceLink {
+  source: string;
+  target: string;
+  type: string; // e.g., 'sync', 'async'
+}
+
+export const serviceData = {
+  nodes: [
+    { id: 'app1', name: 'UserService', type: 'app' },
+    { id: 'app2', name: 'OrderService', type: 'app' },
+    { id: 'db1', name: 'UserDB', type: 'database' },
+    { id: 'queue1', name: 'OrderQueue', type: 'queue' },
+    { id: 'app3', name: 'PaymentService', type: 'app' },
+  ],
+  links: [
+    { source: 'app1', target: 'db1', type: 'sync' },
+    { source: 'app2', target: 'queue1', type: 'async' },
+    { source: 'queue1', target: 'app3', type: 'sync' },
+    { source: 'app3', target: 'app2', type: 'sync' },
+  ],
 };
 
-// Communication links including apps and disambiguated services
-export const communicationLinks = [
-  { source: "RootService1", target: "App1/ServiceA" }, // RootService1 to App1's ServiceA
-  { source: "RootService2", target: "ServiceC" },       // RootService2 to App2's ServiceC
-  { source: "App1", target: "App2" },                  // App1 communicates with App2
-  { source: "App2/ServiceA", target: "App1/ServiceA" } // ServiceA in App2 to ServiceA in App1
-];
 
-
-import { Component, OnInit } from '@angular/core';
+import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
-import { treeData, communicationLinks } from '../data/tree-data';
+import { serviceData, ServiceNode, ServiceLink } from '../service-data';
 
 @Component({
-  selector: 'app-tree-visualization',
-  template: `
-    <div>
-      <button (click)="levelUp()" [disabled]="!currentNode.parent">Level Up</button>
-      <button (click)="levelDown()" [disabled]="!currentNode.children || currentNode.children.length === 0">Level Down</button>
-      <div id="tree-container"></div>
-    </div>
-  `,
-  styles: [`#tree-container { width: 100%; height: 600px; }`]
+  selector: 'app-service-flowmap',
+  template: '<div #flowmapContainer></div>',
+  styles: [
+    `
+      :host {
+        display: block;
+        width: 100%;
+        height: 100vh;
+      }
+      div {
+        width: 100%;
+        height: 100%;
+      }
+    `,
+  ],
 })
-export class TreeVisualizationComponent implements OnInit {
-  private svg: any;
-  private g: any;
-  private currentNode: any;
-  private zoom: any;
+export class ServiceFlowmapComponent implements AfterViewInit {
+  @ViewChild('flowmapContainer') flowmapContainer!: ElementRef;
 
-  ngOnInit() {
-    this.currentNode = d3.hierarchy(treeData);
-    this.createTree();
+  private width = 800;
+  private height = 600;
+
+  ngAfterViewInit() {
+    this.createFlowmap();
   }
 
-  createTree() {
-    const width = 800;
-    const height = 600;
-
-    d3.select('#tree-container').select('svg').remove();
-
-    this.svg = d3.select('#tree-container')
+  private createFlowmap() {
+    const svg = d3
+      .select(this.flowmapContainer.nativeElement)
       .append('svg')
-      .attr('width', width)
-      .attr('height', height);
+      .attr('width', this.width)
+      .attr('height', this.height);
 
-    this.zoom = d3.zoom()
-      .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
-        this.g.attr('transform', event.transform);
-      });
-    this.svg.call(this.zoom);
+    // Create a simulation for force-directed layout
+    const simulation = d3
+      .forceSimulation<ServiceNode>(serviceData.nodes)
+      .force(
+        'link',
+        d3
+          .forceLink<ServiceNode, ServiceLink>(serviceData.links)
+          .id((d) => d.id)
+          .distance(150)
+      )
+      .force('charge', d3.forceManyBody().strength(-300))
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2));
 
-    this.g = this.svg.append('g')
-      .attr('transform', 'translate(50,50)');
-
-    const treeLayout = d3.tree().size([height - 100, width - 100]);
-    treeLayout(this.currentNode);
-
-    this.g.selectAll('.link')
-      .data(this.currentNode.links())
+    // Draw links (dependencies)
+    const link = svg
+      .append('g')
+      .attr('class', 'links')
+      .selectAll('line')
+      .data(serviceData.links)
       .enter()
-      .append('path')
-      .attr('class', 'link')
-      .attr('d', d3.linkHorizontal()
-        .x(d => d.y)
-        .y(d => d.x))
-      .attr('fill', 'none')
-      .attr('stroke', '#ccc');
+      .append('line')
+      .attr('stroke', (d) => (d.type === 'sync' ? '#999' : '#f66')) // Solid for sync, dashed for async
+      .attr('stroke-dasharray', (d) => (d.type === 'async' ? '5,5' : '0'))
+      .attr('stroke-width', 2);
 
-    const node = this.g.selectAll('.node')
-      .data(this.currentNode.descendants())
+    // Draw nodes (services)
+    const node = svg
+      .append('g')
+      .attr('class', 'nodes')
+      .selectAll('g')
+      .data(serviceData.nodes)
       .enter()
       .append('g')
-      .attr('class', 'node')
-      .attr('transform', d => `translate(${d.y},${d.x})`)
-      .on('click', (event, d) => this.handleNodeClick(event, d))
-      .on('dblclick', (event, d) => this.handleNodeDoubleClick(event, d));
+      .call(
+        d3
+          .drag<SVGGElement, ServiceNode>()
+          .on('start', dragStarted)
+          .on('drag', dragged)
+          .on('end', dragEnded)
+      );
 
-    node.append('circle')
-      .attr('r', 5)
-      .attr('fill', d => {
-        if (d.data.type === 'app') return '#1f77b4';
-        if (d.data.type === 'service') return '#ff7f0e';
-        return '#2ca02c';
+    // Add circles for nodes
+    node
+      .append('circle')
+      .attr('r', 20)
+      .attr('fill', (d) => {
+        switch (d.type) {
+          case 'app':
+            return '#1f77b4';
+          case 'database':
+            return '#ff7f0e';
+          case 'queue':
+            return '#2ca02c';
+          default:
+            return '#d62728';
+        }
       });
 
-    node.append('text')
-      .attr('dy', 3)
-      .attr('x', d => d.children ? -10 : 10)
-      .attr('text-anchor', d => d.children ? 'end' : 'start')
-      .text(d => d.data.name);
+    // Add labels to nodes
+    node
+      .append('text')
+      .attr('dy', 4)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#fff')
+      .text((d) => d.name);
 
-    this.drawCommunicationLinks();
-  }
+    // Update positions on each tick
+    simulation.on('tick', () => {
+      link
+        .attr('x1', (d) => (d.source as any).x)
+        .attr('y1', (d) => (d.source as any).y)
+        .attr('x2', (d) => (d.target as any).x)
+        .attr('y2', (d) => (d.target as any).y);
 
-  private drawCommunicationLinks() {
-    // Build a map of nodes with full paths for disambiguation
-    const nodes = this.currentNode.descendants();
-    const nodeMap = new Map<string, { x: number; y: number }>();
-    nodes.forEach(d => {
-      const path = this.getNodePath(d);
-      nodeMap.set(path, { x: d.x, y: d.y });
+      node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
 
-    this.g.selectAll('.comm-link')
-      .data(communicationLinks)
-      .enter()
-      .append('path')
-      .attr('class', 'comm-link')
-      .attr('d', d => {
-        const source = nodeMap.get(d.source);
-        const target = nodeMap.get(d.target);
-        if (source && target) {
-          return d3.linkHorizontal()({
-            source: [source.y, source.x],
-            target: [target.y, target.x]
-          });
-        }
-        return null;
-      })
-      .attr('fill', 'none')
-      .attr('stroke', '#999')
-      .attr('stroke-dasharray', '5,5');
-  }
-
-  // Helper to construct full path for a node (e.g., "App1/ServiceA")
-  private getNodePath(node: any): string {
-    const pathParts = [];
-    let current = node;
-    while (current) {
-      pathParts.unshift(current.data.name);
-      current = current.parent;
+    // Drag functions
+    function dragStarted(event: any, d: any) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
     }
-    return pathParts.join('/');
-  }
 
-  private handleNodeClick(event: any, d: any) {
-    event.stopPropagation();
-    if (d.data.type === 'app') {
-      if (d.children) {
-        d._children = d.children;
-        d.children = null;
-      } else if (d._children) {
-        d.children = d._children;
-        d._children = null;
-      }
-      this.createTree();
-    } else if (d.data.type === 'dependency') {
-      alert(`Clicked dependency: ${d.data.name}`);
+    function dragged(event: any, d: any) {
+      d.fx = event.x;
+      d.fy = event.y;
     }
-  }
 
-  private handleNodeDoubleClick(event: any, d: any) {
-    event.stopPropagation();
-    if (d.data.type === 'app') {
-      const scale = 1;
-      const x = -d.y * scale + this.svg.attr('width') / 2;
-      const y = -d.x * scale + this.svg.attr('height') / 2;
-      const transform = d3.zoomIdentity.translate(x, y).scale(scale);
-      this.svg.transition().duration(750).call(this.zoom.transform, transform);
-    }
-  }
-
-  levelUp() {
-    if (this.currentNode.parent) {
-      this.currentNode = this.currentNode.parent;
-      this.createTree();
-    }
-  }
-
-  levelDown() {
-    if (this.currentNode.children && this.currentNode.children.length > 0) {
-      this.currentNode = this.currentNode.children[0];
-      this.createTree();
+    function dragEnded(event: any, d: any) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
     }
   }
 }
