@@ -2,7 +2,7 @@ export interface MicroserviceNode {
   id: string;
   name: string;
   type: string; // e.g., 'service', 'database', 'queue', 'external'
-  app: string; // New property to group services by app
+  app: string; // Group services by app
 }
 
 export interface MicroserviceLink {
@@ -20,6 +20,9 @@ export const microservicesData = {
     { id: 'ms3', name: 'OrderService', type: 'service', app: 'OrderApp' },
     { id: 'queue1', name: 'OrderQueue', type: 'queue', app: 'OrderApp' },
     { id: 'ext1', name: 'PaymentGateway', type: 'external', app: 'OrderApp' },
+    // New standalone app and its dependency
+    { id: 'ms4', name: 'NotificationService', type: 'service', app: 'ExternalApp' },
+    { id: 'queue2', name: 'NotifyQueue', type: 'queue', app: 'ExternalApp' },
   ],
   links: [
     { source: 'ms1', target: 'db1', interaction: 'db' },
@@ -27,6 +30,9 @@ export const microservicesData = {
     { source: 'ms3', target: 'queue1', interaction: 'queue' },
     { source: 'ms3', target: 'ms2', interaction: 'http' },
     { source: 'ms3', target: 'ext1', interaction: 'http' },
+    // New links for ExternalApp
+    { source: 'ms4', target: 'queue2', interaction: 'queue' },
+    { source: 'ms3', target: 'ms4', interaction: 'http' }, // OrderService depends on NotificationService
   ],
 };
 
@@ -76,7 +82,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
     const nodes = microservicesData.nodes;
     const links = microservicesData.links;
 
-    // Force simulation with clustering by app
+    // Force simulation
     const simulation = d3
       .forceSimulation<MicroserviceNode>(nodes)
       .force(
@@ -88,7 +94,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       )
       .force('charge', d3.forceManyBody().strength(-200))
       .force('center', d3.forceCenter(this.width / 2 - 100, this.height / 2))
-      .force('collision', d3.forceCollide(20)); // Prevent overlap with smaller dots
+      .force('collision', d3.forceCollide(20));
 
     // Draw links
     const link = this.svg
@@ -101,7 +107,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('stroke', (d) => this.getLinkColor(d.interaction))
       .attr('stroke-width', 2);
 
-    // Draw link labels
+    // Draw link labels, aligned with the line
     const linkLabels = this.svg
       .append('g')
       .attr('class', 'link-labels')
@@ -109,9 +115,9 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .data(links)
       .enter()
       .append('text')
-      .attr('dy', -5)
       .attr('text-anchor', 'middle')
       .attr('fill', '#333')
+      .attr('font-size', '12px')
       .text((d) => d.interaction);
 
     // Draw nodes
@@ -126,23 +132,23 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
     // Add smaller circles for nodes
     node
       .append('circle')
-      .attr('r', 5) // Even smaller radius
+      .attr('r', 5)
       .attr('fill', (d) => this.getNodeColor(d.type));
 
     // Add node labels below the circles
     node
       .append('text')
-      .attr('dy', 15) // Adjusted for smaller radius (5 + offset)
+      .attr('dy', 15)
       .attr('text-anchor', 'middle')
       .attr('fill', '#000')
       .text((d) => d.name);
 
-    // Add app labels (positioned slightly below the node name)
+    // Add app labels below the node name
     node
       .append('text')
-      .attr('dy', 30) // Below the node name
+      .attr('dy', 30)
       .attr('text-anchor', 'middle')
-      .attr('fill', '#666') // Lighter gray for app names
+      .attr('fill', '#666')
       .attr('font-size', '12px')
       .text((d) => d.app);
 
@@ -154,9 +160,17 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         .attr('x2', (d) => (d.target as any).x)
         .attr('y2', (d) => (d.target as any).y);
 
-      linkLabels
-        .attr('x', (d) => ((d.source as any).x + (d.target as any).x) / 2)
-        .attr('y', (d) => ((d.source as any).y + (d.target as any).y) / 2);
+      linkLabels.each(function (d: any) {
+        const x1 = d.source.x;
+        const y1 = d.source.y;
+        const x2 = d.target.x;
+        const y2 = d.target.y;
+        const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI); // Convert to degrees
+        d3.select(this)
+          .attr('x', (x1 + x2) / 2)
+          .attr('y', (y1 + y2) / 2)
+          .attr('transform', `rotate(${angle}, ${(x1 + x2) / 2}, ${(y1 + y2) / 2})`);
+      });
 
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
