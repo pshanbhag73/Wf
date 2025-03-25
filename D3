@@ -1,3 +1,57 @@
+export interface MicroserviceNode {
+  id: string;
+  name: string;
+  type: string; // 'app', 'service', 'database', 'queue', 'external'
+  app?: string; // Only for non-app nodes
+}
+
+export interface MicroserviceLink {
+  source: string;
+  target: string;
+  interaction: string; // e.g., 'belongs', 'http', 'queue', 'db'
+}
+
+export const microservicesData = {
+  nodes: [
+    // App nodes
+    { id: 'app1', name: 'AuthApp', type: 'app' },
+    { id: 'app2', name: 'ProductApp', type: 'app' },
+    { id: 'app3', name: 'OrderApp', type: 'app' },
+    { id: 'app4', name: 'ExternalApp', type: 'app' },
+    // Services and dependencies
+    { id: 'ms1', name: 'AuthService', type: 'service', app: 'app1' },
+    { id: 'db1', name: 'AuthDB', type: 'database', app: 'app1' },
+    { id: 'ms2', name: 'ProductService', type: 'service', app: 'app2' },
+    { id: 'db2', name: 'ProductDB', type: 'database', app: 'app2' },
+    { id: 'ms3', name: 'OrderService', type: 'service', app: 'app3' },
+    { id: 'queue1', name: 'OrderQueue', type: 'queue', app: 'app3' },
+    { id: 'ext1', name: 'PaymentGateway', type: 'external', app: 'app3' },
+    { id: 'ms4', name: 'NotificationService', type: 'service', app: 'app4' },
+    { id: 'queue2', name: 'NotifyQueue', type: 'queue', app: 'app4' },
+  ],
+  links: [
+    // Services belong to apps
+    { source: 'app1', target: 'ms1', interaction: 'belongs' },
+    { source: 'app1', target: 'db1', interaction: 'belongs' },
+    { source: 'app2', target: 'ms2', interaction: 'belongs' },
+    { source: 'app2', target: 'db2', interaction: 'belongs' },
+    { source: 'app3', target: 'ms3', interaction: 'belongs' },
+    { source: 'app3', target: 'queue1', interaction: 'belongs' },
+    { source: 'app3', target: 'ext1', interaction: 'belongs' },
+    { source: 'app4', target: 'ms4', interaction: 'belongs' },
+    { source: 'app4', target: 'queue2', interaction: 'belongs' },
+    // Service dependencies
+    { source: 'ms1', target: 'db1', interaction: 'db' },
+    { source: 'ms2', target: 'db2', interaction: 'db' },
+    { source: 'ms3', target: 'queue1', interaction: 'queue' },
+    { source: 'ms3', target: 'ms2', interaction: 'http' },
+    { source: 'ms3', target: 'ext1', interaction: 'http' },
+    { source: 'ms4', target: 'queue2', interaction: 'queue' },
+    { source: 'ms3', target: 'ms4', interaction: 'http' },
+  ],
+};
+
+
 import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
 import { microservicesData, MicroserviceNode, MicroserviceLink } from '../microservices-data';
@@ -43,7 +97,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('width', this.width)
       .attr('height', this.height);
 
-    // Add zoom behavior
     this.zoom = d3.zoom()
       .scaleExtent([0.1, 10])
       .on('zoom', (event) => {
@@ -51,8 +104,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       });
 
     this.svg.call(this.zoom);
-
-    // Create a group for zoomable content
     this.svg.append('g').attr('class', 'content');
   }
 
@@ -68,12 +119,12 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         'link',
         d3
           .forceLink<MicroserviceNode, MicroserviceLink>(links)
-          .id((d) => d.id)
-          .distance(100)
+          .id(( обеспеченияd) => d.id)
+          .distance((d) => (d.interaction === 'belongs' ? 80 : 120))
       )
-      .force('charge', d3.forceManyBody().strength(-200))
-      .force('center', d3.forceCenter(this.width / 2, this.height / 2)) // Center in dynamic size
-      .force('collision', d3.forceCollide(20));
+      .force('charge', d3.forceManyBody().strength(-300))
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+      .force('collision', d3.forceCollide(30));
 
     // Draw links
     const link = content
@@ -84,7 +135,8 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .enter()
       .append('line')
       .attr('stroke', (d) => this.getLinkColor(d.interaction))
-      .attr('stroke-width', 2)
+      .attr('stroke-width', (d) => (d.interaction === 'belongs' ? 1 : 2))
+      .attr('stroke-dasharray', (d) => (d.interaction === 'belongs' ? '5,5' : '0'))
       .on('click', (event, d) => console.log('Clicked link:', d))
       .on('dblclick', (event, d) => console.log('Double-clicked link:', d));
 
@@ -93,7 +145,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .append('g')
       .attr('class', 'link-labels')
       .selectAll('text')
-      .data(links)
+      .data(links.filter((d) => d.interaction !== 'belongs')) // Hide 'belongs' labels
       .enter()
       .append('text')
       .attr('text-anchor', 'middle')
@@ -114,30 +166,21 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .on('click', (event, d) => console.log('Clicked node:', d))
       .on('dblclick', (event, d) => console.log('Double-clicked node:', d));
 
-    // Add smaller circles for nodes
+    // Add circles for nodes (larger for apps)
     node
       .append('circle')
-      .attr('r', 5)
-      .attr('fill', (d) => this.getNodeColor(d.type));
+      .attr('r', (d) => (d.type === 'app' ? 15 : 5))
+      .attr('fill', (d) => this.getNodeColor(d.type, d.id));
 
     // Add node labels below the circles
     node
       .append('text')
-      .attr('dy', 15)
+      .attr('dy', (d) => (d.type === 'app' ? 25 : 15))
       .attr('text-anchor', 'middle')
       .attr('fill', '#000')
       .text((d) => d.name);
 
-    // Add app labels below the node name
-    node
-      .append('text')
-      .attr('dy', 30)
-      .attr('text-anchor', 'middle')
-      .attr('fill', '#666')
-      .attr('font-size', '12px')
-      .text((d) => d.app);
-
-    // Update positions and auto-zoom
+    // Update positions
     simulation.on('tick', () => {
       link
         .attr('x1', (d) => (d.source as any).x)
@@ -165,12 +208,11 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       this.autoZoom(nodes);
     });
 
-    // Add legend (not zoomed)
-    this.addLegend();
+    // Add legends
+    this.addLegends();
   }
 
   private autoZoom(nodes: MicroserviceNode[]) {
-    // Calculate the bounding box of all nodes
     const bounds = {
       xMin: d3.min(nodes, (d) => d.x! - 50) || 0,
       xMax: d3.max(nodes, (d) => d.x! + 50) || this.width,
@@ -180,54 +222,86 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
 
     const contentWidth = bounds.xMax - bounds.xMin;
     const contentHeight = bounds.yMax - bounds.yMin;
-    const scale = 0.9 * Math.min(this.width / contentWidth, this.height / contentHeight); // 90% of available space
+    const scale = 0.9 * Math.min(this.width / contentWidth, this.height / contentHeight);
     const translateX = this.width / 2 - (bounds.xMin + bounds.xMax) / 2 * scale;
     const translateY = this.height / 2 - (bounds.yMin + bounds.yMax) / 2 * scale;
 
-    // Apply the zoom transform
     const transform = d3.zoomIdentity
       .translate(translateX, translateY)
       .scale(scale);
 
     this.svg
       .transition()
-      .duration(750) // Smooth transition
+      .duration(750)
       .call(this.zoom.transform, transform);
   }
 
-  private getNodeColor(type: string): string {
+  private getNodeColor(type: string, id: string): string {
+    if (type === 'app') {
+      switch (id) {
+        case 'app1': return '#6a5acd'; // SlateBlue for AuthApp
+        case 'app2': return '#4682b4'; // SteelBlue for ProductApp
+        case 'app3': return '#9acd32'; // YellowGreen for OrderApp
+        case 'app4': return '#cd5c5c'; // IndianRed for ExternalApp
+        default: return '#888';
+      }
+    }
     switch (type) {
-      case 'service':
-        return '#1f77b4';
-      case 'database':
-        return '#ff7f0e';
-      case 'queue':
-        return '#2ca02c';
-      case 'external':
-        return '#d62728';
-      default:
-        return '#999';
+      case 'service': return '#1f77b4';
+      case 'database': return '#ff7f0e';
+      case 'queue': return '#2ca02c';
+      case 'external': return '#d62728';
+      default: return '#999';
     }
   }
 
   private getLinkColor(interaction: string): string {
     switch (interaction) {
-      case 'http':
-        return '#1f77b4';
-      case 'queue':
-        return '#2ca02c';
-      case 'db':
-        return '#ff7f0e';
-      default:
-        return '#999';
+      case 'belongs': return '#888'; // Gray for app-service links
+      case 'http': return '#1f77b4';
+      case 'queue': return '#2ca02c';
+      case 'db': return '#ff7f0e';
+      default: return '#999';
     }
   }
 
-  private addLegend() {
+  private addLegends() {
     const legend = this.svg.append('g')
       .attr('class', 'legend')
       .attr('transform', `translate(${this.width - 150}, 20)`);
 
+    // App legend
+    const appLegendData = [
+      { label: 'AuthApp', color: '#6a5acd', id: 'app1' },
+      { label: 'ProductApp', color: '#4682b4', id: 'app2' },
+      { label: 'OrderApp', color: '#9acd32', id: 'app3' },
+      { label: 'ExternalApp', color: '#cd5c5c', id: 'app4' },
+    ];
+
+    const appLegend = legend.selectAll('.app-legend')
+      .data(appLegendData)
+      .enter()
+      .append('g')
+      .attr('class', 'app-legend')
+      .attr('transform', (d, i) => `translate(0, ${i * 25})`)
+      .on('click', (event, d) => console.log('Clicked app legend:', d.label))
+      .on('dblclick', (event, d) => console.log('Double-clicked app legend:', d.label));
+
+    appLegend
+      .append('circle')
+      .attr('r', 7)
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('fill', (d) => d.color);
+
+    appLegend
+      .append('text')
+      .attr('x', 15)
+      .attr('y', 5)
+      .attr('fill', '#000')
+      .text((d) => d.label);
+
+    // Node legend
     const nodeLegendData = [
       { label: 'Service', color: '#1f77b4' },
       { label: 'Database', color: '#ff7f0e' },
@@ -235,19 +309,12 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       { label: 'External', color: '#d62728' },
     ];
 
-    const linkLegendData = [
-      { label: 'HTTP', color: '#1f77b4' },
-      { label: 'Queue', color: '#2ca02c' },
-      { label: 'DB', color: '#ff7f0e' },
-    ];
-
-    // Draw node legend
     const nodeLegend = legend.selectAll('.node-legend')
       .data(nodeLegendData)
       .enter()
       .append('g')
       .attr('class', 'node-legend')
-      .attr('transform', (d, i) => `translate(0, ${i * 25})`)
+      .attr('transform', (d, i) => `translate(0, ${(i + appLegendData.length + 1) * 25})`)
       .on('click', (event, d) => console.log('Clicked node legend:', d.label))
       .on('dblclick', (event, d) => console.log('Double-clicked node legend:', d.label));
 
@@ -265,13 +332,20 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('fill', '#000')
       .text((d) => d.label);
 
-    // Draw link legend
+    // Link legend
+    const linkLegendData = [
+      { label: 'Belongs', color: '#888' },
+      { label: 'HTTP', color: '#1f77b4' },
+      { label: 'Queue', color: '#2ca02c' },
+      { label: 'DB', color: '#ff7f0e' },
+    ];
+
     const linkLegend = legend.selectAll('.link-legend')
       .data(linkLegendData)
       .enter()
       .append('g')
       .attr('class', 'link-legend')
-      .attr('transform', (d, i) => `translate(0, ${(i + nodeLegendData.length + 1) * 25})`)
+      .attr('transform', (d, i) => `translate(0, ${(i + appLegendData.length + nodeLegendData.length + 2) * 25})`)
       .on('click', (event, d) => console.log('Clicked link legend:', d.label))
       .on('dblclick', (event, d) => console.log('Double-clicked link legend:', d.label));
 
@@ -282,7 +356,8 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('x2', 10)
       .attr('y2', 0)
       .attr('stroke', (d) => d.color)
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', (d) => (d.label === 'Belongs' ? '5,5' : '0'));
 
     linkLegend
       .append('text')
