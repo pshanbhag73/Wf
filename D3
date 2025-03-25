@@ -22,10 +22,10 @@ import { microservicesData, MicroserviceNode, MicroserviceLink } from '../micros
 export class MicroservicesFlowmapComponent implements AfterViewInit {
   @ViewChild('flowmapContainer') flowmapContainer!: ElementRef;
 
-  private width = 800;
-  private height = 600;
   private svg: any;
   private zoom: any;
+  private width!: number;
+  private height!: number;
 
   ngAfterViewInit() {
     this.initializeSvg();
@@ -33,15 +33,19 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
   }
 
   private initializeSvg() {
+    const container = this.flowmapContainer.nativeElement;
+    this.width = container.clientWidth;
+    this.height = container.clientHeight;
+
     this.svg = d3
-      .select(this.flowmapContainer.nativeElement)
+      .select(container)
       .append('svg')
       .attr('width', this.width)
       .attr('height', this.height);
 
     // Add zoom behavior
     this.zoom = d3.zoom()
-      .scaleExtent([0.1, 10]) // Min and max zoom levels
+      .scaleExtent([0.1, 10])
       .on('zoom', (event) => {
         this.svg.select('.content').attr('transform', event.transform);
       });
@@ -68,7 +72,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
           .distance(100)
       )
       .force('charge', d3.forceManyBody().strength(-200))
-      .force('center', d3.forceCenter(this.width / 2 - 100, this.height / 2))
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2)) // Center in dynamic size
       .force('collision', d3.forceCollide(20));
 
     // Draw links
@@ -133,7 +137,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('font-size', '12px')
       .text((d) => d.app);
 
-    // Update positions on each tick
+    // Update positions and auto-zoom
     simulation.on('tick', () => {
       link
         .attr('x1', (d) => (d.source as any).x)
@@ -156,8 +160,39 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
 
+    // Auto-zoom after simulation stabilizes
+    simulation.on('end', () => {
+      this.autoZoom(nodes);
+    });
+
     // Add legend (not zoomed)
     this.addLegend();
+  }
+
+  private autoZoom(nodes: MicroserviceNode[]) {
+    // Calculate the bounding box of all nodes
+    const bounds = {
+      xMin: d3.min(nodes, (d) => d.x! - 50) || 0,
+      xMax: d3.max(nodes, (d) => d.x! + 50) || this.width,
+      yMin: d3.min(nodes, (d) => d.y! - 50) || 0,
+      yMax: d3.max(nodes, (d) => d.y! + 50) || this.height,
+    };
+
+    const contentWidth = bounds.xMax - bounds.xMin;
+    const contentHeight = bounds.yMax - bounds.yMin;
+    const scale = 0.9 * Math.min(this.width / contentWidth, this.height / contentHeight); // 90% of available space
+    const translateX = this.width / 2 - (bounds.xMin + bounds.xMax) / 2 * scale;
+    const translateY = this.height / 2 - (bounds.yMin + bounds.yMax) / 2 * scale;
+
+    // Apply the zoom transform
+    const transform = d3.zoomIdentity
+      .translate(translateX, translateY)
+      .scale(scale);
+
+    this.svg
+      .transition()
+      .duration(750) // Smooth transition
+      .call(this.zoom.transform, transform);
   }
 
   private getNodeColor(type: string): string {
