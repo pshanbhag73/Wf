@@ -41,13 +41,12 @@ export const microservicesData = {
     { source: 'ms2', target: 'db2', interaction: 'db' },
     { source: 'ms3', target: 'queue1', interaction: 'queue' },
     { source: 'ms3', target: 'ms2', interaction: 'http' }, // Forward link
-    { source: 'ms2', target: 'ms3', interaction: 'http' }, // Reverse link for bidirectionality
+    { source: 'ms2', target: 'ms3', interaction: 'http' }, // Reverse link
     { source: 'ms3', target: 'ext1', interaction: 'http' },
     { source: 'ms4', target: 'queue2', interaction: 'queue' },
     { source: 'ms3', target: 'ms4', interaction: 'http' },
   ],
 };
-
 
 
 import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
@@ -110,7 +109,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       defs.append('marker')
         .attr('id', `arrow-${type}`)
         .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 10)
+        .attr('refX', 15) // Default for apps, adjusted dynamically
         .attr('refY', 0)
         .attr('markerWidth', 6)
         .attr('markerHeight', 6)
@@ -161,6 +160,9 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       );
     };
 
+    // Track processed link pairs to avoid duplicate labels
+    const processedPairs = new Set<string>();
+
     // Draw links with directional arrows
     const link = content
       .append('g')
@@ -177,12 +179,41 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .on('click', (event, d) => console.log('Clicked link:', d))
       .on('dblclick', (event, d) => console.log('Double-clicked link:', d));
 
-    // Draw link labels
+    // Adjust arrow positions to avoid overlap with nodes
+    link.each(function (d: any) {
+      const sourceNode = nodes.find((n) => n.id === d.source.id);
+      const targetNode = nodes.find((n) => n.id === d.target.id);
+      const sourceRadius = sourceNode?.type === 'app' ? 15 : 5;
+      const targetRadius = targetNode?.type === 'app' ? 15 : 5;
+
+      d3.select(this)
+        .attr('marker-end', () => {
+          const marker = d3.select(`#arrow-${d.interaction}`);
+          marker.attr('refX', targetRadius + 5); // Adjust for target node size
+          return `url(#arrow-${d.interaction})`;
+        })
+        .attr('marker-start', () => {
+          if (isBidirectional(d)) {
+            const marker = d3.select(`#arrow-start-${d.interaction}`);
+            marker.attr('refX', sourceRadius + 5); // Adjust for source node size
+            return `url(#arrow-start-${d.interaction})`;
+          }
+          return null;
+        });
+    });
+
+    // Draw link labels (single label for bidirectional links)
     const linkLabels = content
       .append('g')
       .attr('class', 'link-labels')
       .selectAll('text')
-      .data(links.filter((d) => d.interaction !== 'belongs'))
+      .data(links.filter((d) => {
+        if (d.interaction === 'belongs') return false;
+        const pairKey = `${Math.min(d.source, d.target)}-${Math.max(d.source, d.target)}-${d.interaction}`;
+        if (processedPairs.has(pairKey)) return false;
+        processedPairs.add(pairKey);
+        return true;
+      }))
       .enter()
       .append('text')
       .attr('text-anchor', 'middle')
@@ -449,3 +480,4 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .text((d) => d.label);
   }
 }
+
