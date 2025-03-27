@@ -135,7 +135,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .selectAll('text')
       .data(links.filter((d) => {
         if (d.interaction === 'belongs') return false;
-        // Use string comparison instead of Math.min/Math.max
         const pairKey = d.source < d.target ? `${d.source}-${d.target}-${d.interaction}` : `${d.target}-${d.source}-${d.interaction}`;
         if (processedPairs.has(pairKey)) return false;
         processedPairs.add(pairKey);
@@ -192,9 +191,10 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
           const sourceRadius = d.source.type === 'app' ? 15 : 5;
           const targetRadius = d.target.type === 'app' ? 15 : 5;
 
-          d3.select(`#arrow-${d.interaction}`).attr('refX', targetRadius);
+          // Revert to buffer outside node radius
+          d3.select(`#arrow-${d.interaction}`).attr('refX', targetRadius + 5);
           if (isBidirectional(d)) {
-            d3.select(`#arrow-start-${d.interaction}`).attr('refX', sourceRadius);
+            d3.select(`#arrow-start-${d.interaction}`).attr('refX', sourceRadius + 5);
           }
         });
 
