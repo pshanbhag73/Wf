@@ -2,29 +2,6 @@ import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import * as d3 from 'd3';
 
-interface ApiLink {
-  fromApp: string;
-  fromComponent: string | null;
-  fromEntity: string | null;
-  toApp: string;
-  toComponent: string | null;
-  toEntity: string | null;
-  toType: string;
-}
-
-interface MicroserviceNode {
-  id: string;
-  name: string;
-  type: string; // 'app', 'service', 'database', 'queue', 'external'
-  app?: string; // For non-app nodes
-}
-
-interface MicroserviceLink {
-  source: string;
-  target: string;
-  interaction: string; // e.g., 'belongs', 'http', 'queue', 'db'
-}
-
 @Component({
   selector: 'app-microservices-flowmap',
   template: `
@@ -55,6 +32,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
   private height!: number;
   private nodes: MicroserviceNode[] = [];
   private links: MicroserviceLink[] = [];
+  private appServices: AppServices = {};
   loading = true;
 
   constructor(private http: HttpClient) {}
@@ -116,16 +94,30 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
 
   private fetchDataAndRender() {
     this.loading = true;
-    // Replace with your actual API endpoint
-    this.http.get<ApiLink[]>('http://your-api-endpoint/microservices').subscribe({
-      next: (data) => {
-        this.convertApiDataToGraph(data);
-        this.renderFlowmap();
-        this.loading = false;
+
+    // Fetch app services first
+    this.http.get<AppServices>('http://your-api-endpoint/app-services').subscribe({
+      next: (servicesData) => {
+        this.appServices = servicesData;
+
+        // Fetch interaction data
+        this.http.get<ApiLink[]>('http://your-api-endpoint/microservices').subscribe({
+          next: (interactionData) => {
+            this.convertApiDataToGraph(interactionData);
+            this.renderFlowmap();
+            this.loading = false;
+          },
+          error: (error) => {
+            console.error('Error fetching interaction data:', error);
+            this.convertApiDataToGraph([]);
+            this.renderFlowmap();
+            this.loading = false;
+          },
+        });
       },
       error: (error) => {
-        console.error('Error fetching microservices data:', error);
-        // Fallback to empty graph or static data
+        console.error('Error fetching app services:', error);
+        this.appServices = {};
         this.convertApiDataToGraph([]);
         this.renderFlowmap();
         this.loading = false;
@@ -144,19 +136,29 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         nodeMap.set(fromAppId, { id: fromAppId, name: item.fromApp, type: 'app' });
       }
 
-      // Determine source node (service or entity)
+      // Process fromComponent or fromEntity
       let fromId = fromAppId;
       if (item.fromComponent) {
         fromId = `${fromAppId}-${item.fromComponent}`;
+        const isService = this.appServices[item.fromApp]?.includes(item.fromComponent);
         if (!nodeMap.has(fromId)) {
-          nodeMap.set(fromId, { id: fromId, name: item.fromComponent, type: 'service', app: fromAppId });
+          nodeMap.set(fromId, {
+            id: fromId,
+            name: item.fromComponent,
+            type: isService ? 'service' : this.inferEntityType(item.fromComponent, item.toType),
+            app: fromAppId,
+          });
         }
         links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
       } else if (item.fromEntity) {
         fromId = `${fromAppId}-${item.fromEntity}`;
         if (!nodeMap.has(fromId)) {
-          const entityType = this.inferEntityType(item.fromEntity, item.toType);
-          nodeMap.set(fromId, { id: fromId, name: item.fromEntity, type: entityType, app: fromAppId });
+          nodeMap.set(fromId, {
+            id: fromId,
+            name: item.fromEntity,
+            type: this.inferEntityType(item.fromEntity, item.toType),
+            app: fromAppId,
+          });
         }
         links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
       }
@@ -167,19 +169,29 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         nodeMap.set(toAppId, { id: toAppId, name: item.toApp, type: 'app' });
       }
 
-      // Determine target node (service or entity)
+      // Process toComponent or toEntity
       let toId = toAppId;
       if (item.toComponent) {
         toId = `${toAppId}-${item.toComponent}`;
+        const isService = this.appServices[item.toApp]?.includes(item.toComponent);
         if (!nodeMap.has(toId)) {
-          nodeMap.set(toId, { id: toId, name: item.toComponent, type: 'service', app: toAppId });
+          nodeMap.set(toId, {
+            id: toId,
+            name: item.toComponent,
+            type: isService ? 'service' : this.inferEntityType(item.toComponent, item.toType),
+            app: toAppId,
+          });
         }
         links.push({ source: toAppId, target: toId, interaction: 'belongs' });
       } else if (item.toEntity) {
         toId = `${toAppId}-${item.toEntity}`;
         if (!nodeMap.has(toId)) {
-          const entityType = this.inferEntityType(item.toEntity, item.toType);
-          nodeMap.set(toId, { id: toId, name: item.toEntity, type: entityType, app: toAppId });
+          nodeMap.set(toId, {
+            id: toId,
+            name: item.toEntity,
+            type: this.inferEntityType(item.toEntity, item.toType),
+            app: toAppId,
+          });
         }
         links.push({ source: toAppId, target: toId, interaction: 'belongs' });
       }
@@ -194,9 +206,8 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
     this.links = links;
   }
 
-  private inferEntityType(entityName: string, toType: string): string {
-    // Use toType to help infer entity type, with fallback to name-based heuristic
-    const lowerName = entityName.toLowerCase();
+  private inferEntityType(name: string, toType: string): string {
+    const lowerName = name.toLowerCase();
     if (toType === 'db') return 'database';
     if (toType === 'queue') return 'queue';
     if (lowerName.includes('db') || lowerName.includes('database')) return 'database';
@@ -300,6 +311,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
         .each(function (d: any) {
           const sourceRadius = d.source.type === 'app' ? 15 : 5;
           const targetRadius = d.target.type === 'app' ? 15 : 5;
+
           d3.select(`#arrow-${d.interaction}`).attr('refX', targetRadius + 5);
           if (isBidirectional(d)) {
             d3.select(`#arrow-start-${d.interaction}`).attr('refX', sourceRadius + 5);
