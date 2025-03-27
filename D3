@@ -58,7 +58,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       defs.append('marker')
         .attr('id', `arrow-${type}`)
         .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 15) // Default, will be overridden dynamically
+        .attr('refX', 15) // Default, adjusted in tick
         .attr('refY', 0)
         .attr('markerWidth', 6)
         .attr('markerHeight', 6)
@@ -70,7 +70,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       defs.append('marker')
         .attr('id', `arrow-start-${type}`)
         .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 0) // Default, will be overridden dynamically
+        .attr('refX', 0) // Default, adjusted in tick
         .attr('refY', 0)
         .attr('markerWidth', 6)
         .attr('markerHeight', 6)
@@ -135,7 +135,8 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .selectAll('text')
       .data(links.filter((d) => {
         if (d.interaction === 'belongs') return false;
-        const pairKey = `${Math.min(d.source, d.target)}-${Math.max(d.source, d.target)}-${d.interaction}`;
+        // Use string comparison instead of Math.min/Math.max
+        const pairKey = d.source < d.target ? `${d.source}-${d.target}-${d.interaction}` : `${d.target}-${d.source}-${d.interaction}`;
         if (processedPairs.has(pairKey)) return false;
         processedPairs.add(pairKey);
         return true;
@@ -191,7 +192,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
           const sourceRadius = d.source.type === 'app' ? 15 : 5;
           const targetRadius = d.target.type === 'app' ? 15 : 5;
 
-          // Set refX to exactly the radius of the target/source node
           d3.select(`#arrow-${d.interaction}`).attr('refX', targetRadius);
           if (isBidirectional(d)) {
             d3.select(`#arrow-start-${d.interaction}`).attr('refX', sourceRadius);
