@@ -1,0 +1,518 @@
+import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import * as d3 from 'd3';
+
+interface ApiLink {
+  fromApp: string;
+  fromComponent: string | null;
+  fromEntity: string | null;
+  toApp: string;
+  toComponent: string | null;
+  toEntity: string | null;
+  toType: string;
+}
+
+interface MicroserviceNode {
+  id: string;
+  name: string;
+  type: string; // 'app', 'service', 'database', 'queue', 'external'
+  app?: string; // For non-app nodes
+}
+
+interface MicroserviceLink {
+  source: string;
+  target: string;
+  interaction: string; // e.g., 'belongs', 'http', 'queue', 'db'
+}
+
+@Component({
+  selector: 'app-microservices-flowmap',
+  template: `
+    <div #flowmapContainer>
+      <div *ngIf="loading" style="text-align: center; padding: 20px;">Loading...</div>
+    </div>
+  `,
+  styles: [
+    `
+      :host {
+        display: block;
+        width: 100%;
+        height: 100vh;
+      }
+      div {
+        width: 100%;
+        height: 100%;
+      }
+    `,
+  ],
+})
+export class MicroservicesFlowmapComponent implements AfterViewInit {
+  @ViewChild('flowmapContainer') flowmapContainer!: ElementRef;
+
+  private svg: any;
+  private zoom: any;
+  private width!: number;
+  private height!: number;
+  private nodes: MicroserviceNode[] = [];
+  private links: MicroserviceLink[] = [];
+  loading = true;
+
+  constructor(private http: HttpClient) {}
+
+  ngAfterViewInit() {
+    this.initializeSvg();
+    this.fetchDataAndRender();
+  }
+
+  private initializeSvg() {
+    const container = this.flowmapContainer.nativeElement;
+    this.width = container.clientWidth;
+    this.height = container.clientHeight;
+
+    this.svg = d3
+      .select(container)
+      .append('svg')
+      .attr('width', this.width)
+      .attr('height', this.height);
+
+    this.zoom = d3.zoom()
+      .scaleExtent([0.1, 10])
+      .on('zoom', (event) => {
+        this.svg.select('.content').attr('transform', event.transform);
+      });
+
+    this.svg.call(this.zoom);
+
+    const defs = this.svg.append('defs');
+    const linkTypes = ['belongs', 'http', 'queue', 'db'];
+    linkTypes.forEach((type) => {
+      defs.append('marker')
+        .attr('id', `arrow-${type}`)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 15)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', this.getLinkColor(type));
+
+      defs.append('marker')
+        .attr('id', `arrow-start-${type}`)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 0)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto-start-reverse')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', this.getLinkColor(type));
+    });
+
+    this.svg.append('g').attr('class', 'content');
+  }
+
+  private fetchDataAndRender() {
+    this.loading = true;
+    // Replace with your actual API endpoint
+    this.http.get<ApiLink[]>('http://your-api-endpoint/microservices').subscribe({
+      next: (data) => {
+        this.convertApiDataToGraph(data);
+        this.renderFlowmap();
+        this.loading = false;
+      },
+      error: (error) => {
+        console.error('Error fetching microservices data:', error);
+        // Fallback to empty graph or static data
+        this.convertApiDataToGraph([]);
+        this.renderFlowmap();
+        this.loading = false;
+      },
+    });
+  }
+
+  private convertApiDataToGraph(apiData: ApiLink[]) {
+    const nodeMap = new Map<string, MicroserviceNode>();
+    const links: MicroserviceLink[] = [];
+
+    apiData.forEach((item) => {
+      // Add fromApp as a node
+      const fromAppId = item.fromApp;
+      if (!nodeMap.has(fromAppId)) {
+        nodeMap.set(fromAppId, { id: fromAppId, name: item.fromApp, type: 'app' });
+      }
+
+      // Determine source node (service or entity)
+      let fromId = fromAppId;
+      if (item.fromComponent) {
+        fromId = `${fromAppId}-${item.fromComponent}`;
+        if (!nodeMap.has(fromId)) {
+          nodeMap.set(fromId, { id: fromId, name: item.fromComponent, type: 'service', app: fromAppId });
+        }
+        links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
+      } else if (item.fromEntity) {
+        fromId = `${fromAppId}-${item.fromEntity}`;
+        if (!nodeMap.has(fromId)) {
+          const entityType = this.inferEntityType(item.fromEntity, item.toType);
+          nodeMap.set(fromId, { id: fromId, name: item.fromEntity, type: entityType, app: fromAppId });
+        }
+        links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
+      }
+
+      // Add toApp as a node
+      const toAppId = item.toApp;
+      if (!nodeMap.has(toAppId)) {
+        nodeMap.set(toAppId, { id: toAppId, name: item.toApp, type: 'app' });
+      }
+
+      // Determine target node (service or entity)
+      let toId = toAppId;
+      if (item.toComponent) {
+        toId = `${toAppId}-${item.toComponent}`;
+        if (!nodeMap.has(toId)) {
+          nodeMap.set(toId, { id: toId, name: item.toComponent, type: 'service', app: toAppId });
+        }
+        links.push({ source: toAppId, target: toId, interaction: 'belongs' });
+      } else if (item.toEntity) {
+        toId = `${toAppId}-${item.toEntity}`;
+        if (!nodeMap.has(toId)) {
+          const entityType = this.inferEntityType(item.toEntity, item.toType);
+          nodeMap.set(toId, { id: toId, name: item.toEntity, type: entityType, app: toAppId });
+        }
+        links.push({ source: toAppId, target: toId, interaction: 'belongs' });
+      }
+
+      // Add interaction link
+      if (fromId !== toId) {
+        links.push({ source: fromId, target: toId, interaction: item.toType });
+      }
+    });
+
+    this.nodes = Array.from(nodeMap.values());
+    this.links = links;
+  }
+
+  private inferEntityType(entityName: string, toType: string): string {
+    // Use toType to help infer entity type, with fallback to name-based heuristic
+    const lowerName = entityName.toLowerCase();
+    if (toType === 'db') return 'database';
+    if (toType === 'queue') return 'queue';
+    if (lowerName.includes('db') || lowerName.includes('database')) return 'database';
+    if (lowerName.includes('queue')) return 'queue';
+    return 'external'; // Default fallback
+  }
+
+  private renderFlowmap() {
+    const content = this.svg.select('.content');
+
+    const simulation = d3
+      .forceSimulation<MicroserviceNode>(this.nodes)
+      .force(
+        'link',
+        d3
+          .forceLink<MicroserviceNode, MicroserviceLink>(this.links)
+          .id((d) => d.id)
+          .distance((d) => (d.interaction === 'belongs' ? 80 : 120))
+      )
+      .force('charge', d3.forceManyBody().strength(-300))
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+      .force('collision', d3.forceCollide(30));
+
+    const isBidirectional = (link: MicroserviceLink) => {
+      return this.links.some(
+        (l) => l.source === link.target && l.target === link.source && l.interaction === link.interaction
+      );
+    };
+
+    const processedPairs = new Set<string>();
+
+    const link = content
+      .append('g')
+      .attr('class', 'links')
+      .selectAll('line')
+      .data(this.links)
+      .enter()
+      .append('line')
+      .attr('stroke', (d) => this.getLinkColor(d.interaction))
+      .attr('stroke-width', (d) => (d.interaction === 'belongs' ? 1 : 2))
+      .attr('stroke-dasharray', (d) => (d.interaction === 'belongs' ? '5,5' : '0'))
+      .attr('marker-end', (d) => `url(#arrow-${d.interaction})`)
+      .attr('marker-start', (d) => (isBidirectional(d) ? `url(#arrow-start-${d.interaction})` : null))
+      .on('click', (event, d) => console.log('Clicked link:', d))
+      .on('dblclick', (event, d) => console.log('Double-clicked link:', d));
+
+    const linkLabels = content
+      .append('g')
+      .attr('class', 'link-labels')
+      .selectAll('text')
+      .data(this.links.filter((d) => {
+        if (d.interaction === 'belongs') return false;
+        const pairKey = d.source < d.target ? `${d.source}-${d.target}-${d.interaction}` : `${d.target}-${d.source}-${d.interaction}`;
+        if (processedPairs.has(pairKey)) return false;
+        processedPairs.add(pairKey);
+        return true;
+      }))
+      .enter()
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#333')
+      .attr('font-size', '12px')
+      .text((d) => d.interaction)
+      .on('click', (event, d) => console.log('Clicked link label:', d))
+      .on('dblclick', (event, d) => console.log('Double-clicked link label:', d));
+
+    const node = content
+      .append('g')
+      .attr('class', 'nodes')
+      .selectAll('g')
+      .data(this.nodes)
+      .enter()
+      .append('g')
+      .call(
+        d3.drag<SVGGElement, MicroserviceNode>()
+          .on('start', (event, d) => this.dragStarted(event, d, simulation))
+          .on('drag', this.dragged)
+          .on('end', (event, d) => this.dragEnded(event, d, simulation))
+      )
+      .on('click', (event, d) => console.log('Clicked node:', d))
+      .on('dblclick', (event, d) => console.log('Double-clicked node:', d));
+
+    const circles = node
+      .append('circle')
+      .attr('r', (d) => (d.type === 'app' ? 15 : 5))
+      .attr('fill', (d) => this.getNodeColor(d.type));
+
+    node
+      .append('text')
+      .attr('dy', (d) => (d.type === 'app' ? 25 : 15))
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#000')
+      .text((d) => d.name);
+
+    simulation.on('tick', () => {
+      link
+        .attr('x1', (d) => (d.source as any).x)
+        .attr('y1', (d) => (d.source as any).y)
+        .attr('x2', (d) => (d.target as any).x)
+        .attr('y2', (d) => (d.target as any).y)
+        .each(function (d: any) {
+          const sourceRadius = d.source.type === 'app' ? 15 : 5;
+          const targetRadius = d.target.type === 'app' ? 15 : 5;
+          d3.select(`#arrow-${d.interaction}`).attr('refX', targetRadius + 5);
+          if (isBidirectional(d)) {
+            d3.select(`#arrow-start-${d.interaction}`).attr('refX', sourceRadius + 5);
+          }
+        });
+
+      linkLabels.each(function (d: any) {
+        const x1 = d.source.x;
+        const y1 = d.source.y;
+        const x2 = d.target.x;
+        const y2 = d.target.y;
+        const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+        d3.select(this)
+          .attr('x', (x1 + x2) / 2)
+          .attr('y', (y1 + y2) / 2)
+          .attr('transform', `rotate(${angle}, ${(x1 + x2) / 2}, ${(y1 + y2) / 2})`);
+      });
+
+      node.attr('transform', (d) => `translate(${d.x},${d.y})`);
+    });
+
+    simulation.on('end', () => {
+      this.autoZoom(this.nodes);
+    });
+
+    this.addLegends();
+  }
+
+  private dragStarted(event: any, d: any, simulation: d3.Simulation<MicroserviceNode, undefined>) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+    d3.select(event.sourceEvent.target.parentNode).select('circle')
+      .attr('stroke', '#000')
+      .attr('stroke-width', 2);
+  }
+
+  private dragged(event: any, d: any) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  private dragEnded(event: any, d: any, simulation: d3.Simulation<MicroserviceNode, undefined>) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+    d3.select(event.sourceEvent.target.parentNode).select('circle')
+      .attr('stroke', null)
+      .attr('stroke-width', null);
+  }
+
+  private autoZoom(nodes: MicroserviceNode[]) {
+    const bounds = {
+      xMin: d3.min(nodes, (d) => d.x! - 50) || 0,
+      xMax: d3.max(nodes, (d) => d.x! + 50) || this.width,
+      yMin: d3.min(nodes, (d) => d.y! - 50) || 0,
+      yMax: d3.max(nodes, (d) => d.y! + 50) || this.height,
+    };
+
+    const contentWidth = bounds.xMax - bounds.xMin;
+    const contentHeight = bounds.yMax - bounds.yMin;
+    const scale = 0.9 * Math.min(this.width / contentWidth, this.height / contentHeight);
+    const translateX = this.width / 2 - (bounds.xMin + bounds.xMax) / 2 * scale;
+    const translateY = this.height / 2 - (bounds.yMin + bounds.yMax) / 2 * scale;
+
+    const transform = d3.zoomIdentity
+      .translate(translateX, translateY)
+      .scale(scale);
+
+    this.svg
+      .transition()
+      .duration(750)
+      .call(this.zoom.transform, transform);
+  }
+
+  private getNodeColor(type: string): string {
+    switch (type) {
+      case 'app': return '#800080'; // Purple for all apps
+      case 'service': return '#1f77b4'; // Blue for all services
+      case 'database': return '#ff7f0e'; // Orange for databases
+      case 'queue': return '#2ca02c'; // Green for queues
+      case 'external': return '#d62728'; // Red for externals
+      default: return '#999';
+    }
+  }
+
+  private getLinkColor(interaction: string): string {
+    switch (interaction) {
+      case 'belongs': return '#888'; // Gray for app-service links
+      case 'http': return '#1f77b4';
+      case 'queue': return '#2ca02c';
+      case 'db': return '#ff7f0e';
+      default: return '#999';
+    }
+  }
+
+  private addLegends() {
+    const legend = this.svg.append('g')
+      .attr('class', 'legend')
+      .attr('transform', `translate(${this.width - 150}, 20)`);
+
+    let yOffset = 0;
+
+    legend.append('text')
+      .attr('x', 0)
+      .attr('y', yOffset)
+      .attr('fill', '#000')
+      .attr('font-weight', 'bold')
+      .text('Application');
+
+    const appLegendData = [{ label: 'App', color: '#800080' }];
+    const appLegend = legend.selectAll('.app-legend')
+      .data(appLegendData)
+      .enter()
+      .append('g')
+      .attr('class', 'app-legend')
+      .attr('transform', (d, i) => `translate(0, ${yOffset + (i + 1) * 25})`)
+      .on('click', (event, d) => console.log('Clicked app legend:', d.label))
+      .on('dblclick', (event, d) => console.log('Double-clicked app legend:', d.label));
+
+    appLegend
+      .append('circle')
+      .attr('r', 7)
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('fill', (d) => d.color);
+
+    appLegend
+      .append('text')
+      .attr('x', 15)
+      .attr('y', 5)
+      .attr('fill', '#000')
+      .text((d) => d.label);
+
+    yOffset += (appLegendData.length + 1) * 25 + 10;
+
+    legend.append('text')
+      .attr('x', 0)
+      .attr('y', yOffset)
+      .attr('fill', '#000')
+      .attr('font-weight', 'bold')
+      .text('Dependencies');
+
+    const nodeLegendData = [
+      { label: 'Service', color: '#1f77b4' },
+      { label: 'Database', color: '#ff7f0e' },
+      { label: 'Queue', color: '#2ca02c' },
+      { label: 'External', color: '#d62728' },
+    ];
+
+    const nodeLegend = legend.selectAll('.node-legend')
+      .data(nodeLegendData)
+      .enter()
+      .append('g')
+      .attr('class', 'node-legend')
+      .attr('transform', (d, i) => `translate(0, ${yOffset + (i + 1) * 25})`)
+      .on('click', (event, d) => console.log('Clicked node legend:', d.label))
+      .on('dblclick', (event, d) => console.log('Double-clicked node legend:', d.label));
+
+    nodeLegend
+      .append('circle')
+      .attr('r', 5)
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('fill', (d) => d.color);
+
+    nodeLegend
+      .append('text')
+      .attr('x', 15)
+      .attr('y', 5)
+      .attr('fill', '#000')
+      .text((d) => d.label);
+
+    yOffset += (nodeLegendData.length + 1) * 25 + 10;
+
+    legend.append('text')
+      .attr('x', 0)
+      .attr('y', yOffset)
+      .attr('fill', '#000')
+      .attr('font-weight', 'bold')
+      .text('Interactions');
+
+    const linkLegendData = [
+      { label: 'Belongs', color: '#888' },
+      { label: 'HTTP', color: '#1f77b4' },
+      { label: 'Queue', color: '#2ca02c' },
+      { label: 'DB', color: '#ff7f0e' },
+    ];
+
+    const linkLegend = legend.selectAll('.link-legend')
+      .data(linkLegendData)
+      .enter()
+      .append('g')
+      .attr('class', 'link-legend')
+      .attr('transform', (d, i) => `translate(0, ${yOffset + (i + 1) * 25})`)
+      .on('click', (event, d) => console.log('Clicked link legend:', d.label))
+      .on('dblclick', (event, d) => console.log('Double-clicked link legend:', d.label));
+
+    linkLegend
+      .append('line')
+      .attr('x1', -5)
+      .attr('y1', 0)
+      .attr('x2', 10)
+      .attr('y2', 0)
+      .attr('stroke', (d) => d.color)
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', (d) => (d.label === 'Belongs' ? '5,5' : '0'));
+
+    linkLegend
+      .append('text')
+      .attr('x', 15)
+      .attr('y', 5)
+      .attr('fill', '#000')
+      .text((d) => d.label);
+  }
+}
