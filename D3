@@ -40,14 +40,13 @@ export const microservicesData = {
     { source: 'ms1', target: 'db1', interaction: 'db' },
     { source: 'ms2', target: 'db2', interaction: 'db' },
     { source: 'ms3', target: 'queue1', interaction: 'queue' },
-    { source: 'ms3', target: 'ms2', interaction: 'http' },
+    { source: 'ms3', target: 'ms2', interaction: 'http' }, // Forward link
+    { source: 'ms2', target: 'ms3', interaction: 'http' }, // Reverse link for bidirectionality
     { source: 'ms3', target: 'ext1', interaction: 'http' },
     { source: 'ms4', target: 'queue2', interaction: 'queue' },
     { source: 'ms3', target: 'ms4', interaction: 'http' },
   ],
 };
-
-
 
 
 
@@ -104,18 +103,30 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
 
     this.svg.call(this.zoom);
 
-    // Add definitions for arrow markers
+    // Define arrow markers
     const defs = this.svg.append('defs');
     const linkTypes = ['belongs', 'http', 'queue', 'db'];
     linkTypes.forEach((type) => {
       defs.append('marker')
         .attr('id', `arrow-${type}`)
         .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 10) // Position arrow at the end of the line
+        .attr('refX', 10)
         .attr('refY', 0)
         .attr('markerWidth', 6)
         .attr('markerHeight', 6)
         .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', this.getLinkColor(type));
+
+      defs.append('marker')
+        .attr('id', `arrow-start-${type}`)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 0)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto-start-reverse')
         .append('path')
         .attr('d', 'M0,-5L10,0L0,5')
         .attr('fill', this.getLinkColor(type));
@@ -143,7 +154,14 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .force('center', d3.forceCenter(this.width / 2, this.height / 2))
       .force('collision', d3.forceCollide(30));
 
-    // Draw links with arrows
+    // Function to check if a link is bidirectional
+    const isBidirectional = (link: MicroserviceLink) => {
+      return links.some(
+        (l) => l.source === link.target && l.target === link.source && l.interaction === link.interaction
+      );
+    };
+
+    // Draw links with directional arrows
     const link = content
       .append('g')
       .attr('class', 'links')
@@ -154,7 +172,8 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('stroke', (d) => this.getLinkColor(d.interaction))
       .attr('stroke-width', (d) => (d.interaction === 'belongs' ? 1 : 2))
       .attr('stroke-dasharray', (d) => (d.interaction === 'belongs' ? '5,5' : '0'))
-      .attr('marker-end', (d) => `url(#arrow-${d.interaction})`) // Add arrowhead
+      .attr('marker-end', (d) => `url(#arrow-${d.interaction})`)
+      .attr('marker-start', (d) => (isBidirectional(d) ? `url(#arrow-start-${d.interaction})` : null))
       .on('click', (event, d) => console.log('Clicked link:', d))
       .on('dblclick', (event, d) => console.log('Double-clicked link:', d));
 
