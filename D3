@@ -1,3 +1,56 @@
+export interface MicroserviceNode {
+  id: string;
+  name: string;
+  type: string; // 'app', 'service', 'database', 'queue', 'external'
+  app?: string; // Only for non-app nodes
+}
+
+export interface MicroserviceLink {
+  source: string;
+  target: string;
+  interaction: string; // e.g., 'belongs', 'http', 'queue', 'db'
+}
+
+export const microservicesData = {
+  nodes: [
+    { id: 'app1', name: 'AuthApp', type: 'app' },
+    { id: 'app2', name: 'ProductApp', type: 'app' },
+    { id: 'app3', name: 'OrderApp', type: 'app' },
+    { id: 'app4', name: 'ExternalApp', type: 'app' },
+    { id: 'ms1', name: 'AuthService', type: 'service', app: 'app1' },
+    { id: 'db1', name: 'AuthDB', type: 'database', app: 'app1' },
+    { id: 'ms2', name: 'ProductService', type: 'service', app: 'app2' },
+    { id: 'db2', name: 'ProductDB', type: 'database', app: 'app2' },
+    { id: 'ms3', name: 'OrderService', type: 'service', app: 'app3' },
+    { id: 'queue1', name: 'OrderQueue', type: 'queue', app: 'app3' },
+    { id: 'ext1', name: 'PaymentGateway', type: 'external', app: 'app3' },
+    { id: 'ms4', name: 'NotificationService', type: 'service', app: 'app4' },
+    { id: 'queue2', name: 'NotifyQueue', type: 'queue', app: 'app4' },
+  ],
+  links: [
+    { source: 'app1', target: 'ms1', interaction: 'belongs' },
+    { source: 'app1', target: 'db1', interaction: 'belongs' },
+    { source: 'app2', target: 'ms2', interaction: 'belongs' },
+    { source: 'app2', target: 'db2', interaction: 'belongs' },
+    { source: 'app3', target: 'ms3', interaction: 'belongs' },
+    { source: 'app3', target: 'queue1', interaction: 'belongs' },
+    { source: 'app3', target: 'ext1', interaction: 'belongs' },
+    { source: 'app4', target: 'ms4', interaction: 'belongs' },
+    { source: 'app4', target: 'queue2', interaction: 'belongs' },
+    { source: 'ms1', target: 'db1', interaction: 'db' },
+    { source: 'ms2', target: 'db2', interaction: 'db' },
+    { source: 'ms3', target: 'queue1', interaction: 'queue' },
+    { source: 'ms3', target: 'ms2', interaction: 'http' },
+    { source: 'ms3', target: 'ext1', interaction: 'http' },
+    { source: 'ms4', target: 'queue2', interaction: 'queue' },
+    { source: 'ms3', target: 'ms4', interaction: 'http' },
+  ],
+};
+
+
+
+
+
 import { Component, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import * as d3 from 'd3';
 import { microservicesData, MicroserviceNode, MicroserviceLink } from '../microservices-data';
@@ -50,6 +103,24 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       });
 
     this.svg.call(this.zoom);
+
+    // Add definitions for arrow markers
+    const defs = this.svg.append('defs');
+    const linkTypes = ['belongs', 'http', 'queue', 'db'];
+    linkTypes.forEach((type) => {
+      defs.append('marker')
+        .attr('id', `arrow-${type}`)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 10) // Position arrow at the end of the line
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', this.getLinkColor(type));
+    });
+
     this.svg.append('g').attr('class', 'content');
   }
 
@@ -72,7 +143,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .force('center', d3.forceCenter(this.width / 2, this.height / 2))
       .force('collision', d3.forceCollide(30));
 
-    // Draw links
+    // Draw links with arrows
     const link = content
       .append('g')
       .attr('class', 'links')
@@ -83,6 +154,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('stroke', (d) => this.getLinkColor(d.interaction))
       .attr('stroke-width', (d) => (d.interaction === 'belongs' ? 1 : 2))
       .attr('stroke-dasharray', (d) => (d.interaction === 'belongs' ? '5,5' : '0'))
+      .attr('marker-end', (d) => `url(#arrow-${d.interaction})`) // Add arrowhead
       .on('click', (event, d) => console.log('Clicked link:', d))
       .on('dblclick', (event, d) => console.log('Double-clicked link:', d));
 
@@ -101,7 +173,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .on('click', (event, d) => console.log('Clicked link label:', d))
       .on('dblclick', (event, d) => console.log('Double-clicked link label:', d));
 
-    // Draw nodes
+    // Draw nodes with drag behavior
     const node = content
       .append('g')
       .attr('class', 'nodes')
@@ -109,11 +181,17 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .data(nodes)
       .enter()
       .append('g')
+      .call(
+        d3.drag<SVGGElement, MicroserviceNode>()
+          .on('start', (event, d) => this.dragStarted(event, d, simulation))
+          .on('drag', this.dragged)
+          .on('end', (event, d) => this.dragEnded(event, d, simulation))
+      )
       .on('click', (event, d) => console.log('Clicked node:', d))
       .on('dblclick', (event, d) => console.log('Double-clicked node:', d));
 
     // Add circles for nodes
-    node
+    const circles = node
       .append('circle')
       .attr('r', (d) => (d.type === 'app' ? 15 : 5))
       .attr('fill', (d) => this.getNodeColor(d.type));
@@ -154,8 +232,31 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       this.autoZoom(nodes);
     });
 
-    // Add legends with labels
+    // Add legends
     this.addLegends();
+  }
+
+  private dragStarted(event: any, d: any, simulation: d3.Simulation<MicroserviceNode, undefined>) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+    d3.select(event.sourceEvent.target.parentNode).select('circle')
+      .attr('stroke', '#000')
+      .attr('stroke-width', 2);
+  }
+
+  private dragged(event: any, d: any) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  private dragEnded(event: any, d: any, simulation: d3.Simulation<MicroserviceNode, undefined>) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+    d3.select(event.sourceEvent.target.parentNode).select('circle')
+      .attr('stroke', null)
+      .attr('stroke-width', null);
   }
 
   private autoZoom(nodes: MicroserviceNode[]) {
@@ -218,7 +319,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('font-weight', 'bold')
       .text('Application');
 
-    // Application legend
     const appLegendData = [
       { label: 'App', color: '#800080' },
     ];
@@ -246,7 +346,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('fill', '#000')
       .text((d) => d.label);
 
-    yOffset += (appLegendData.length + 1) * 25 + 10; // Extra space after section
+    yOffset += (appLegendData.length + 1) * 25 + 10;
 
     // Dependencies legend label
     legend.append('text')
@@ -256,7 +356,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('font-weight', 'bold')
       .text('Dependencies');
 
-    // Dependencies (Nodes) legend
     const nodeLegendData = [
       { label: 'Service', color: '#1f77b4' },
       { label: 'Database', color: '#ff7f0e' },
@@ -287,7 +386,7 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('fill', '#000')
       .text((d) => d.label);
 
-    yOffset += (nodeLegendData.length + 1) * 25 + 10; // Extra space after section
+    yOffset += (nodeLegendData.length + 1) * 25 + 10;
 
     // Interactions legend label
     legend.append('text')
@@ -297,7 +396,6 @@ export class MicroservicesFlowmapComponent implements AfterViewInit {
       .attr('font-weight', 'bold')
       .text('Interactions');
 
-    // Interactions (Links) legend
     const linkLegendData = [
       { label: 'Belongs', color: '#888' },
       { label: 'HTTP', color: '#1f77b4' },
