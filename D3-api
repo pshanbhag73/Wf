@@ -106,3 +106,44 @@ private convertApiDataToGraph(apiData: ApiLink[], append: boolean = false) {
     if (fromId !== toId && !links.some(l => l.source === fromId...
 
 Something went wrong, please try again.
+
+
+
+
+
+// Inside renderFlowmap, after node selection
+const tooltip = d3.select('body')
+  .append('div')
+  .attr('class', 'tooltip')
+  .style('position', 'absolute')
+  .style('background', '#f9f9f9')
+  .style('padding', '5px')
+  .style('border', '1px solid #ccc')
+  .style('border-radius', '3px')
+  .style('pointer-events', 'auto')
+  .style('opacity', 0);
+
+node
+  .on('mouseover', (event, d) => {
+    tooltip.transition()
+      .duration(200)
+      .style('opacity', 0.9);
+    tooltip.html(`
+      Name: ${d.name}<br>Type: ${d.type}${d.app ? `<br>App: ${d.app}` : ''}<br>
+      <button onclick="window.expandRelationships('${d.id}')">Expand Relationships</button>
+    `)
+      .style('left', (event.pageX + 10) + 'px')
+      .style('top', (event.pageY - 28) + 'px');
+  })
+  .on('mouseout', () => {
+    tooltip.transition()
+      .duration(500)
+      .style('opacity', 0);
+  });
+
+// Add this function globally (e.g., in a script tag or separate JS file)
+window.expandRelationships = (nodeId) => {
+  // Call your component method here, e.g., via an event emitter or direct method call
+  console.log(`Expanding relationships for ${nodeId}`);
+  // Example: this.handleNodeClick({ id: nodeId, name: '', type: 'service' }); // Adjust as needed
+};
