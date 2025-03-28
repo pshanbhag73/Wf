@@ -1,3 +1,20 @@
+// Inside renderFlowmap
+this.simulation = d3
+  .forceSimulation<MicroserviceNode>(this.nodes)
+  .force(
+    'link',
+    d3
+      .forceLink<MicroserviceNode, MicroserviceLink>(this.links)
+      .id((d) => d.id)
+      .distance((d) => (d.interaction === 'belongs' ? 100 : 150)) // Increase link distance
+  )
+  .force('charge', d3.forceManyBody().strength(-500)) // Stronger repulsion to spread nodes
+  .force('center', d3.forceCenter(this.width / 2, this.height / 2)) // Center in available space
+  .force('collision', d3.forceCollide(50)) // Larger collision radius to prevent overlap
+  .force('x', d3.forceX().strength(0.1)) // Encourage horizontal spread
+  .force('y', d3.forceY().strength(0.1)); // Encourage vertical spread
+
+
 // Existing node selection
 const node = content
   .append('g')
