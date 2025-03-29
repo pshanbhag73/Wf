@@ -76,3 +76,81 @@ window.viewDependencies = (id) => {
     error: (error) => console.error(`Error fetching dependencies for ${id}:`, error),
   });
 };
+
+
+
+
+<div class="dialog-container" #flowmapContainer>
+  <div id="action-menu" class="action-menu" [style.display]="showActionMenu ? 'block' : 'none'" 
+       [style.left.px]="actionMenuX" [style.top.px]="actionMenuY">
+    <div>Options for {{ selectedNode?.name }}:</div>
+    <button (click)="viewNextLevel()">View Next Level</button><br>
+    <button (click)="viewDependencies()">View Dependencies</button>
+  </div>
+</div>
+
+
+.dialog-container {
+  width: 100%;
+  height: 100%;
+  position: relative; /* Ensure action menu positions relative to this */
+}
+
+.action-menu {
+  position: absolute;
+  background: #f9f9f9;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  z-index: 10; /* Ensure it’s above SVG elements */
+}
+
+
+
+// Properties
+showActionMenu = false;
+actionMenuX = 0;
+actionMenuY = 0;
+selectedNode: MicroserviceNode | null = null;
+
+// Inside renderFlowmap, after node selection
+node.on('click', (event, d) => {
+  this.selectedNode = d;
+  this.actionMenuX = event.offsetX + 10; // Position relative to click
+  this.actionMenuY = event.offsetY - 20;
+  this.showActionMenu = true;
+
+  // Hide on click outside
+  d3.select('body').on('click', (e) => {
+    if (!d3.select(e.target).closest('#action-menu').size() && !d3.select(e.target).closest('.nodes').size()) {
+      this.showActionMenu = false;
+    }
+  });
+});
+
+// Action methods
+viewNextLevel() {
+  if (this.selectedNode && (this.selectedNode.type === 'app' || this.selectedNode.type === 'service')) {
+    this.http.get<ApiLink[]>(`http://your-api-endpoint/relationships/${this.selectedNode.id}`).subscribe({
+      next: (relationships) => {
+        this.convertApiDataToGraph(relationships, true);
+        this.renderFlowmap();
+        this.showActionMenu = false; // Hide after action
+      },
+      error: (error) => console.error(`Error fetching relationships for ${this.selectedNode.id}:`, error),
+    });
+  }
+}
+
+viewDependencies() {
+  if (this.selectedNode && (this.selectedNode.type === 'app' || this.selectedNode.type === 'service')) {
+    this.http.get<ApiLink[]>(`http://your-api-endpoint/dependencies/${this.selectedNode.id}`).subscribe({
+      next: (dependencies) => {
+        this.convertApiDataToGraph(dependencies, true);
+        this.renderFlowmap();
+        this.showActionMenu = false; // Hide after action
+      },
+      error: (error) => console.error(`Error fetching dependencies for ${this.selectedNode.id}:`, error),
+    });
+  }
+}
