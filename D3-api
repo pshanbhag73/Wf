@@ -1,137 +1,31 @@
-// Inside renderFlowmap
-this.simulation = d3
-  .forceSimulation<MicroserviceNode>(this.nodes)
-  .force(
-    'link',
-    d3
-      .forceLink<MicroserviceNode, MicroserviceLink>(this.links)
-      .id((d) => d.id)
-      .distance((d) => (d.interaction === 'belongs' ? 100 : 150)) // Increase link distance
-  )
-  .force('charge', d3.forceManyBody().strength(-500)) // Stronger repulsion to spread nodes
-  .force('center', d3.forceCenter(this.width / 2, this.height / 2)) // Center in available space
-  .force('collision', d3.forceCollide(50)) // Larger collision radius to prevent overlap
-  .force('x', d3.forceX().strength(0.1)) // Encourage horizontal spread
-  .force('y', d3.forceY().strength(0.1)); // Encourage vertical spread
+.full-height-dialog .mat-dialog-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
 
+.full-height-dialog .mat-dialog-content {
+  margin: 0;
+  padding: 0;
+  max-height: none;
+  flex-grow: 1;
+  overflow: hidden;
+}
 
-// Existing node selection
-const node = content
-  .append('g')
-  .attr('class', 'nodes')
-  .selectAll('g')
-  .data(this.nodes)
-  .enter()
-  .append('g')
-  .call(
-    d3.drag<SVGGElement, MicroserviceNode>()
-      .on('start', (event, d) => this.dragStarted(event, d, this.simulation))
-      .on('drag', this.dragged)
-      .on('end', (event, d) => this.dragEnded(event, d, this.simulation))
-  )
-  .on('click', (event, d) => this.handleNodeClick(d)); // Add click event
-
-
-private handleNodeClick(d: MicroserviceNode) {
-  if (d.type === 'app' || d.type === 'service') {
-    this.http.get<ApiLink[]>(`http://your-api-endpoint/relationships/${d.id}`).subscribe({
-      next: (relationships) => {
-        this.convertApiDataToGraph(relationships, true); // Append new relationships
-        this.renderFlowmap(); // Re-render with updated data
-      },
-      error: (error) => console.error(`Error fetching relationships for ${d.id}:`, error),
-    });
-  }
+.tooltip {
+  position: absolute;
+  background: #f9f9f9;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  pointer-events: none;
 }
 
 
-private convertApiDataToGraph(apiData: ApiLink[], append: boolean = false) {
-  const nodeMap = append ? new Map(this.nodes.map(n => [n.id, n])) : new Map<string, MicroserviceNode>();
-  const links = append ? [...this.links] : [];
-
-  apiData.forEach((item) => {
-    const fromAppId = item.fromApp;
-    if (!nodeMap.has(fromAppId)) {
-      nodeMap.set(fromAppId, { id: fromAppId, name: item.fromApp, type: 'app' });
-    }
-
-    let fromId = fromAppId;
-    if (item.fromComponent) {
-      fromId = `${fromAppId}-${item.fromComponent}`;
-      const isService = this.appServices[item.fromApp]?.includes(item.fromComponent);
-      if (!nodeMap.has(fromId)) {
-        nodeMap.set(fromId, {
-          id: fromId,
-          name: item.fromComponent,
-          type: isService ? 'service' : this.inferEntityType(item.fromComponent, item.toType),
-          app: fromAppId,
-        });
-      }
-      if (!links.some(l => l.source === fromAppId && l.target === fromId && l.interaction === 'belongs')) {
-        links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
-      }
-    } else if (item.fromEntity) {
-      fromId = `${fromAppId}-${item.fromEntity}`;
-      if (!nodeMap.has(fromId)) {
-        nodeMap.set(fromId, {
-          id: fromId,
-          name: item.fromEntity,
-          type: this.inferEntityType(item.fromEntity, item.toType),
-          app: fromAppId,
-        });
-      }
-      if (!links.some(l => l.source === fromAppId && l.target === fromId && l.interaction === 'belongs')) {
-        links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
-      }
-    }
-
-    const toAppId = item.toApp;
-    if (!nodeMap.has(toAppId)) {
-      nodeMap.set(toAppId, { id: toAppId, name: item.toApp, type: 'app' });
-    }
-
-    let toId = toAppId;
-    if (item.toComponent) {
-      toId = `${toAppId}-${item.toComponent}`;
-      const isService = this.appServices[item.toApp]?.includes(item.toComponent);
-      if (!nodeMap.has(toId)) {
-        nodeMap.set(toId, {
-          id: toId,
-          name: item.toComponent,
-          type: isService ? 'service' : this.inferEntityType(item.toComponent, item.toType),
-          app: toAppId,
-        });
-      }
-      if (!links.some(l => l.source === toAppId && l.target === toId && l.interaction === 'belongs')) {
-        links.push({ source: toAppId, target: toId, interaction: 'belongs' });
-      }
-    } else if (item.toEntity) {
-      toId = `${toAppId}-${item.toEntity}`;
-      if (!nodeMap.has(toId)) {
-        nodeMap.set(toId, {
-          id: toId,
-          name: item.toEntity,
-          type: this.inferEntityType(item.toEntity, item.toType),
-          app: toAppId,
-        });
-      }
-      if (!links.some(l => l.source === toAppId && l.target === toId && l.interaction === 'belongs')) {
-        links.push({ source: toAppId, target: toId, interaction: 'belongs' });
-      }
-    }
-
-    if (fromId !== toId && !links.some(l => l.source === fromId...
-
-Something went wrong, please try again.
-
-
-
-
-
-// Inside renderFlowmap, after node selection
-const tooltip = d3.select('body')
+// Tooltip setup for click actions
+const actionTooltip = d3.select('body')
   .append('div')
-  .attr('class', 'tooltip')
+  .attr('class', 'action-tooltip')
   .style('position', 'absolute')
   .style('background', '#f9f9f9')
   .style('padding', '5px')
@@ -140,27 +34,45 @@ const tooltip = d3.select('body')
   .style('pointer-events', 'auto')
   .style('opacity', 0);
 
-node
-  .on('mouseover', (event, d) => {
-    tooltip.transition()
-      .duration(200)
-      .style('opacity', 0.9);
-    tooltip.html(`
-      Name: ${d.name}<br>Type: ${d.type}${d.app ? `<br>App: ${d.app}` : ''}<br>
-      <button onclick="window.expandRelationships('${d.id}')">Expand Relationships</button>
-    `)
-      .style('left', (event.pageX + 10) + 'px')
-      .style('top', (event.pageY - 28) + 'px');
-  })
-  .on('mouseout', () => {
-    tooltip.transition()
-      .duration(500)
-      .style('opacity', 0);
-  });
+node.on('click', (event, d) => {
+  actionTooltip.transition()
+    .duration(200)
+    .style('opacity', 0.9);
+  actionTooltip.html(`
+    <div>Options for ${d.name}:</div>
+    <button onclick="window.viewNextLevel('${d.id}')">View Next Level</button><br>
+    <button onclick="window.viewDependencies('${d.id}')">View Dependencies</button>
+  `)
+    .style('left', (event.pageX + 10) + 'px')
+    .style('top', (event.pageY - 28) + 'px');
 
-// Add this function globally (e.g., in a script tag or separate JS file)
-window.expandRelationships = (nodeId) => {
-  // Call your component method here, e.g., via an event emitter or direct method call
-  console.log(`Expanding relationships for ${nodeId}`);
-  // Example: this.handleNodeClick({ id: nodeId, name: '', type: 'service' }); // Adjust as needed
+  // Hide tooltip on click outside
+  d3.select('body').on('click', (e) => {
+    if (!actionTooltip.node().contains(e.target)) {
+      actionTooltip.transition()
+        .duration(500)
+        .style('opacity', 0);
+    }
+  });
+});
+
+// Define action functions globally
+window.viewNextLevel = (id) => {
+  this.http.get<ApiLink[]>(`http://your-api-endpoint/relationships/${id}`).subscribe({
+    next: (relationships) => {
+      this.convertApiDataToGraph(relationships, true);
+      this.renderFlowmap();
+    },
+    error: (error) => console.error(`Error fetching next level for ${id}:`, error),
+  });
+};
+
+window.viewDependencies = (id) => {
+  this.http.get<ApiLink[]>(`http://your-api-endpoint/dependencies/${id}`).subscribe({
+    next: (dependencies) => {
+      this.convertApiDataToGraph(dependencies, true);
+      this.renderFlowmap();
+    },
+    error: (error) => console.error(`Error fetching dependencies for ${id}:`, error),
+  });
 };
