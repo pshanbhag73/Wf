@@ -1,176 +1,96 @@
-node.on('click', (event, d) => {
-  this.selectedNode = d;
-  this.actionMenuX = event.offsetX + 10;
-  this.actionMenuY = event.offsetY - 20;
-  this.showActionMenu = true;
+private convertApiDataToGraph(apiData: ApiLink[], append: boolean = false) {
+  const nodeMap = append ? new Map(this.nodes.map(n => [n.id, n])) : new Map<string, MicroserviceNode>();
+  const existingLinks = append ? new Set(this.links.map(l => `${l.source}-${l.target}-${l.interaction}`)) : new Set<string>();
+  const links = append ? [...this.links] : [];
 
-  // Hide on click outside
-  setTimeout(() => { // Delay to avoid immediate hide
-    d3.select('body').on('click.outside', (e) => {
-      if (!d3.select(e.target).closest('#action-menu').size() && !d3.select(e.target).closest('.nodes').size()) {
-        this.showActionMenu = false;
-        this.$apply(); // Apply changes if using Angular (remove if not needed)
-        d3.select('body').on('click.outside', null); // Clean up listener
+  apiData.forEach((item) => {
+    const fromAppId = item.fromApp;
+    if (!nodeMap.has(fromAppId)) {
+      nodeMap.set(fromAppId, { id: fromAppId, name: item.fromApp, type: 'app' });
+    }
+
+    let fromId = fromAppId;
+    if (item.fromComponent) {
+      fromId = `${fromAppId}-${item.fromComponent}`;
+      const isService = this.appServices[item.fromApp]?.includes(item.fromComponent);
+      if (!nodeMap.has(fromId)) {
+        nodeMap.set(fromId, {
+          id: fromId,
+          name: item.fromComponent,
+          type: isService ? 'service' : this.inferEntityType(item.fromComponent, item.toType),
+          app: fromAppId,
+        });
       }
-    });
-  }, 0);
-});
+      const belongsKey = `${fromAppId}-${fromId}-belongs`;
+      if (!existingLinks.has(belongsKey)) {
+        links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
+        existingLinks.add(belongsKey);
+      }
+    } else if (item.fromEntity) {
+      fromId = `${fromAppId}-${item.fromEntity}`;
+      if (!nodeMap.has(fromId)) {
+        nodeMap.set(fromId, {
+          id: fromId,
+          name: item.fromEntity,
+          type: this.inferEntityType(item.fromEntity, item.toType),
+          app: fromAppId,
+        });
+      }
+      const belongsKey = `${fromAppId}-${fromId}-belongs`;
+      if (!existingLinks.has(belongsKey)) {
+        links.push({ source: fromAppId, target: fromId, interaction: 'belongs' });
+        existingLinks.add(belongsKey);
+      }
+    }
 
+    const toAppId = item.toApp;
+    if (!nodeMap.has(toAppId)) {
+      nodeMap.set(toAppId, { id: toAppId, name: item.toApp, type: 'app' });
+    }
 
+    let toId = toAppId;
+    if (item.toComponent) {
+      toId = `${toAppId}-${item.toComponent}`;
+      const isService = this.appServices[item.toApp]?.includes(item.toComponent);
+      if (!nodeMap.has(toId)) {
+        nodeMap.set(toId, {
+          id: toId,
+          name: item.toComponent,
+          type: isService ? 'service' : this.inferEntityType(item.toComponent, item.toType),
+          app: toAppId,
+        });
+      }
+      const belongsKey = `${toAppId}-${toId}-belongs`;
+      if (!existingLinks.has(belongsKey)) {
+        links.push({ source: toAppId, target: toId, interaction: 'belongs' });
+        existingLinks.add(belongsKey);
+      }
+    } else if (item.toEntity) {
+      toId = `${toAppId}-${item.toEntity}`;
+      if (!nodeMap.has(toId)) {
+        nodeMap.set(toId, {
+          id: toId,
+          name: item.toEntity,
+          type: this.inferEntityType(item.toEntity, item.toType),
+          app: toAppId,
+        });
+      }
+      const belongsKey = `${toAppId}-${toId}-belongs`;
+      if (!existingLinks.has(belongsKey)) {
+        links.push({ source: toAppId, target: toId, interaction: 'belongs' });
+        existingLinks.add(belongsKey);
+      }
+    }
 
-.full-height-dialog .mat-dialog-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.full-height-dialog .mat-dialog-content {
-  margin: 0;
-  padding: 0;
-  max-height: none;
-  flex-grow: 1;
-  overflow: hidden;
-}
-
-.tooltip {
-  position: absolute;
-  background: #f9f9f9;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  pointer-events: none;
-}
-
-
-// Tooltip setup for click actions
-const actionTooltip = d3.select('body')
-  .append('div')
-  .attr('class', 'action-tooltip')
-  .style('position', 'absolute')
-  .style('background', '#f9f9f9')
-  .style('padding', '5px')
-  .style('border', '1px solid #ccc')
-  .style('border-radius', '3px')
-  .style('pointer-events', 'auto')
-  .style('opacity', 0);
-
-node.on('click', (event, d) => {
-  actionTooltip.transition()
-    .duration(200)
-    .style('opacity', 0.9);
-  actionTooltip.html(`
-    <div>Options for ${d.name}:</div>
-    <button onclick="window.viewNextLevel('${d.id}')">View Next Level</button><br>
-    <button onclick="window.viewDependencies('${d.id}')">View Dependencies</button>
-  `)
-    .style('left', (event.pageX + 10) + 'px')
-    .style('top', (event.pageY - 28) + 'px');
-
-  // Hide tooltip on click outside
-  d3.select('body').on('click', (e) => {
-    if (!actionTooltip.node().contains(e.target)) {
-      actionTooltip.transition()
-        .duration(500)
-        .style('opacity', 0);
+    if (fromId !== toId) {
+      const linkKey = `${fromId}-${toId}-${item.toType}`;
+      if (!existingLinks.has(linkKey)) {
+        links.push({ source: fromId, target: toId, interaction: item.toType });
+        existingLinks.add(linkKey);
+      }
     }
   });
-});
 
-// Define action functions globally
-window.viewNextLevel = (id) => {
-  this.http.get<ApiLink[]>(`http://your-api-endpoint/relationships/${id}`).subscribe({
-    next: (relationships) => {
-      this.convertApiDataToGraph(relationships, true);
-      this.renderFlowmap();
-    },
-    error: (error) => console.error(`Error fetching next level for ${id}:`, error),
-  });
-};
-
-window.viewDependencies = (id) => {
-  this.http.get<ApiLink[]>(`http://your-api-endpoint/dependencies/${id}`).subscribe({
-    next: (dependencies) => {
-      this.convertApiDataToGraph(dependencies, true);
-      this.renderFlowmap();
-    },
-    error: (error) => console.error(`Error fetching dependencies for ${id}:`, error),
-  });
-};
-
-
-
-
-<div class="dialog-container" #flowmapContainer>
-  <div id="action-menu" class="action-menu" [style.display]="showActionMenu ? 'block' : 'none'" 
-       [style.left.px]="actionMenuX" [style.top.px]="actionMenuY">
-    <div>Options for {{ selectedNode?.name }}:</div>
-    <button (click)="viewNextLevel()">View Next Level</button><br>
-    <button (click)="viewDependencies()">View Dependencies</button>
-  </div>
-</div>
-
-
-.dialog-container {
-  width: 100%;
-  height: 100%;
-  position: relative; /* Ensure action menu positions relative to this */
-}
-
-.action-menu {
-  position: absolute;
-  background: #f9f9f9;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  z-index: 10; /* Ensure it’s above SVG elements */
-}
-
-
-
-// Properties
-showActionMenu = false;
-actionMenuX = 0;
-actionMenuY = 0;
-selectedNode: MicroserviceNode | null = null;
-
-// Inside renderFlowmap, after node selection
-node.on('click', (event, d) => {
-  this.selectedNode = d;
-  this.actionMenuX = event.offsetX + 10; // Position relative to click
-  this.actionMenuY = event.offsetY - 20;
-  this.showActionMenu = true;
-
-  // Hide on click outside
-  d3.select('body').on('click', (e) => {
-    if (!d3.select(e.target).closest('#action-menu').size() && !d3.select(e.target).closest('.nodes').size()) {
-      this.showActionMenu = false;
-    }
-  });
-});
-
-// Action methods
-viewNextLevel() {
-  if (this.selectedNode && (this.selectedNode.type === 'app' || this.selectedNode.type === 'service')) {
-    this.http.get<ApiLink[]>(`http://your-api-endpoint/relationships/${this.selectedNode.id}`).subscribe({
-      next: (relationships) => {
-        this.convertApiDataToGraph(relationships, true);
-        this.renderFlowmap();
-        this.showActionMenu = false; // Hide after action
-      },
-      error: (error) => console.error(`Error fetching relationships for ${this.selectedNode.id}:`, error),
-    });
-  }
-}
-
-viewDependencies() {
-  if (this.selectedNode && (this.selectedNode.type === 'app' || this.selectedNode.type === 'service')) {
-    this.http.get<ApiLink[]>(`http://your-api-endpoint/dependencies/${this.selectedNode.id}`).subscribe({
-      next: (dependencies) => {
-        this.convertApiDataToGraph(dependencies, true);
-        this.renderFlowmap();
-        this.showActionMenu = false; // Hide after action
-      },
-      error: (error) => console.error(`Error fetching dependencies for ${this.selectedNode.id}:`, error),
-    });
-  }
+  this.nodes = Array.from(nodeMap.values());
+  this.links = links;
 }
