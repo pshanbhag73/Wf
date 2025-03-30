@@ -1,3 +1,23 @@
+node.on('click', (event, d) => {
+  this.selectedNode = d;
+  this.actionMenuX = event.offsetX + 10;
+  this.actionMenuY = event.offsetY - 20;
+  this.showActionMenu = true;
+
+  // Hide on click outside
+  setTimeout(() => { // Delay to avoid immediate hide
+    d3.select('body').on('click.outside', (e) => {
+      if (!d3.select(e.target).closest('#action-menu').size() && !d3.select(e.target).closest('.nodes').size()) {
+        this.showActionMenu = false;
+        this.$apply(); // Apply changes if using Angular (remove if not needed)
+        d3.select('body').on('click.outside', null); // Clean up listener
+      }
+    });
+  }, 0);
+});
+
+
+
 .full-height-dialog .mat-dialog-container {
   padding: 0;
   display: flex;
