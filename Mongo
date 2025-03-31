@@ -1,0 +1,46 @@
+db.collection.aggregate([
+  // Sort by end time descending to get latest records first
+  {
+    $sort: {
+      endTime: -1
+    }
+  },
+  // Group by jobId first to get the latest status for each job
+  {
+    $group: {
+      _id: {
+        jobId: "$jobId",
+        appId: "$appId"
+      },
+      latestStatus: { $first: "$status" }
+    }
+  },
+  // Group by appId and status to get counts
+  {
+    $group: {
+      _id: {
+        appId: "$_id.appId",
+        status: "$latestStatus"
+      },
+      count: { $sum: 1 }
+    }
+  },
+  // Optional: reshape the output for better readability
+  {
+    $group: {
+      _id: "$_id.appId",
+      statuses: {
+        $push: {
+          status: "$_id.status",
+          count: "$count"
+        }
+      }
+    }
+  },
+  // Optional: sort by appId
+  {
+    $sort: {
+      _id: 1
+    }
+  }
+])
