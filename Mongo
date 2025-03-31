@@ -1,3 +1,5 @@
+db.collection.createIndex({ "scheduler": 1, "endTime": -1, "jobId": 1, "appId": 1 })
+
 db.collection.aggregate([
   // Sort by end time descending to get latest records first
   {
