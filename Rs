@@ -1,0 +1,55 @@
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCreator;
+import org.springframework.stereotype.Component;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+@Component
+public class EmployeeDao {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    public List<String> getEmployeesByDepartment(String deptName, int fetchSize) {
+        String sql = "SELECT first_name FROM employees WHERE department = ?";
+
+        return jdbcTemplate.query(
+            new PreparedStatementCreator() {
+                @Override
+                public PreparedStatement createPreparedStatement(Connection con) throws SQLException {
+                    PreparedStatement ps = con.prepareStatement(
+                        sql,
+                        ResultSet.TYPE_FORWARD_ONLY,
+                        ResultSet.CONCUR_READ_ONLY
+                    );
+                    ps.setString(1, deptName);
+                    ps.setFetchSize(fetchSize); // Set the fetch size
+                    return ps;
+                }
+            },
+            (ResultSet rs) -> {
+                List<String> employeeNames = new ArrayList<>();
+
+                // Check if ResultSet has rows and process them
+                if (!rs.next()) {
+                    System.out.println("ResultSet is empty - no rows returned.");
+                    return employeeNames;
+                }
+
+                do {
+                    String name = rs.getString("first_name");
+                    employeeNames.add(name);
+                    System.out.println("Processing: " + name);
+                } while (rs.next());
+
+                return employeeNames;
+            }
+        );
+    }
+}
