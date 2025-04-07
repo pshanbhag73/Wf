@@ -1,3 +1,37 @@
+// Run in MongoDB shell or Node.js with MongoDB driver
+const keepRuns = db.collection.aggregate([
+  { $match: { scheduler: "abc" } },
+  { $sort: { endTime: -1 } },
+  {
+    $group: {
+      _id: "$jobId",
+      jobRunIds: { $push: "$jobRunId" }
+    }
+  },
+  {
+    $project: {
+      jobRunIds: { $slice: ["$jobRunIds", 30] }
+    }
+  },
+  { $unwind: "$jobRunIds" },
+  {
+    $group: {
+      _id: null,
+      keepRunIds: { $push: "$jobRunIds" }
+    }
+  }
+]).toArray();
+
+const keepRunIds = keepRuns.length > 0 ? keepRuns[0].keepRunIds : [];
+
+const result = db.collection.deleteMany({
+  scheduler: "abc",
+  jobRunId: { $nin: keepRunIds }
+});
+
+print(`Deleted ${result.deletedCount} runs`);
+
+
 db.collection.createIndex({ "scheduler": 1, "endTime": -1, "jobId": 1, "appId": 1 })
 
 db.collection.aggregate([
