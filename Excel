@@ -1,0 +1,1 @@
+=IF(LEFT(Sheet2!A1, LEN(Sheet1!A1))=Sheet1!A1, "Starts With", "Does Not Start With")
