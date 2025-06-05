@@ -1,0 +1,55 @@
+Step 3: Rate Relationships (Confidence Scoring)
+
+Assign a confidence score to each matched relationship based on:
+
+Number of Sources: More sources confirming the relationship increase confidence.
+
+
+
+Source Reliability: Assign weights to sources based on their trustworthiness (e.g., CMDB = 0.8, Logs = 0.5).
+
+
+
+Recency: Recent last_seen timestamps indicate active relationships.
+
+
+
+Consistency: Agreement on details (e.g., same connection_type or metadata).
+
+
+Scoring Formula:
+
+
+Confidence = (Sum of Source Weights) * Recency Factor * Consistency Factor
+
+
+
+Source Weight: Predefined weight for each source (e.g., CMDB = 0.8, API Gateway = 0.7, Logs = 0.5).
+
+
+
+Recency Factor:
+
+If last_seen is within 30 days: 1.0
+
+
+
+30–90 days: 0.8
+
+
+
+Older than 90 days: 0.5
+
+
+Consistency Factor:
+
+1.0 if all records in the cluster agree on connection_type and key metadata.
+
+
+
+Reduce by 0.1 for each conflicting field (e.g., different connection_type).
+
+
+Maximum Score: Normalize to 100.
+
+
