@@ -1,121 +1,66 @@
-Revised Confidence Formula
+The new formula becomes:
 
-Let’s redefine the confidence score as:
 
+Source Contribution = Source Weight × Source Recency Factor × Source Consistency Factor
+Total Raw Confidence = (Sum of Source Contributions) × (1 + 0.1 × (Number of Sources - 1))
+Final Confidence = min(Total Raw Confidence × 100, 100)
 
-Raw Confidence = (Sum of Source Weights) × (1 + 0.1 × (Number of Sources - 1)) × Recency Factor × Consistency Factor
-Final Confidence = min(Raw Confidence × 100, 100)
 
 
+Source Weight: The predefined weight for the source (e.g., 0.5 for all sources, as specified).
 
-Sum of Source Weights: Instead of averaging, we sum the weights of all contributing sources. This allows the score to grow as more sources are added.
 
 
+Source Recency Factor: Computed based on the last_seen timestamp of that source’s record (e.g., 1.0 if <7 days, 0.8 if 7–30 days, etc.).
 
-Number of Sources Bonus: (1 + 0.1 × (Number of Sources - 1)) adds a small bonus for each additional source beyond the first (e.g., 1 source → 1.0, 2 sources → 1.1, 3 sources → 1.2). The 0.1 factor can be adjusted based on how much you want to reward additional sources.
 
 
+Source Consistency Factor: Computed based on how well the source’s connection_type aligns with the most common connection_type in the cluster (e.g., 1.0 if it matches, 0.7 if it doesn’t).
 
-Recency and Consistency Factors: These remain unchanged.
 
 
+Sources Bonus: (1 + 0.1 × (Number of Sources - 1)) remains to reward having more sources.
 
-Normalization: We still scale to 0–100, but since the raw score can now exceed 1 (due to summing weights and the sources bonus), we use min() to cap the final score at 100.
 
+Steps to Compute Per-Source Factors
 
-Example with Revised Formula (All Weights = 0.5)
+Per-Source Recency:
 
-Cluster 1: Dependency seen in 1 source (CMDB, weight = 0.5).
+For each record, compute the recency factor based on its last_seen timestamp.
 
-Sum of Source Weights: 0.5.
 
 
+Use the same thresholds: 1.0 (<7 days), 0.8 (7–30 days), 0.5 (30–90 days), 0.2 (>90 days).
 
-Sources Bonus: 1 + 0.1 × (1 - 1) = 1.0.
 
+Per-Source Consistency:
 
+Determine the most common connection_type in the cluster (e.g., if 2 sources report "API" and 1 reports "DB", "API" is the majority).
 
-Recency: 1.0.
 
 
+For each source:
 
-Consistency: 1.0.
+If its connection_type matches the majority, assign a consistency factor of 1.0.
 
 
 
-Raw Confidence = 0.5 × 1.0 × 1.0 × 1.0 = 0.5.
+If it disagrees, assign a consistency factor of 0.7.
 
 
+For a single source, the consistency factor is always 1.0 (no conflict possible).
 
-Final Confidence = 0.5 × 100 = 50.
 
+Combine Contributions:
 
-Cluster 2: Dependency seen in 3 sources (CMDB, API Gateway, Logs, all weights = 0.5).
+For each source, compute its contribution as Weight × Recency × Consistency.
 
-Sum of Source Weights: 0.5 + 0.5 + 0.5 = 1.5.
 
 
+Sum the contributions across all sources.
 
-Sources Bonus: 1 + 0.1 × (3 - 1) = 1 + 0.2 = 1.2.
 
 
-
-Recency: 1.0.
-
-
-
-Consistency: 1.0.
-
-
-
-Raw Confidence = 1.5 × 1.2 × 1.0 × 1.0 = 1.8.
-
-
-
-Final Confidence = min(1.8 × 100, 100) = 100.
-
-
-Analysis of Results
-
-Cluster 1: A dependency seen in only one source gets a confidence score of 50, which aligns with a single, moderately reliable source (weight 0.5).
-
-
-
-Cluster 2: A dependency seen in three sources gets a much higher score (100, capped), reflecting the increased reliability from multiple confirmations.
-
-
-
-Improvement: The revised formula rewards the presence of more sources, ensuring that the confidence score increases as more data sources corroborate the dependency, even when all weights are 0.5.
-
-
-Adjusting for Balance
-
-If the scores increase too quickly (e.g., reaching 100 with just 3 sources), you can:
-
-Reduce the source weight (e.g., use 0.3 instead of 0.5).
-
-
-
-Lower the sources bonus factor (e.g., use 0.05 instead of 0.1).
-
-
-
-Example with Adjusted Parameters (weight = 0.3, bonus factor = 0.05):
-
-Cluster 2 (3 sources):
-
-Sum of Source Weights: 0.3 + 0.3 + 0.3 = 0.9.
-
-
-
-Sources Bonus: 1 + 0.05 × (3 - 1) = 1.1.
-
-
-
-Raw Confidence = 0.9 × 1.1 × 1.0 × 1.0 = 0.99.
-
-
-
-Final Confidence = 0.99 × 100 = 99
+Apply the sources bonus and scale to 0–100.
 
 
