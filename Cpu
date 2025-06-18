@@ -6,3 +6,9 @@ function checkCPULoad() {
   lastTime = currentTime;
   return delta > threshold; // High CPU if frame time is too long
 }
+
+const renderer = new THREE.WebGLRenderer();
+const gl = renderer.getContext();
+const isWebGL2 = gl instanceof WebGL2RenderingContext;
+const maxTextures = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+const isWeakGPU = !isWebGL2 || maxTextures < 16; // Example threshold for weak GPU
