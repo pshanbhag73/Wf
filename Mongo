@@ -2,16 +2,27 @@ db.collection.aggregate([
   {
     $addFields: {
       ipOnly: {
-        $regexFind: {
-          input: "$fieldName", // Replace with your field name
-          regex: "^(?:\\[?)([0-9a-fA-F.:]+)(?:\\]?)(?::\\d+)?$" // Captures IP, excludes port
+        $cond: {
+          if: { $regexMatch: { input: "$fieldName", regex: "\\[" } }, // Check for IPv6 with brackets
+          then: {
+            $arrayElemAt: [
+              { $split: { $trim: { input: "$fieldName", chars: "[]" }, ":" } },
+              0
+            ]
+          },
+          else: {
+            $arrayElemAt: [
+              { $split: "$fieldName", ":" },
+              0
+            ]
+          }
         }
       }
     }
   },
   {
     $group: {
-      _id: "$ipOnly.match" // Group by extracted IP
+      _id: "$ipOnly" // Group by extracted IP
     }
   },
   {
