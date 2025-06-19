@@ -1,82 +1,28 @@
-// Run in MongoDB shell or Node.js with MongoDB driver
-const keepRuns = db.collection.aggregate([
-  { $match: { scheduler: "abc" } },
-  { $sort: { endTime: -1 } },
-  {
-    $group: {
-      _id: "$jobId",
-      jobRunIds: { $push: "$jobRunId" }
-    }
-  },
-  {
-    $project: {
-      jobRunIds: { $slice: ["$jobRunIds", 30] }
-    }
-  },
-  { $unwind: "$jobRunIds" },
-  {
-    $group: {
-      _id: null,
-      keepRunIds: { $push: "$jobRunIds" }
-    }
-  }
-]).toArray();
-
-const keepRunIds = keepRuns.length > 0 ? keepRuns[0].keepRunIds : [];
-
-const result = db.collection.deleteMany({
-  scheduler: "abc",
-  jobRunId: { $nin: keepRunIds }
-});
-
-print(`Deleted ${result.deletedCount} runs`);
-
-
-db.collection.createIndex({ "scheduler": 1, "endTime": -1, "jobId": 1, "appId": 1 })
-
 db.collection.aggregate([
-  // Sort by end time descending to get latest records first
   {
-    $sort: {
-      endTime: -1
-    }
-  },
-  // Group by jobId first to get the latest status for each job
-  {
-    $group: {
-      _id: {
-        jobId: "$jobId",
-        appId: "$appId"
-      },
-      latestStatus: { $first: "$status" }
-    }
-  },
-  // Group by appId and status to get counts
-  {
-    $group: {
-      _id: {
-        appId: "$_id.appId",
-        status: "$latestStatus"
-      },
-      count: { $sum: 1 }
-    }
-  },
-  // Optional: reshape the output for better readability
-  {
-    $group: {
-      _id: "$_id.appId",
-      statuses: {
-        $push: {
-          status: "$_id.status",
-          count: "$count"
+    $addFields: {
+      ipOnly: {
+        $regexFind: {
+          input: "$fieldName", // Replace with your field name
+          regex: "^(?:\\[?)(.*?)(?:\\]?:\\d+$|$)" // Matches IPv4 or IPv6 before port
         }
       }
     }
   },
-  // Optional: sort by appId
   {
-    $sort: {
-      _id: 1
+    $group: {
+      _id: "$ipOnly.match" // Group by the extracted IP
+    }
+  },
+  {
+    $match: {
+      "_id": { $ne: null } // Exclude null matches
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      ip: "$_id"
     }
   }
 ])
