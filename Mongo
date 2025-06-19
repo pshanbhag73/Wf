@@ -4,14 +4,14 @@ db.collection.aggregate([
       ipOnly: {
         $regexFind: {
           input: "$fieldName", // Replace with your field name
-          regex: "^(?:\\[?)(.*?)(?:\\]?:\\d+$|$)" // Matches IPv4 or IPv6 before port
+          regex: "^(?:\\[?)([0-9a-fA-F.:]+)(?:\\]?)(?::\\d+)?$" // Captures IP, excludes port
         }
       }
     }
   },
   {
     $group: {
-      _id: "$ipOnly.match" // Group by the extracted IP
+      _id: "$ipOnly.match" // Group by extracted IP
     }
   },
   {
