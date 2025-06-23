@@ -1,39 +1,23 @@
 db.collection.aggregate([
   {
-    $addFields: {
-      ipOnly: {
-        $cond: {
-          if: { $regexMatch: { input: "$fieldName", regex: "\\[" } }, // Check for IPv6 with brackets
-          then: {
-            $arrayElemAt: [
-              { $split: { $trim: { input: "$fieldName", chars: "[]" }, ":" } },
-              0
-            ]
-          },
-          else: {
-            $arrayElemAt: [
-              { $split: "$fieldName", ":" },
-              0
+    $project: {
+      _id: 0, // Exclude _id if not needed
+      Field1: 1, // Keep other fields
+      Field2: 1,
+      Source: 1,
+      ConnectionsString: {
+        $reduce: {
+          input: { $slice: ["$Connections", 5] }, // Take first 5 objects
+          initialValue: "",
+          in: {
+            $concat: [
+              "$$value",
+              { $cond: [{ $eq: ["$$value", ""] }, "", ", "] },
+              "$$this.name" // Replace 'name' with desired field
             ]
           }
         }
       }
-    }
-  },
-  {
-    $group: {
-      _id: "$ipOnly" // Group by extracted IP
-    }
-  },
-  {
-    $match: {
-      "_id": { $ne: null } // Exclude null matches
-    }
-  },
-  {
-    $project: {
-      _id: 0,
-      ip: "$_id"
     }
   }
 ])
