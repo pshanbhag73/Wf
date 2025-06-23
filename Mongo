@@ -1,19 +1,40 @@
 db.collection.aggregate([
   {
+    $set: {
+      AllConnections: {
+        $reduce: {
+          input: "$Source",
+          initialValue: [],
+          in: { $concatArrays: ["$$value", "$$this.Connections"] }
+        }
+      }
+    }
+  },
+  {
+    $set: {
+      AllConnections: {
+        $sortArray: {
+          input: "$AllConnections",
+          sortBy: { score: -1 } // Sort by 'score' descending
+        }
+      }
+    }
+  },
+  {
     $project: {
-      _id: 0, // Exclude _id if not needed
-      Field1: 1, // Keep other fields
+      _id: 0,
+      Field1: 1,
       Field2: 1,
       Source: 1,
       ConnectionsString: {
         $reduce: {
-          input: { $slice: ["$Connections", 5] }, // Take first 5 objects
+          input: { $slice: ["$AllConnections", 5] }, // Top 5 connections
           initialValue: "",
           in: {
             $concat: [
               "$$value",
               { $cond: [{ $eq: ["$$value", ""] }, "", ", "] },
-              "$$this.name" // Replace 'name' with desired field
+              "$$this.connName" // Concatenate 'connName'
             ]
           }
         }
