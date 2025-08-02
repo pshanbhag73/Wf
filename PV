@@ -1,0 +1,142 @@
+import { Component, ElementRef, OnInit, OnDestroy } from '@angular/core';
+import * as d3 from 'd3';
+
+@Component({
+  selector: 'app-traceroute-graph',
+  template: '<div class="graph-container"></div>',
+  styleUrls: ['./traceroute-graph.component.css']
+})
+export class TracerouteGraphComponent implements OnInit, OnDestroy {
+  private svg: any;
+  private simulation: any;
+  private width = 800;
+  private height = 400;
+
+  // Sample traceroute data (hops as nodes, consecutive connections as links)
+  private nodes = [
+    { id: 'Hop1', ip: '192.168.1.1', latency: 5 },
+    { id: 'Hop2', ip: '10.0.0.1', latency: 10 },
+    { id: 'Hop3', ip: '172.16.0.1', latency: 20 },
+    { id: 'Hop4', ip: '8.8.8.8', latency: 30 },
+    { id: 'Hop5', ip: 'Destination', latency: 40 }
+  ];
+
+  private links = [
+    { source: 'Hop1', target: 'Hop2' },
+    { source: 'Hop2', target: 'Hop3' },
+    { source: 'Hop3', target: 'Hop4' },
+    { source: 'Hop4', target: 'Hop5' }
+  ];
+
+  constructor(private elementRef: ElementRef) {}
+
+  ngOnInit(): void {
+    // Create SVG container
+    this.svg = d3.select(this.elementRef.nativeElement.querySelector('.graph-container'))
+      .append('svg')
+      .attr('width', this.width)
+      .attr('height', this.height)
+      .attr('viewBox', [0, 0, this.width, this.height])
+      .style('background', '#f0f0f0');
+
+    // Initialize force simulation for layout
+    this.simulation = d3.forceSimulation(this.nodes)
+      .force('link', d3.forceLink(this.links).id((d: any) => d.id).distance(150))  // Link distance for spacing
+      .force('charge', d3.forceManyBody().strength(-200))  // Repulsion to spread nodes
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2))  // Center the graph
+      .force('x', d3.forceX().strength(0.1))  // Encourage horizontal alignment for a "path-like" route
+      .on('tick', this.ticked.bind(this));
+
+    // Add links (lines)
+    const link = this.svg.append('g')
+      .selectAll('line')
+      .data(this.links)
+      .enter().append('line')
+      .attr('stroke', '#999')
+      .attr('stroke-width', 2);
+
+    // Add nodes (circles)
+    const node = this.svg.append('g')
+      .selectAll('circle')
+      .data(this.nodes)
+      .enter().append('circle')
+      .attr('r', 10)
+      .attr('fill', 'steelblue')
+      .call(this.drag(this.simulation));  // Enable dragging for interactivity
+
+    // Add labels (hop ID and latency)
+    const label = this.svg.append('g')
+      .selectAll('text')
+      .data(this.nodes)
+      .enter().append('text')
+      .text((d: any) => `${d.id} (${d.latency}ms)`)
+      .attr('dx', 12)
+      .attr('dy', '.35em')
+      .style('font-size', '12px');
+
+    // Tooltip for IP on hover
+    const tooltip = d3.select('body').append('div')
+      .attr('class', 'tooltip')
+      .style('opacity', 0)
+      .style('position', 'absolute')
+      .style('background', '#fff')
+      .style('border', '1px solid #ccc')
+      .style('padding', '5px');
+
+    node.on('mouseover', (event: any, d: any) => {
+      tooltip.transition().duration(200).style('opacity', .9);
+      tooltip.html(`IP: ${d.ip}<br>Latency: ${d.latency}ms`)
+        .style('left', (event.pageX + 5) + 'px')
+        .style('top', (event.pageY - 28) + 'px');
+    }).on('mouseout', () => {
+      tooltip.transition().duration(500).style('opacity', 0);
+    });
+
+    // Update positions on each tick
+    this.ticked = () => {
+      link
+        .attr('x1', (d: any) => d.source.x)
+        .attr('y1', (d: any) => d.source.y)
+        .attr('x2', (d: any) => d.target.x)
+        .attr('y2', (d: any) => d.target.y);
+
+      node
+        .attr('cx', (d: any) => d.x)
+        .attr('cy', (d: any) => d.y);
+
+      label
+        .attr('x', (d: any) => d.x)
+        .attr('y', (d: any) => d.y);
+    };
+  }
+
+  // Drag behavior
+  private drag(simulation: any): any {
+    return d3.drag()
+      .on('start', (event: any, d: any) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event: any, d: any) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event: any, d: any) => {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      });
+  }
+
+  private ticked(): void {
+    // Defined in ngOnInit for binding
+  }
+
+  ngOnDestroy(): void {
+    // Clean up
+    if (this.simulation) this.simulation.stop();
+    d3.select(this.elementRef.nativeElement).selectAll('*').remove();
+    d3.select('.tooltip').remove();
+  }
+}
