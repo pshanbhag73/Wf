@@ -6,8 +6,8 @@
     <title>Incident Pulse - Triaging Incidents</title>
     <style>
         body {
-            background-color: #001f3f;
-            color: white;
+            background-color: #ffffff;
+            color: #001f3f;
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
@@ -15,15 +15,21 @@
             flex-direction: column;
             align-items: center;
         }
+        .header {
+            background-color: #ff0000;
+            color: white;
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
         .title {
             font-size: 48px;
-            margin-bottom: 10px;
-            text-align: center;
+            margin: 0;
         }
         .subtitle {
             font-size: 16px;
-            margin-bottom: 40px;
-            text-align: center;
+            margin-top: 10px;
         }
         .card {
             background-color: white;
@@ -34,6 +40,7 @@
             width: 80%;
             max-width: 600px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border: 1px solid #ff0000;
         }
         .card-header {
             display: flex;
@@ -48,6 +55,7 @@
         .card-title {
             font-size: 24px;
             font-weight: bold;
+            color: #ff0000;
         }
         .card-description {
             font-size: 14px;
@@ -59,7 +67,7 @@
             gap: 10px;
         }
         .button {
-            background-color: #001f3f;
+            background-color: #ff0000;
             color: white;
             padding: 8px 16px;
             border-radius: 20px;
@@ -74,19 +82,21 @@
     </style>
 </head>
 <body>
-    <h1 class="title">Incident Pulse - Triaging Incidents</h1>
-    <p class="subtitle">https://evr.priout.nonptdd.is.of indcurfects!</p>
+    <div class="header">
+        <h1 class="title">Incident Pulse - Triaging Incidents</h1>
+        <p class="subtitle">https://evr.priout.nonptdd.is.of indcurfects!</p>
+    </div>
     
     <div class="card">
         <div class="card-header">
             <svg class="card-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="30" cy="30" r="28" fill="#001f3f" stroke="#fff" stroke-width="2"/>
-                <path d="M30 50 L20 30 L40 30 Z" fill="#fff"/>
-                <text x="30" y="25" text-anchor="middle" fill="#fff" font-size="12">556M</text>
+                <circle cx="30" cy="30" r="28" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
+                <path d="M30 50 L20 30 L40 30 Z" fill="#001f3f"/>
+                <text x="30" y="25" text-anchor="middle" fill="#001f3f" font-size="12">556M</text>
             </svg>
             <div>
                 <h2 class="card-title">URL Tracker</h2>
-                <p class="card-description">Arcectore elainion alit il aregion reibicdant.</p>
+                <p class="card-description">Arcecectore elainion alit il aregion reibicdant.</p>
             </div>
         </div>
         <div class="buttons">
@@ -101,10 +111,10 @@
     <div class="card">
         <div class="card-header">
             <svg class="card-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                <rect x="10" y="10" width="40" height="30" rx="5" fill="#001f3f" stroke="#fff" stroke-width="2"/>
-                <rect x="20" y="40" width="20" height="10" fill="#001f3f" stroke="#fff" stroke-width="2"/>
-                <line x1="10" y1="15" x2="50" y2="15" stroke="#fff" stroke-width="1"/>
-                <line x1="10" y1="20" x2="50" y2="20" stroke="#fff" stroke-width="1"/>
+                <rect x="10" y="10" width="32" height="30" rx="5" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
+                <rect x="20" y="40" width="20" height="10" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
+                <line x1="10" y1="15" x2="42" y2="15" stroke="#001f3f" stroke-width="1"/>
+                <line x1="10" y1="20" x2="42" y2="20" stroke="#001f3f" stroke-width="1"/>
             </svg>
             <div>
                 <h2 class="card-title">Device Tracker</h2>
@@ -112,15 +122,15 @@
             </div>
         </div>
         <svg class="graph" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="150" cy="50" r="20" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <text x="150" y="55" text-anchor="middle" fill="#001f3f" font-size="16">⏱</text>
-            <circle cx="100" cy="20" r="10" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <circle cx="200" cy="20" r="10" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <circle cx="100" cy="80" r="10" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <circle cx="200" cy="80" r="10" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <circle cx="50" cy="50" r="10" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <circle cx="250" cy="50" r="10" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <path d="M150 50 L100 20 M150 50 L200 20 M150 50 L100 80 M150 50 L200 80 M150 50 L50 50 M150 50 L250 50" stroke="#001f3f" stroke-width="2" fill="none"/>
+            <circle cx="150" cy="50" r="20" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <text x="150" y="55" text-anchor="middle" fill="#ff0000" font-size="16">⏱</text>
+            <circle cx="100" cy="20" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <circle cx="200" cy="20" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <circle cx="100" cy="80" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <circle cx="200" cy="80" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <circle cx="50" cy="50" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <circle cx="250" cy="50" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <path d="M150 50 L100 20 M150 50 L200 20 M150 50 L100 80 M150 50 L200 80 M150 50 L50 50 M150 50 L250 50" stroke="#ff0000" stroke-width="2" fill="none"/>
         </svg>
         <div class="buttons">
             <div class="button">Artovals</div>
@@ -133,8 +143,8 @@
     <div class="card">
         <div class="card-header">
             <svg class="card-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                <rect x="15" y="15" width="30" height="30" rx="5" fill="#001f3f" stroke="#fff" stroke-width="2"/>
-                <text x="30" y="35" text-anchor="middle" fill="#fff" font-size="14">MQL</text>
+                <rect x="15" y="15" width="30" height="30" rx="5" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
+                <text x="30" y="35" text-anchor="middle" fill="#001f3f" font-size="14">MQL</text>
             </svg>
             <div>
                 <h2 class="card-title">Application Flowmap</h2>
@@ -142,16 +152,16 @@
             </div>
         </div>
         <svg class="graph" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
-            <line x1="20" y1="50" x2="280" y2="50" stroke="#e6f7ff" stroke-width="2"/>
-            <circle cx="50" cy="50" r="15" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <text x="50" y="55" text-anchor="middle" fill="#001f3f" font-size="12">☁</text>
-            <circle cx="120" cy="50" r="15" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <text x="120" y="55" text-anchor="middle" fill="#001f3f" font-size="12">⏰</text>
-            <circle cx="180" cy="50" r="15" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <text x="180" y="55" text-anchor="middle" fill="#001f3f" font-size="12">✉</text>
-            <circle cx="250" cy="50" r="15" fill="#e6f7ff" stroke="#001f3f" stroke-width="2"/>
-            <text x="250" y="55" text-anchor="middle" fill="#001f3f" font-size="12">Φ</text>
-            <path d="M120 30 L100 10 M120 70 L100 90 M180 30 L200 10 M180 70 L200 90 M250 30 L230 10 M250 70 L230 90" stroke="#e6f7ff" stroke-width="2" fill="none"/>
+            <line x1="20" y1="50" x2="280" y2="50" stroke="#ffcccc" stroke-width="2"/>
+            <circle cx="50" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <text x="50" y="55" text-anchor="middle" fill="#ff0000" font-size="12">☁</text>
+            <circle cx="120" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <text x="120" y="55" text-anchor="middle" fill="#ff0000" font-size="12">⏰</text>
+            <circle cx="180" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <text x="180" y="55" text-anchor="middle" fill="#ff0000" font-size="12">✉</text>
+            <circle cx="250" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
+            <text x="250" y="55" text-anchor="middle" fill="#ff0000" font-size="12">Φ</text>
+            <path d="M120 30 L100 10 M120 70 L100 90 M180 30 L200 10 M180 70 L200 90 M250 30 L230 10 M250 70 L230 90" stroke="#ffcccc" stroke-width="2" fill="none"/>
         </svg>
         <div class="buttons">
             <div class="button">Eavaritod</div>
