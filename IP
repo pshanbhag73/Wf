@@ -1,172 +1,212 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Incident Pulse - Triaging Incidents</title>
-    <style>
-        body {
-            background-color: #ffffff;
-            color: #001f3f;
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .header {
-            background-color: #ff0000;
-            color: white;
-            width: 100%;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        .title {
-            font-size: 48px;
-            margin: 0;
-        }
-        .subtitle {
-            font-size: 16px;
-            margin-top: 10px;
-        }
-        .card {
-            background-color: white;
-            color: #001f3f;
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 20px;
-            width: 80%;
-            max-width: 600px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            border: 1px solid #ff0000;
-        }
-        .card-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .card-icon {
-            width: 60px;
-            height: 60px;
-            margin-right: 20px;
-        }
-        .card-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #ff0000;
-        }
-        .card-description {
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        .buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .button {
-            background-color: #ff0000;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        .graph {
-            width: 100%;
-            height: 100px;
-            margin: 10px 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1 class="title">Incident Pulse - Triaging Incidents</h1>
-        <p class="subtitle">https://evr.priout.nonptdd.is.of indcurfects!</p>
+<!-- app.component.html -->
+<div class="header">
+  <h1>INCIDENT PULSE IN REVILYOUR VOSSPINESS</h1>
+</div>
+
+<div class="flow-container upper">
+  <svg class="road" viewBox="0 0 1000 400" preserveAspectRatio="none">
+    <path d="M50 300 C250 400 750 200 950 300" fill="none" stroke="#001f3f" stroke-width="60" stroke-dasharray="15 15"></path>
+  </svg>
+  <!-- Top labels (dark blue) -->
+  <div class="label top header-cell" style="left: 5%; top: 10%;">URL TRACKER</div>
+  <div class="label top header-cell" style="left: 30%; top: 0%;">Traftlers</div>
+  <div class="label top header-cell" style="left: 55%; top: 0%;">Seocs</div>
+  <div class="label top header-cell" style="left: 80%; top: 10%;">Abtcliior</div>
+  <!-- Main labels (white) -->
+  <div class="label main" style="left: 5%; top: 30%;">
+    EAPRCES
+    <svg class="icon computer" viewBox="0 0 50 40" xmlns="http://www.w3.org/2000/svg">
+      <rect x="5" y="5" width="40" height="25" rx="2" fill="#ccc"></rect>
+      <rect x="20" y="30" width="10" height="5" fill="#999"></rect>
+      <text x="25" y="20" text-anchor="middle" font-size="8" fill="#000">Αεροντιοο Εσνεβαιδα</text>
+    </svg>
+    <div class="sub-label red-icon">
+      <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <rect width="20" height="20" fill="#ff0000"></rect>
+        <text x="10" y="15" text-anchor="middle" fill="#fff" font-size="12">S</text>
+      </svg>
+      Burlex
     </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <svg class="card-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="30" cy="30" r="28" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
-                <path d="M30 50 L20 30 L40 30 Z" fill="#001f3f"/>
-                <text x="30" y="25" text-anchor="middle" fill="#001f3f" font-size="12">556M</text>
-            </svg>
-            <div>
-                <h2 class="card-title">URL Tracker</h2>
-                <p class="card-description">Arcecectore elainion alit il aregion reibicdant.</p>
-            </div>
-        </div>
-        <div class="buttons">
-            <div class="button">Exteregor</div>
-            <div class="button">Vitalaiatian5/9/858in</div>
-            <div class="button">Cantark</div>
-            <div class="button">Corniorole</div>
-            <div class="button">Sect toctale</div>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <svg class="card-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                <rect x="10" y="10" width="32" height="30" rx="5" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
-                <rect x="20" y="40" width="20" height="10" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
-                <line x1="10" y1="15" x2="42" y2="15" stroke="#001f3f" stroke-width="1"/>
-                <line x1="10" y1="20" x2="42" y2="20" stroke="#001f3f" stroke-width="1"/>
-            </svg>
-            <div>
-                <h2 class="card-title">Device Tracker</h2>
-                <p class="card-description">Arack sour reachability orecrsoridundt:ys</p>
-            </div>
-        </div>
-        <svg class="graph" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="150" cy="50" r="20" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <text x="150" y="55" text-anchor="middle" fill="#ff0000" font-size="16">⏱</text>
-            <circle cx="100" cy="20" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <circle cx="200" cy="20" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <circle cx="100" cy="80" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <circle cx="200" cy="80" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <circle cx="50" cy="50" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <circle cx="250" cy="50" r="10" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <path d="M150 50 L100 20 M150 50 L200 20 M150 50 L100 80 M150 50 L200 80 M150 50 L50 50 M150 50 L250 50" stroke="#ff0000" stroke-width="2" fill="none"/>
-        </svg>
-        <div class="buttons">
-            <div class="button">Artovals</div>
-            <div class="button">Salety</div>
-            <div class="button">Sensreclif</div>
-            <div class="button">SSia</div>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <svg class="card-icon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                <rect x="15" y="15" width="30" height="30" rx="5" fill="#ff0000" stroke="#001f3f" stroke-width="2"/>
-                <text x="30" y="35" text-anchor="middle" fill="#001f3f" font-size="14">MQL</text>
-            </svg>
-            <div>
-                <h2 class="card-title">Application Flowmap</h2>
-                <p class="card-description">Eotortable Evrtticatios Batclovanaectland and interconnectivity Keciolal Keiolriaa onliction</p>
-            </div>
-        </div>
-        <svg class="graph" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
-            <line x1="20" y1="50" x2="280" y2="50" stroke="#ffcccc" stroke-width="2"/>
-            <circle cx="50" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <text x="50" y="55" text-anchor="middle" fill="#ff0000" font-size="12">☁</text>
-            <circle cx="120" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <text x="120" y="55" text-anchor="middle" fill="#ff0000" font-size="12">⏰</text>
-            <circle cx="180" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <text x="180" y="55" text-anchor="middle" fill="#ff0000" font-size="12">✉</text>
-            <circle cx="250" cy="50" r="15" fill="#ffcccc" stroke="#ff0000" stroke-width="2"/>
-            <text x="250" y="55" text-anchor="middle" fill="#ff0000" font-size="12">Φ</text>
-            <path d="M120 30 L100 10 M120 70 L100 90 M180 30 L200 10 M180 70 L200 90 M250 30 L230 10 M250 70 L230 90" stroke="#ffcccc" stroke-width="2" fill="none"/>
-        </svg>
-        <div class="buttons">
-            <div class="button">Eavaritod</div>
-            <div class="button">Arolaoh</div>
-        </div>
-    </div>
-</body>
-</html>
+  </div>
+  <div class="label main" style="left: 30%; top: 40%;">
+    Sueles Diellerain
+    <p>Tuckie OUC Route</p>
+    <div class="sub-label">Device Tracker</div>
+  </div>
+  <div class="label main" style="left: 55%; top: 40%;">
+    <svg class="icon headphones" viewBox="0 0 50 40" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="10" width="10" height="20" rx="5" fill="#999"></rect>
+      <rect x="30" y="10" width="10" height="20" rx="5" fill="#999"></rect>
+      <path d="M15 10 Q25 0 35 10" fill="none" stroke="#999" stroke-width="5"></path>
+    </svg>
+    Eachigeler
+    <p>56.95 Ecridion</p>
+    <div class="sub-label">Imling Preranation</div>
+  </div>
+  <div class="label main" style="left: 80%; top: 30%;">
+    Reachability Cio; Sidaue
+    <p>Coatn sake UtteuadvaLele Dxhier</p>
+    <div class="sub-label">Arolnottnay Inserosts</div>
+  </div>
+  <!-- Cars -->
+  <svg class="car" style="left: 45%; top: 50%; transform: rotate(-30deg);">
+    <rect x="0" y="0" width="60" height="30" rx="5" fill="#fff" stroke="#000" stroke-width="2"></rect>
+    <circle cx="15" cy="35" r="10" fill="#333"></circle>
+    <circle cx="45" cy="35" r="10" fill="#333"></circle>
+  </svg>
+</div>
+
+<div class="flow-container lower">
+  <svg class="road" viewBox="0 0 1000 400" preserveAspectRatio="none">
+    <path d="M50 100 C250 0 750 200 950 100" fill="none" stroke="#001f3f" stroke-width="60" stroke-dasharray="15 15"></path>
+  </svg>
+  <!-- Top labels (dark blue) -->
+  <div class="label top header-cell" style="left: 5%; top: 10%;">Application Flow</div>
+  <div class="label graph-cell" style="left: 55%; top: 10%;">
+    <svg class="graph" viewBox="0 0 150 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="75" cy="50" r="15" fill="#4a90e2"></circle>
+      <text x="75" y="55" text-anchor="middle" fill="#fff" font-size="12">⏰</text>
+      <circle cx="50" cy="20" r="10" fill="#4a90e2"></circle>
+      <text x="50" y="25" text-anchor="middle" fill="#fff" font-size="10">Fosk</text>
+      <circle cx="100" cy="20" r="10" fill="#4a90e2"></circle>
+      <text x="100" y="25" text-anchor="middle" fill="#fff" font-size="10">Z Deslee</text>
+      <line x1="75" y1="50" x2="50" y2="20" stroke="#4a90e2" stroke-width="2"></line>
+      <line x1="75" y1="50" x2="100" y2="20" stroke="#4a90e2" stroke-width="2"></line>
+      <line x1="75" y1="50" x2="30" y2="80" stroke="#4a90e2" stroke-width="2"></line>
+      <line x1="75" y1="50" x2="120" y2="80" stroke="#4a90e2" stroke-width="2"></line>
+      <circle cx="30" cy="80" r="10" fill="#4a90e2"></circle>
+      <circle cx="120" cy="80" r="10" fill="#4a90e2"></circle>
+    </svg>
+  </div>
+  <!-- Main labels (white) -->
+  <div class="label main" style="left: 5%; top: 30%;">
+    Noartilaeo;
+    <p>8RA Treteha</p>
+  </div>
+  <div class="label main" style="left: 30%; top: 20%;">
+    Calecatioe
+    <p>21.4 Arttention</p>
+  </div>
+  <!-- Bottom labels -->
+  <div class="label main bottom" style="left: 5%; top: 60%;">
+    Core senehy
+    <p>58 Eoeoule</p>
+  </div>
+  <div class="label main bottom" style="left: 30%; top: 70%;">
+    Eacam:
+    <p>8y.50.10.25aue</p>
+  </div>
+  <div class="label main bottom" style="left: 55%; top: 70%;">
+    Sertility
+    <p>6A Attration</p>
+  </div>
+  <div class="label main bottom" style="left: 80%; top: 60%;">
+    Ihdrallel
+    <p>9.24.AL Erouction</p>
+  </div>
+  <!-- Car -->
+  <svg class="car" style="left: 70%; top: 40%; transform: rotate(30deg);">
+    <rect x="0" y="0" width="60" height="30" rx="5" fill="#fff" stroke="#000" stroke-width="2"></rect>
+    <circle cx="15" cy="35" r="10" fill="#333"></circle>
+    <circle cx="45" cy="35" r="10" fill="#333"></circle>
+  </svg>
+</div>
+
+
+// app.component.scss
+.header {
+  background: #ff0000;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  text-align: center;
+  margin-bottom: 40px;
+  h1 {
+    font-size: 36px;
+    margin: 0;
+  }
+}
+
+.flow-container {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  margin-bottom: 40px;
+
+  .road {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+  }
+
+  .label {
+    position: absolute;
+    background: white;
+    color: #001f3f;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    font-size: 14px;
+    transform: translate(-50%, -50%);
+    width: 150px;
+
+    p {
+      margin: 5px 0;
+      font-size: 12px;
+    }
+
+    .sub-label {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    &.header-cell {
+      background: #001f3f;
+      color: white;
+    }
+  }
+
+  .graph-cell {
+    position: absolute;
+    background: white;
+    padding: 0;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 100px;
+
+    .graph {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .icon {
+    width: 40px;
+    height: 30px;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .red-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .car {
+    position: absolute;
+    width: 60px;
+    height: 40px;
+    transform: translate(-50%, -50%);
+  }
+
+  &.lower .road {
+    path {
+      d: path('M50 100 C250 0 750 200 950 100');
+    }
+  }
+}
