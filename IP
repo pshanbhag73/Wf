@@ -1,317 +1,245 @@
 <!-- app.component.html -->
-<div class="scene">
-  <div class="curtain"></div>
-  <div class="display-booth">
-    <div class="top-banner">
-      <h1>Incident Pulse</h1>
+<div class="page-container">
+  <nav class="header">
+    <div class="logo">Incident Pulse</div>
+    <ul class="menu">
+      <li>Home</li>
+      <li>Contact</li>
+      <li>Oneos</li>
+      <li>Phereels</li>
+    </ul>
+  </nav>
+  <section class="hero">
+    <h1>Incident Pulse</h1>
+    <p class="subtitle">URL tracker for oeeacontfeeonlife ht seltoing anr ereals.</p>
+    <div class="search-bar">
+      <label>Search Root Cause</label>
+      <input type="text" value="Ses-11095" />
+      <button>Trace Route</button>
     </div>
-    <div class="screen">
-      <h2 class="screen-title">Incident Pulse</h2>
-      <div class="top-panels">
-        <div class="panel small black">
-          <div class="label">ADVNNIS</div>
-          <div class="lines">
-            <hr><hr><hr>
-          </div>
-        </div>
-        <div class="panel large black">
-          <div class="number">32.8577353</div>
-        </div>
-        <div class="panel medium black">
-          <div class="code">GJGerPONGeBa</div>
-          <div class="sub">f)</div>
-        </div>
-        <div class="panel large black">
-          <div class="number">PJ 47733</div>
-        </div>
-        <div class="panel small black">
-          <div class="percentage">010%/46%/00</div>
-        </div>
+  </section>
+  <section class="features">
+    <div class="cards">
+      <div class="card">
+        <svg class="icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="12" width="32" height="24" rx="2" fill="none" stroke="#ff0000" stroke-width="2"/>
+          <path d="M4 40 h40" stroke="#ff0000" stroke-width="2"/>
+          <path d="M12 18 Q18 24 24 18 Q30 12 36 18" fill="none" stroke="#ff0000" stroke-width="2"/>
+        </svg>
+        <h3>DNS Tracker</h3>
+        <p>For aurvane Inse</p>
       </div>
-      <div class="bottom-panels">
-        <div class="card light-blue">
-          <div class="title">Svaerig Faateken</div>
-          <div class="subtitle">Zaote moele fvrbty</div>
-          <svg class="icon map" viewBox="0 0 50 50">
-            <path d="M25 5 L45 20 L45 45 L5 45 L5 20 Z" fill="none" stroke="#ff0000" stroke-width="2"></path>
-            <circle cx="25" cy="25" r="5" fill="#ff0000"></circle>
-          </svg>
-        </div>
-        <div class="card red-dot">
-          <svg class="icon bucket" viewBox="0 0 50 50">
-            <rect x="10" y="20" width="30" height="25" rx="5" fill="none" stroke="#fff" stroke-width="2"></rect>
-            <path d="M5 15 Q25 0 45 15" fill="none" stroke="#fff" stroke-width="2"></path>
-          </svg>
-          <div class="title">Buice<poite Tracker</div>
-          <div class="subtitle">Maseufy</div>
-        </div>
-        <div class="card beige">
-          <div class="title">Naesaeties Tracker</div>
-          <div class="subtitle">Reachability ana metrics</div>
-        </div>
-        <div class="card dark graph1">
-          <div class="title">Booterfor</div>
-          <svg class="graph" viewBox="0 0 100 50">
-            <circle cx="20" cy="25" r="5" fill="#fff"></circle>
-            <circle cx="50" cy="10" r="5" fill="#fff"></circle>
-            <circle cx="50" cy="40" r="5" fill="#fff"></circle>
-            <circle cx="80" cy="25" r="5" fill="#fff"></circle>
-            <line x1="20" y1="25" x2="50" y2="10" stroke="#fff" stroke-width="2"></line>
-            <line x1="20" y1="25" x2="50" y2="40" stroke="#fff" stroke-width="2"></line>
-            <line x1="50" y1="10" x2="80" y2="25" stroke="#fff" stroke-width="2"></line>
-            <line x1="50" y1="40" x2="80" y2="25" stroke="#fff" stroke-width="2"></line>
-          </svg>
-        </div>
-        <div class="card dark graph2">
-          <div class="title">Bnationali</div>
-          <svg class="graph" viewBox="0 0 100 50">
-            <polyline points="10,40 30,20 50,30 70,10 90,25" fill="none" stroke="#ff00ff" stroke-width="2"></polyline>
-            <circle cx="10" cy="40" r="3" fill="#ff00ff"></circle>
-            <circle cx="30" cy="20" r="3" fill="#ff00ff"></circle>
-            <circle cx="50" cy="30" r="3" fill="#ff00ff"></circle>
-            <circle cx="70" cy="10" r="3" fill="#ff00ff"></circle>
-            <circle cx="90" cy="25" r="3" fill="#ff00ff"></circle>
-          </svg>
-        </div>
-        <div class="card white">
-          <div class="title">Application Flowmap</div>
-          <div class="subtitle">Boderolact</div>
-        </div>
-        <div class="card dark graph3">
-          <svg class="graph" viewBox="0 0 100 50">
-            <rect x="10" y="20" width="20" height="30" fill="#00ffff"></rect>
-            <rect x="40" y="10" width="20" height="40" fill="#00ffff"></rect>
-            <rect x="70" y="30" width="20" height="20" fill="#00ffff"></rect>
-          </svg>
-        </div>
-        <div class="card dark graph4">
-          <svg class="graph" viewBox="0 0 100 50">
-            <circle cx="50" cy="25" r="20" fill="none" stroke="#ffff00" stroke-width="2"></circle>
-            <path d="M30 25 L70 25 M50 5 L50 45" stroke="#ffff00" stroke-width="2"></path>
-          </svg>
-        </div>
+      <div class="card">
+        <svg class="icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="16" fill="none" stroke="#ff0000" stroke-width="2"/>
+          <text x="24" y="30" text-anchor="middle" font-size="20" fill="#ff0000">4</text>
+        </svg>
+        <h3>Belerie Tracker</h3>
+        <p>For tirantanties</p>
+      </div>
+      <div class="card">
+        <svg class="icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="8" fill="none" stroke="#ff0000" stroke-width="2"/>
+          <circle cx="12" cy="12" r="4" fill="none" stroke="#ff0000" stroke-width="2"/>
+          <circle cx="36" cy="12" r="4" fill="none" stroke="#ff0000" stroke-width="2"/>
+          <circle cx="12" cy="36" r="4" fill="none" stroke="#ff0000" stroke-width="2"/>
+          <circle cx="36" cy="36" r="4" fill="none" stroke="#ff0000" stroke-width="2"/>
+          <line x1="24" y1="24" x2="12" y2="12" stroke="#ff0000" stroke-width="2"/>
+          <line x1="24" y1="24" x2="36" y2="12" stroke="#ff0000" stroke-width="2"/>
+          <line x1="24" y1="24" x2="12" y2="36" stroke="#ff0000" stroke-width="2"/>
+          <line x1="24" y1="24" x2="36" y2="36" stroke="#ff0000" stroke-width="2"/>
+        </svg>
+        <h3>Applicatio Flow</h3>
+        <p>For intercoredity.</p>
       </div>
     </div>
-    <div class="bottom-border"></div>
-  </div>
-  <div class="floor"></div>
-  <div class="reflection"></div>
+    <div class="row">
+      <div class="image-placeholder">
+        <!-- Placeholder for people at computer image -->
+        <div class="placeholder-text">Image of team monitoring incidents</div>
+      </div>
+      <div class="text-block">
+        <h3>Application Flowmap</h3>
+        <p>Sessgetetes send see to icb eyrnol onorofeiatanted or aeiu tmd harmertietion.</p>
+      </div>
+    </div>
+    <div class="row reverse">
+      <div class="text-block">
+        <h3>Device Tracker</h3>
+        <p>Seissr enloop sreddnt sine est and ovechengralio arrwott, ang. oresedleo eene to witd loertool nesi cmrer athivity.</p>
+      </div>
+      <svg class="graph" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="150" cy="100" r="30" fill="#001f3f" stroke="#fff" stroke-width="2"/>
+        <text x="150" y="105" text-anchor="middle" fill="#fff" font-size="12">12:10</text>
+        <circle cx="100" cy="50" r="15" fill="#001f3f" stroke="#fff" stroke-width="2"/>
+        <text x="100" y="55" text-anchor="middle" fill="#fff" font-size="10">Source</text>
+        <circle cx="200" cy="50" r="15" fill="#001f3f" stroke="#fff" stroke-width="2"/>
+        <text x="200" y="55" text-anchor="middle" fill="#fff" font-size="10">Destination</text>
+        <circle cx="50" cy="100" r="15" fill="#001f3f" stroke="#fff" stroke-width="2"/>
+        <text x="50" y="105" text-anchor="middle" fill="#fff" font-size="10">Firewall</text>
+        <circle cx="250" cy="100" r="15" fill="#001f3f" stroke="#fff" stroke-width="2"/>
+        <text x="250" y="105" text-anchor="middle" fill="#fff" font-size="10">Load Balancer</text>
+        <circle cx="100" cy="150" r="15" fill="#001f3f" stroke="#fff" stroke-width="2"/>
+        <text x="100" y="155" text-anchor="middle" fill="#fff" font-size="10">Database</text>
+        <circle cx="200" cy="150" r="15" fill="#001f3f" stroke="#fff" stroke-width="2"/>
+        <text x="200" y="155" text-anchor="middle" fill="#fff" font-size="10">API Server</text>
+        <polyline points="150,100 100,50 50,100 100,150 150,100 200,50 250,100 200,150" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="5,5"/>
+      </svg>
+    </div>
+  </section>
 </div>
 
 
-
 // app.component.scss
-.scene {
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-  background: linear-gradient(to bottom, #f0f0f0, #d0d0d0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  perspective: 1200px;  // Increased perspective for better depth
+.page-container {
+  max-width: 800px;
+  margin: 20px auto;
+  background: white;
+  border-radius: 20px;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  font-family: Arial, sans-serif;
 }
 
-.curtain {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 60%;  // Increased height
-  background: linear-gradient(to bottom, #c0c0c0, transparent);
-  opacity: 0.5;
-}
-
-.display-booth {
-  width: 900px;  // Increased width
-  height: 600px;  // Increased height
-  position: relative;
-  transform-style: preserve-3d;
-  transform: rotateX(10deg) rotateY(0deg);
-  box-shadow: 0 30px 60px rgba(0,0,0,0.2);  // Adjusted shadow
-}
-
-.top-banner {
-  position: absolute;
-  top: -60px;  // Adjusted position
-  left: 0;
-  width: 100%;
-  height: 80px;  // Increased height
-  background: #a00000;
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.header {
+  background: #ff0000;
   color: white;
-  font-size: 48px;  // Increased font size
-  font-weight: bold;
-  z-index: 2;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.3);  // Adjusted shadow
-}
-
-.screen {
-  width: 100%;
-  height: 100%;
-  background: #fff;
-  border-radius: 150px;  // Adjusted radius
-  padding: 60px 30px 30px;  // Increased padding
-  box-shadow: inset 0 0 30px rgba(255,255,255,0.8), 0 0 45px rgba(255,255,255,0.5);  // Adjusted glow
+  padding: 10px 20px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  overflow: hidden;
 }
 
-.screen-title {
-  color: #a00000;
-  font-size: 42px;  // Increased font size
-  margin-bottom: 15px;  // Adjusted margin
+.logo {
+  font-size: 24px;
+  font-weight: bold;
 }
 
-.top-panels {
+.menu {
+  list-style: none;
   display: flex;
-  justify-content: center;
-  gap: 15px;  // Increased gap
-  margin-bottom: 30px;  // Increased margin
-}
-
-.panel {
-  background: #000;
-  color: #fff;
-  padding: 8px 15px;  // Increased padding
-  border-radius: 8px;  // Increased radius
-  text-align: center;
-  font-family: monospace;
-
-  &.small {
-    width: 90px;  // Increased width
-    .label {
-      font-size: 15px;  // Increased font size
-    }
-    .lines hr {
-      border: 0;
-      height: 1px;
-      background: #fff;
-      margin: 3px 0;  // Adjusted margin
-    }
-  }
-
-  &.medium {
-    width: 150px;  // Increased width
-    .code {
-      font-size: 18px;  // Increased font size
-    }
-    .sub {
-      font-size: 15px;  // Increased font size
-    }
-  }
-
-  &.large {
-    width: 180px;  // Increased width
-    .number {
-      font-size: 24px;  // Increased font size
-    }
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  li {
+    cursor: pointer;
   }
 }
 
-.bottom-panels {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 15px;  // Increased gap
-  width: 100%;
+.hero {
+  background: #001f3f;
+  color: white;
+  padding: 40px 20px;
+  text-align: left;
+}
+
+h1 {
+  font-size: 36px;
+  margin: 0 0 10px;
+}
+
+.subtitle {
+  font-size: 16px;
+  margin: 0 0 20px;
+}
+
+.search-bar {
+  display: flex;
+  gap: 10px;
+  label {
+    background: #333;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+  }
+  input {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+  }
+  button {
+    background: #333;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+}
+
+.features {
+  padding: 40px 20px;
+}
+
+.cards {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 40px;
 }
 
 .card {
-  background: #e0e0ff;
-  padding: 15px;  // Increased padding
-  border-radius: 15px;  // Increased radius
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
   text-align: center;
-  font-size: 18px;  // Increased font size
-  position: relative;
-
-  .title {
-    font-weight: bold;
-    font-size: 20px;  // Adjusted
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  flex: 1;
+  .icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 10px;
   }
-
-  .subtitle {
-    font-size: 15px;  // Increased font size
+  h3 {
+    font-size: 18px;
+    margin: 10px 0 5px;
   }
-
-  .icon, .graph {
-    width: 60px;  // Increased size
-    height: 60px;  // Increased size
-    margin: 8px auto;  // Adjusted margin
+  p {
+    font-size: 14px;
+    color: #666;
   }
+}
 
-  &.light-blue {
-    background: #d0e0ff;
+.row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 40px;
+  &.reverse {
+    flex-direction: row-reverse;
   }
-
-  &.red-dot {
-    background: #f0f0f0;
-    &:before {
-      content: '';
-      position: absolute;
-      top: 15px;  // Adjusted
-      left: 50%;
-      transform: translateX(-50%);
-      width: 15px;  // Increased size
-      height: 15px;  // Increased size
-      background: #ff0000;
-      border-radius: 50%;
+  .image-placeholder {
+    width: 50%;
+    height: 200px;
+    background: #eee;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    .placeholder-text {
+      color: #999;
     }
   }
-
-  &.beige {
-    background: #f0e8d0;
+  .graph {
+    width: 50%;
+    height: 200px;
+    background: #001f3f;
+    border-radius: 10px;
   }
-
-  &.dark {
-    background: #202020;
-    color: #fff;
-
-    &.graph1, &.graph2, &.graph3, &.graph4 {
-      svg {
-        margin: 0 auto;
-      }
+  .text-block {
+    width: 50%;
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    h3 {
+      font-size: 24px;
+      margin: 0 0 10px;
+    }
+    p {
+      font-size: 16px;
+      color: #666;
     }
   }
-
-  &.white {
-    background: #fff;
-  }
-}
-
-.bottom-border {
-  position: absolute;
-  bottom: -30px;  // Adjusted position
-  left: 0;
-  width: 100%;
-  height: 60px;  // Increased height
-  background: #a00000;
-  border-radius: 0 0 50% 50% / 0 0 100% 100%;
-  box-shadow: 0 -10px 20px rgba(0,0,0,0.3);  // Adjusted shadow
-}
-
-.floor {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 30%;  // Increased height
-  background: linear-gradient(to top, #e0e0e0, transparent);
-}
-
-.reflection {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%) scaleY(-1) translateY(-100%);
-  width: 900px;  // Matched increased width
-  height: 300px;  // Increased height
-  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.5));
-  filter: blur(15px);  // Adjusted blur
-  opacity: 0.3;
 }
