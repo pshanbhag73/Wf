@@ -1,281 +1,319 @@
 <!-- app.component.html -->
-<div class="header">
-  <h1>Incident Pulse...</h1>
+<div class="scene">
+  <div class="curtain"></div>
+  <div class="display-booth">
+    <div class="top-banner">
+      <h1>Incident Pulse</h1>
+    </div>
+    <div class="screen">
+      <h2 class="screen-title">Incident Pulse</h2>
+      <div class="top-panels">
+        <div class="panel small black">
+          <div class="label">ADVNNIS</div>
+          <div class="lines">
+            <hr><hr><hr>
+          </div>
+        </div>
+        <div class="panel large black">
+          <div class="number">32.8577353</div>
+        </div>
+        <div class="panel medium black">
+          <div class="code">GJGerPONGeBa</div>
+          <div class="sub">f)</div>
+        </div>
+        <div class="panel large black">
+          <div class="number">PJ 47733</div>
+        </div>
+        <div class="panel small black">
+          <div class="percentage">010%/46%/00</div>
+        </div>
+      </div>
+      <div class="bottom-panels">
+        <div class="card light-blue">
+          <div class="title">Svaerig Faateken</div>
+          <div class="subtitle">Zaote moele fvrbty</div>
+          <svg class="icon map" viewBox="0 0 50 50">
+            <path d="M25 5 L45 20 L45 45 L5 45 L5 20 Z" fill="none" stroke="#ff0000" stroke-width="2"></path>
+            <circle cx="25" cy="25" r="5" fill="#ff0000"></circle>
+          </svg>
+        </div>
+        <div class="card red-dot">
+          <svg class="icon bucket" viewBox="0 0 50 50">
+            <rect x="10" y="20" width="30" height="25" rx="5" fill="none" stroke="#fff" stroke-width="2"></rect>
+            <path d="M5 15 Q25 0 45 15" fill="none" stroke="#fff" stroke-width="2"></path>
+          </svg>
+          <div class="title">Buice<poite Tracker</div>
+          <div class="subtitle">Maseufy</div>
+        </div>
+        <div class="card beige">
+          <div class="title">Naesaeties Tracker</div>
+          <div class="subtitle">Reachability ana metrics</div>
+        </div>
+        <div class="card dark graph1">
+          <div class="title">Booterfor</div>
+          <svg class="graph" viewBox="0 0 100 50">
+            <circle cx="20" cy="25" r="5" fill="#fff"></circle>
+            <circle cx="50" cy="10" r="5" fill="#fff"></circle>
+            <circle cx="50" cy="40" r="5" fill="#fff"></circle>
+            <circle cx="80" cy="25" r="5" fill="#fff"></circle>
+            <line x1="20" y1="25" x2="50" y2="10" stroke="#fff" stroke-width="2"></line>
+            <line x1="20" y1="25" x2="50" y2="40" stroke="#fff" stroke-width="2"></line>
+            <line x1="50" y1="10" x2="80" y2="25" stroke="#fff" stroke-width="2"></line>
+            <line x1="50" y1="40" x2="80" y2="25" stroke="#fff" stroke-width="2"></line>
+          </svg>
+        </div>
+        <div class="card dark graph2">
+          <div class="title">Bnationali</div>
+          <svg class="graph" viewBox="0 0 100 50">
+            <polyline points="10,40 30,20 50,30 70,10 90,25" fill="none" stroke="#ff00ff" stroke-width="2"></polyline>
+            <circle cx="10" cy="40" r="3" fill="#ff00ff"></circle>
+            <circle cx="30" cy="20" r="3" fill="#ff00ff"></circle>
+            <circle cx="50" cy="30" r="3" fill="#ff00ff"></circle>
+            <circle cx="70" cy="10" r="3" fill="#ff00ff"></circle>
+            <circle cx="90" cy="25" r="3" fill="#ff00ff"></circle>
+          </svg>
+        </div>
+        <div class="card white">
+          <div class="title">Application Flowmap</div>
+          <div class="subtitle">Boderolact</div>
+        </div>
+        <div class="card dark graph3">
+          <svg class="graph" viewBox="0 0 100 50">
+            <rect x="10" y="20" width="20" height="30" fill="#00ffff"></rect>
+            <rect x="40" y="10" width="20" height="40" fill="#00ffff"></rect>
+            <rect x="70" y="30" width="20" height="20" fill="#00ffff"></rect>
+          </svg>
+        </div>
+        <div class="card dark graph4">
+          <svg class="graph" viewBox="0 0 100 50">
+            <circle cx="50" cy="25" r="20" fill="none" stroke="#ffff00" stroke-width="2"></circle>
+            <path d="M30 25 L70 25 M50 5 L50 45" stroke="#ffff00" stroke-width="2"></path>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-border"></div>
+  </div>
+  <div class="floor"></div>
+  <div class="reflection"></div>
 </div>
-<div class="content">
-  <h2>Incident Pulse</h2>
-  <p class="description">Rapidly triage major incidents with real-time monitoring, alerts, and analytics. Gain insights into system health, detect anomalies, and respond swiftly to minimize downtime.</p>
-  
-  <div class="row">
-    <div class="card url-tracker">
-      <h3>URL Tracker</h3>
-      <p>Monitor website availability and performance. Track uptime, response times, and routing paths to ensure seamless access for users.</p>
-      <div class="buttons">
-        <button class="btn primary">Edit</button>
-        <button class="btn secondary">New Alarm</button>
-        <button class="btn secondary">Alerts</button>
-      </div>
-    </div>
-    <div class="card hero-image">
-      <!-- Placeholder for the red radial image -->
-      <div class="image-placeholder">
-        <h2>BTNNI ANAUCE</h2>
-      </div>
-    </div>
-  </div>
-  
-  <div class="row">
-    <div class="card device-tracker">
-      <h3>Device Tracker</h3>
-      <div class="charts">
-        <svg class="pie-chart" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="40" fill="none" stroke="#4a90e2" stroke-width="20" stroke-dasharray="251.2" stroke-dashoffset="2.512"></circle>
-          <text x="50" y="55" text-anchor="middle" fill="#333" font-size="20">99%</text>
-        </svg>
-        <svg class="line-chart" viewBox="0 0 200 50">
-          <polyline points="0,40 40,30 80,35 120,20 160,25 200,15" fill="none" stroke="#4a90e2" stroke-width="2"></polyline>
-          <text x="100" y="10" text-anchor="middle" fill="#333" font-size="10">15.1 Avg</text>
-        </svg>
-      </div>
-      <div class="labels">
-        <span>Upstream</span><span>Downstream</span><span>Latency</span><span>Throughput</span>
-      </div>
-    </div>
-    <div class="card interconnectivity">
-      <h3>Interconnectivity</h3>
-      <svg class="graph" viewBox="0 0 200 100">
-        <g class="nodes">
-          <circle cx="20" cy="50" r="10" fill="#fff" stroke="#4a90e2"></circle>
-          <circle cx="80" cy="20" r="10" fill="#fff" stroke="#4a90e2"></circle>
-          <circle cx="80" cy="80" r="10" fill="#fff" stroke="#4a90e2"></circle>
-          <circle cx="140" cy="50" r="10" fill="#fff" stroke="#4a90e2"></circle>
-          <circle cx="180" cy="20" r="10" fill="#fff" stroke="#4a90e2"></circle>
-          <circle cx="180" cy="80" r="10" fill="#fff" stroke="#4a90e2"></circle>
-        </g>
-        <g class="lines">
-          <line x1="20" y1="50" x2="80" y2="20" stroke="#4a90e2" stroke-width="2"></line>
-          <line x1="20" y1="50" x2="80" y2="80" stroke="#4a90e2" stroke-width="2"></line>
-          <line x1="80" y1="20" x2="140" y2="50" stroke="#4a90e2" stroke-width="2"></line>
-          <line x1="80" y1="80" x2="140" y2="50" stroke="#4a90e2" stroke-width="2"></line>
-          <line x1="140" y1="50" x2="180" y2="20" stroke="#4a90e2" stroke-width="2"></line>
-          <line x1="140" y1="50" x2="180" y2="80" stroke="#4a90e2" stroke-width="2"></line>
-        </g>
-        <g class="labels">
-          <text x="20" y="55" text-anchor="middle" font-size="8">Primary</text>
-          <text x="80" y="15" text-anchor="middle" font-size="8">Node A</text>
-          <text x="80" y="85" text-anchor="middle" font-size="8">Node B</text>
-          <text x="140" y="55" text-anchor="middle" font-size="8">Hub</text>
-          <text x="180" y="15" text-anchor="middle" font-size="8">Endpoint 1</text>
-          <text x="180" y="85" text-anchor="middle" font-size="8">Endpoint 2</text>
-        </g>
-      </svg>
-    </div>
-  </div>
-  
-  <h2>Application Flow</h2>
-  <p class="description">Visualize and manage application workflows. Identify bottlenecks, optimize processes, and ensure efficient data flow across your systems.</p>
-  
-  <div class="row full-width">
-    <div class="card app-flow">
-      <svg class="network-diagram" viewBox="0 0 300 200">
-        <g transform="translate(150,100)">
-          <rect x="-30" y="-20" width="60" height="40" rx="5" fill="#fff" stroke="#333"></rect>
-          <text x="0" y="5" text-anchor="middle" font-size="12">Core</text>
-          <circle cx="-60" cy="-50" r="20" fill="#fff" stroke="#333"></circle>
-          <text x="-60" y="-45" text-anchor="middle" font-size="10">Input</text>
-          <line x1="-30" y1="-20" x2="-40" y2="-50" stroke="#333"></line>
-          <circle cx="60" cy="-50" r="20" fill="#fff" stroke="#333"></circle>
-          <text x="60" y="-45" text-anchor="middle" font-size="10">Output</text>
-          <line x1="30" y1="-20" x2="40" y2="-50" stroke="#333"></line>
-          <circle cx="-60" cy="50" r="20" fill="#fff" stroke="#333"></circle>
-          <text x="-60" y="55" text-anchor="middle" font-size="10">Database</text>
-          <line x1="-30" y1="20" x2="-40" y2="50" stroke="#333"></line>
-          <circle cx="60" cy="50" r="20" fill="#fff" stroke="#333"></circle>
-          <text x="60" y="55" text-anchor="middle" font-size="10">API</text>
-          <line x1="30" y1="20" x2="40" y2="50" stroke="#333"></line>
-          <circle cx="0" cy="70" r="20" fill="#fff" stroke="#333"></circle>
-          <text x="0" y="75" text-anchor="middle" font-size="10">Logger</text>
-          <line x1="0" y1="20" x2="0" y2="50" stroke="#333"></line>
-        </g>
-      </svg>
-      <div class="text-section">
-        <h3>Interconnectormap</h3>
-        <p>Interactive visualization of system connections. Explore relationships between components, identify potential failure points, and plan for robust integrations.</p>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Add a connection form for users to connect/interact -->
-  <div class="connect-section">
-    <h2>Connect to Incident Pulse</h2>
-    <p>Enter your details to get started with monitoring and triaging.</p>
-    <form>
-      <input type="text" placeholder="Username" />
-      <input type="password" placeholder="Password" />
-      <input type="email" placeholder="Email" />
-      <button type="submit" class="btn primary">Connect</button>
-    </form>
-  </div>
-</div>
+
+
 
 
 // app.component.scss
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-}
-
-.header {
-  background-color: #ff0000;
-  color: white;
-  padding: 20px;
-  text-align: center;
-  h1 {
-    margin: 0;
-    font-size: 48px;
-  }
-}
-
-.content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-  background: white;
-}
-
-h2 {
-  color: #001f3f;
-  text-align: center;
-}
-
-.description {
-  color: #333;
-  text-align: center;
-  max-width: 800px;
-  margin: 0 auto 40px;
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-
-  &.full-width {
-    justify-content: center;
-  }
-}
-
-.card {
-  background: #001f3f;
-  color: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  width: 48%;
-
-  h3 {
-    margin-top: 0;
-  }
-}
-
-.url-tracker {
-  .buttons {
-    display: flex;
-    gap: 10px;
-    .btn {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 20px;
-      cursor: pointer;
-      &.primary {
-        background: #ff0000;
-        color: white;
-      }
-      &.secondary {
-        background: #4a90e2;
-        color: white;
-      }
-    }
-  }
-}
-
-.hero-image {
-  background: #ff0000;
+.scene {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  background: linear-gradient(to bottom, #f0f0f0, #d0d0d0);
   display: flex;
   align-items: center;
   justify-content: center;
-  .image-placeholder {
-    text-align: center;
-    h2 {
-      color: white;
-      font-size: 32px;
-    }
-  }
+  perspective: 1000px;
+  overflow: hidden;
 }
 
-.device-tracker {
-  .charts {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    .pie-chart {
-      width: 100px;
-      height: 100px;
-    }
-    .line-chart {
-      width: 200px;
-      height: 50px;
-    }
-  }
-  .labels {
-    display: flex;
-    justify-content: space-around;
-    font-size: 12px;
-    margin-top: 10px;
-  }
+.curtain {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(to bottom, #c0c0c0, transparent);
+  opacity: 0.5;
 }
 
-.interconnectivity {
-  .graph {
-    width: 100%;
-    height: 150px;
-  }
+.display-booth {
+  width: 600px;
+  height: 400px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(10deg) rotateY(0deg);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
 }
 
-.app-flow {
+.top-banner {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: #a00000;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
   display: flex;
-  width: 80%;
-  .network-diagram {
-    width: 50%;
-    height: 200px;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 32px;
+  font-weight: bold;
+  z-index: 2;
+  box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+}
+
+.screen {
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border-radius: 100px;
+  padding: 40px 20px 20px;
+  box-shadow: inset 0 0 20px rgba(255,255,255,0.8), 0 0 30px rgba(255,255,255,0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+.screen-title {
+  color: #a00000;
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.top-panels {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.panel {
+  background: #000;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 5px;
+  text-align: center;
+  font-family: monospace;
+
+  &.small {
+    width: 60px;
+    .label {
+      font-size: 10px;
+    }
+    .lines hr {
+      border: 0;
+      height: 1px;
+      background: #fff;
+      margin: 2px 0;
+    }
   }
-  .text-section {
-    width: 50%;
-    padding-left: 20px;
+
+  &.medium {
+    width: 100px;
+    .code {
+      font-size: 12px;
+    }
+    .sub {
+      font-size: 10px;
+    }
+  }
+
+  &.large {
+    width: 120px;
+    .number {
+      font-size: 16px;
+    }
   }
 }
 
-.connect-section {
-  margin-top: 40px;
+.bottom-panels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.card {
+  background: #e0e0ff;
+  padding: 10px;
+  border-radius: 10px;
   text-align: center;
-  form {
-    display: flex;
-    flex-direction: column;
-    max-width: 300px;
-    margin: 0 auto;
-    gap: 10px;
-    input {
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      padding: 10px;
+  font-size: 12px;
+  position: relative;
+
+  .title {
+    font-weight: bold;
+  }
+
+  .subtitle {
+    font-size: 10px;
+  }
+
+  .icon, .graph {
+    width: 40px;
+    height: 40px;
+    margin: 5px auto;
+  }
+
+  &.light-blue {
+    background: #d0e0ff;
+  }
+
+  &.red-dot {
+    background: #f0f0f0;
+    &:before {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
       background: #ff0000;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      border-radius: 50%;
     }
   }
+
+  &.beige {
+    background: #f0e8d0;
+  }
+
+  &.dark {
+    background: #202020;
+    color: #fff;
+
+    &.graph1, &.graph2, &.graph3, &.graph4 {
+      svg {
+        margin: 0 auto;
+      }
+    }
+  }
+
+  &.white {
+    background: #fff;
+  }
 }
+
+.bottom-border {
+  position: absolute;
+  bottom: -20px;
+  left: 0;
+  width: 100%;
+  height: 40px;
+  background: #a00000;
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  box-shadow: 0 -5px 10px rgba(0,0,0,0.3);
+}
+
+.floor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 20%;
+  background: linear-gradient(to top, #e0e0e0, transparent);
+}
+
+.reflection {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) scaleY(-1) translateY(-100%);
+  width: 600px;
+  height: 200px;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.5));
+  filter: blur(10px);
+  opacity: 0.3;
+}
+
+
