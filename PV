@@ -228,11 +228,11 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
 
     // Add text with positioning based on node type
     this.node.append('text')
-      .attr('x', (d: any) => d.isSource ? -8 : (d.isDestination ? 8 : 8)) // Left for source, right for destination, right for others
+      .attr('x', (d: any) => d.isSource ? -12 : (d.isDestination ? 12 : 8)) // Left for source (-12), right for destination (+12), right for others (+8)
       .attr('y', 3)
       .text((d: any) => d.label.split('\n')[0]) // Show only IP/location initially
       .attr('font-size', '10px')
-      .attr('text-anchor', (d: any) => d.isSource ? 'end' : 'start'); // End for source (left), start for others (right)
+      .attr('text-anchor', (d: any) => d.isSource ? 'end' : (d.isDestination ? 'start' : 'start')) // End for source, start for destination, start for others
 
     // Add hover tooltip
     this.node.append('title')
