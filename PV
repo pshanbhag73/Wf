@@ -24,7 +24,7 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
   private svg: any;
   private simulation: any;
   private width = 800;
-  private height = 600;
+  private height = 800; // Increased for better vertical spread
   private nodes: any[] = [];
   private links: any[] = [];
   private subscription: Subscription | undefined;
@@ -64,11 +64,10 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
 
     this.simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id((d: any) => d.id).distance(150))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('y', d3.forceY((d: any, i) => {
-        const locationIndex = this.nodes.findIndex(n => n.locationId === d.locationId && n.type === 'source');
-        return (locationIndex * 120) % this.height;
-      }).strength(0.1))
+      .force('charge', d3.forceManyBody().strength(-500)) // Stronger repulsion for spread
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2)) // Center the graph
+      .force('x', d3.forceX((d: any) => d.initialX || this.width / 2).strength(0.1)) // Weak horizontal pull based on initial X
+      .force('y', d3.forceY((d: any) => d.initialY || this.height / 2).strength(0.1)) // Weak vertical pull based on initial Y
       .on('tick', this.ticked.bind(this));
   }
 
@@ -78,28 +77,32 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       this.links = [];
       results.forEach((result: any, locationIndex: number) => {
         const locationId = `Loc_${locationIndex}_${result.hostname}`;
-        this.nodes.push({ id: locationId, label: result.hostname, type: 'source', locationId });
+        const baseY = locationIndex * 120; // Vertical offset per location
+        this.nodes.push({ id: locationId, label: result.hostname, type: 'source', locationId, initialX: 50, initialY: baseY + 50 });
 
         let prevId = locationId;
+        let hopX = 100; // Starting horizontal position for hops
         result.hops.forEach((hop: any, hopIndex: number) => {
           const hopId = `${locationId}_Hop_${hop.hopNumber}`;
-          const uniqueIps = [...new Set(hop.hopDetails.map((detail: any) => detail.ipAddress))]; // Get unique IPs
+          const uniqueIps = [...new Set(hop.hopDetails.map((detail: any) => detail.ipAddress))];
           const avgTime = hop.hopDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / hop.hopDetails.length;
 
-          // Parent hop node
-          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails });
+          // Parent hop node with initial position
+          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails, initialX: hopX, initialY: baseY + 50 });
           this.links.push({ source: prevId, target: hopId });
 
-          // Sub-nodes for each unique IP
+          // Sub-nodes for each unique IP, offset slightly vertically
           uniqueIps.forEach((ip, ipIndex) => {
             const subNodeId = `${hopId}_IP_${ipIndex}`;
-            const ipDetails = hop.hopDetails.filter((detail: any) => detail.ipAddress === ip);
-            const ipAvgTime = ipDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / ipDetails.length;
-            this.nodes.push({ id: subNodeId, label: `${ip} (${ipAvgTime.toFixed(1)}ms)`, type: 'subhop', locationId, parentId: hopId, details: ipDetails });
+            const subY = baseY + 50 + (ipIndex * 30 - (uniqueIps.length * 15)); // Fan out vertically around parent
+            const subDetails = hop.hopDetails.filter((detail: any) => detail.ipAddress === ip);
+            const subAvgTime = subDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / subDetails.length;
+            this.nodes.push({ id: subNodeId, label: `${ip} (${subAvgTime.toFixed(1)}ms)`, type: 'subhop', locationId, parentId: hopId, details: subDetails, initialX: hopX + 50, initialY: subY });
             this.links.push({ source: hopId, target: subNodeId, type: 'sub' });
           });
 
           prevId = hopId;
+          hopX += 150; // Increment horizontal position for next hop
         });
       });
 
@@ -109,6 +112,12 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
   }
 
   private redrawGraph() {
+    // Assign initial positions to simulation nodes
+    this.nodes.forEach(node => {
+      node.x = node.initialX;
+      node.y = node.initialY;
+    });
+
     this.simulation.nodes(this.nodes).force('link').links(this.links);
     this.simulation.alpha(1).restart();
 
@@ -198,10 +207,9 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
 
 
 
-
 .graph-container {
   width: 100%;
-  height: 600px;
+  height: 800px; /* Matches increased component height */
   position: relative;
 }
 
@@ -221,21 +229,13 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
 .sub-link {
   stroke: #ccc;
   stroke-width: 1;
-  stroke-dasharray: 2,2; /* Dashed for sub-links */
+  stroke-dasharray: 2,2;
 }
 
 text {
   pointer-events: none;
   font-family: Arial, sans-serif;
   fill: #333;
-}
-
-text.label {
-  font-size: 12px;
-}
-
-text.sub-label {
-  font-size: 10px;
 }
 
 .tooltip {
