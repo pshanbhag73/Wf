@@ -60,15 +60,15 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .append('svg')
       .attr('width', this.width)
       .attr('height', this.height)
-      .attr('viewBox', `0 0 ${this.width} ${this.height}`) // Ensures proper scaling
+      .attr('viewBox', `0 0 ${this.width} ${this.height}`)
       .style('background', '#f0f0f0');
 
     this.simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id((d: any) => d.id).distance(150))
-      .force('charge', d3.forceManyBody().strength(-600)) // Stronger repulsion
-      .force('collide', d3.forceCollide().radius(20).strength(0.5)) // Prevent overlap
+      .force('charge', d3.forceManyBody().strength(-600))
+      .force('collide', d3.forceCollide().radius(20).strength(0.5))
       .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-      .force('x', d3.forceX((d: any) => d.initialX || this.width / 2).strength(0.05)) // Weaker to allow spread
+      .force('x', d3.forceX((d: any) => d.initialX || this.width / 2).strength(0.05))
       .force('y', d3.forceY((d: any) => d.initialY || this.height / 2).strength(0.05))
       .on('tick', this.ticked.bind(this));
   }
@@ -82,24 +82,22 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
 
       results.forEach((result: any, locationIndex: number) => {
         const locationId = `Loc_${locationIndex}_${result.hostname}`;
-        const baseY = (locationIndex + 1) * verticalSpacing; // Dynamic vertical centering
+        const baseY = (locationIndex + 1) * verticalSpacing;
         this.nodes.push({ id: locationId, label: result.hostname, type: 'source', locationId, initialX: 100, initialY: baseY });
 
         let prevId = locationId;
-        let hopX = 200; // Start hops further right
+        let hopX = 200;
         result.hops.forEach((hop: any, hopIndex: number) => {
           const hopId = `${locationId}_Hop_${hop.hopNumber}`;
           const uniqueIps = [...new Set(hop.hopDetails.map((detail: any) => detail.ipAddress))];
           const avgTime = hop.hopDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / hop.hopDetails.length;
 
-          // Parent hop node
           this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails, initialX: hopX, initialY: baseY });
           this.links.push({ source: prevId, target: hopId });
 
-          // Sub-nodes with random jitter for initial spread
           uniqueIps.forEach((ip, ipIndex) => {
             const subNodeId = `${hopId}_IP_${ipIndex}`;
-            const subY = baseY + (ipIndex * 30 - (uniqueIps.length * 15)) + (Math.random() * 20 - 10); // Jitter for spread
+            const subY = baseY + (ipIndex * 30 - (uniqueIps.length * 15)) + (Math.random() * 20 - 10);
             const subX = hopX + 50 + (Math.random() * 20 - 10);
             const subDetails = hop.hopDetails.filter((detail: any) => detail.ipAddress === ip);
             const subAvgTime = subDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / subDetails.length;
@@ -108,7 +106,7 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
           });
 
           prevId = hopId;
-          hopX += 200; // Larger increment for horizontal spread
+          hopX += 250; // Increased for better horizontal spread
         });
       });
 
@@ -118,16 +116,16 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
   }
 
   private redrawGraph() {
-    // Assign initial positions
+    // Assign initial positions to simulation nodes
     this.nodes.forEach(node => {
       node.x = node.initialX;
       node.y = node.initialY;
     });
 
     this.simulation.nodes(this.nodes).force('link').links(this.links);
-    this.simulation.alpha(1).restart(); // High alpha for strong initial force
+    this.simulation.alpha(1).restart();
 
-    // Warm-up simulation with a few ticks
+    // Warm-up simulation
     for (let i = 0; i < 100; i++) {
       this.simulation.tick();
     }
@@ -140,7 +138,11 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .enter().append('line')
       .attr('class', (d: any) => `link ${d.type === 'sub' ? 'sub-link' : ''}`)
       .attr('stroke', (d: any) => d.type === 'sub' ? '#ccc' : '#999')
-      .attr('stroke-width', (d: any) => d.type === 'sub' ? 1 : 2);
+      .attr('stroke-width', (d: any) => d.type === 'sub' ? 1 : 2)
+      .attr('x1', (d: any) => d.source.initialX || d.source.x || 0) // Initial set
+      .attr('y1', (d: any) => d.source.initialY || d.source.y || 0)
+      .attr('x2', (d: any) => d.target.initialX || d.target.x || 0)
+      .attr('y2', (d: any) => d.target.initialY || d.target.y || 0);
 
     const node = this.svg.append('g')
       .selectAll('.node')
@@ -149,6 +151,8 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .attr('class', 'node')
       .attr('r', (d: any) => d.type === 'subhop' ? 5 : Math.min(15, d.avgTime || 10))
       .attr('fill', (d: any) => d.type === 'source' ? 'green' : d.type === 'subhop' ? '#666' : 'steelblue')
+      .attr('cx', (d: any) => d.initialX || d.x || 0) // Initial set
+      .attr('cy', (d: any) => d.initialY || d.y || 0)
       .call(this.drag(this.simulation));
 
     const label = this.svg.append('g')
@@ -159,7 +163,9 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .text((d: any) => d.label)
       .attr('dx', 12)
       .attr('dy', '.35em')
-      .style('font-size', (d: any) => d.type === 'subhop' ? '10px' : '12px');
+      .style('font-size', (d: any) => d.type === 'subhop' ? '10px' : '12px')
+      .attr('x', (d: any) => d.initialX || d.x || 0) // Initial set
+      .attr('y', (d: any) => d.initialY || d.y || 0);
 
     const tooltip = d3.select(this.elementRef.nativeElement).append('div')
       .attr('class', 'tooltip')
@@ -174,20 +180,23 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       tooltip.transition().duration(500).style('opacity', 0);
     });
 
+    // Call ticked to update with warmed positions
+    this.ticked();
+
     this.ticked = () => {
       link
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
+        .attr('x1', (d: any) => d.source.x || 0)
+        .attr('y1', (d: any) => d.source.y || 0)
+        .attr('x2', (d: any) => d.target.x || 0)
+        .attr('y2', (d: any) => d.target.y || 0);
 
       node
-        .attr('cx', (d: any) => d.x)
-        .attr('cy', (d: any) => d.y);
+        .attr('cx', (d: any) => d.x || 0)
+        .attr('cy', (d: any) => d.y || 0);
 
       label
-        .attr('x', (d: any) => d.x)
-        .attr('y', (d: any) => d.y);
+        .attr('x', (d: any) => d.x || 0)
+        .attr('y', (d: any) => d.y || 0);
     };
   }
 
