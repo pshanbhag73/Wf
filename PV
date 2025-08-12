@@ -1,143 +1,290 @@
-private drawVisualization(): void {
-  const width = 800;
-  const height = 600;
+import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, SimpleChanges, ViewChild } from '@angular/core';
+import * as d3 from 'd3';
 
-  // Prepare nodes and links
-  const nodes = new Map<string, { id: string, label: string, color: string, times: number[], x: number, y: number }>();
-  const links: { source: string, target: string, count: number }[] = [];
+interface Probe {
+  location: string;
+  dns: string;
+  hops: Hop[];
+}
 
-  this.probes.forEach(probe => {
-    const sourceId = probe.location.replace(/\s/g, '_');
-    if (!nodes.has(sourceId)) {
-      nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [], x: 50, y: height / 2 });
+interface Hop {
+  hopNumber: number;
+  hopDetails: HopDetail[];
+}
+
+interface HopDetail {
+  ip: string;
+  time: number;
+}
+
+@Component({
+  selector: 'app-traceroute-visualization',
+  template: `<div #tracerouteContainer style="height: 600px; width: 100%; border: 1px solid #ccc;"></div>`,
+  styles: []
+})
+export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDestroy {
+  @ViewChild('tracerouteContainer') container!: ElementRef;
+  @Input() probes: Probe[] = [];
+
+  private svg: any;
+  private simulation: any;
+  private g: any; // Group for zoom/pan
+  private zoom: any;
+
+  ngOnInit(): void {
+    this.initializeVisualization();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['probes'] && !changes['probes'].firstChange) {
+      this.updateVisualization();
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.simulation) {
+      this.simulation.stop();
+    }
+    if (this.svg) {
+      this.svg.remove();
+    }
+  }
+
+  private initializeVisualization(): void {
+    if (!this.probes || this.probes.length === 0) {
+      return;
     }
 
-    let previous = sourceId;
-    probe.hops.forEach((hop, index) => {
-      hop.hopDetails.forEach(detail => {
-        const current = detail.ip;
-        if (!nodes.has(current)) {
-          nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 });
-        }
+    const width = 800;
+    const height = 600;
 
-        nodes.get(current)!.times.push(detail.time);
-        links.push({ source: previous, target: current, count: 1 });
+    this.svg = d3.select(this.container.nativeElement)
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height);
 
-        previous = current;
+    // Add a group for zoom/pan
+    this.g = this.svg.append('g');
+
+    // Add zoom behavior
+    this.zoom = d3.zoom()
+      .scaleExtent([0.1, 10]) // Min and max zoom levels
+      .on('zoom', (event: any) => {
+        this.g.attr('transform', event.transform);
       });
+    this.svg.call(this.zoom);
 
-      // Handle multiple IPs per hop by branching
-      if (hop.hopDetails.length > 1) {
-        hop.hopDetails.slice(1).forEach((detail, i) => {
+    this.drawVisualization();
+    this.fitToView(); // Fit content on load
+  }
+
+  private updateVisualization(): void {
+    if (!this.probes || this.probes.length === 0) {
+      return;
+    }
+
+    // Remove existing elements
+    this.g.selectAll('*').remove();
+    if (this.simulation) {
+      this.simulation.stop();
+    }
+
+    this.drawVisualization();
+    this.fitToView(); // Fit content after update
+  }
+
+  private drawVisualization(): void {
+    const width = 800;
+    const height = 600;
+
+    // Prepare nodes and links
+    const nodes = new Map<string, { id: string, label: string, color: string, times: number[], x: number, y: number }>();
+    const links: { source: string, target: string, count: number }[] = [];
+
+    this.probes.forEach(probe => {
+      const sourceId = probe.location.replace(/\s/g, '_');
+      if (!nodes.has(sourceId)) {
+        nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [], x: 50, y: height / 2 });
+      }
+
+      let previous = sourceId;
+      probe.hops.forEach((hop, index) => {
+        hop.hopDetails.forEach(detail => {
           const current = detail.ip;
           if (!nodes.has(current)) {
-            nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (i + 1) * 50 });
+            nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 });
           }
+
           nodes.get(current)!.times.push(detail.time);
           links.push({ source: previous, target: current, count: 1 });
+
+          previous = current;
         });
+
+        // Handle multiple IPs per hop by branching
+        if (hop.hopDetails.length > 1) {
+          hop.hopDetails.slice(1).forEach((detail, i) => {
+            const current = detail.ip;
+            if (!nodes.has(current)) {
+              nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (i + 1) * 50 });
+            }
+            nodes.get(current)!.times.push(detail.time);
+            links.push({ source: previous, target: current, count: 1 });
+          });
+        }
+      });
+
+      // Mark destination
+      if (nodes.has(previous)) {
+        const node = nodes.get(previous)!;
+        node.label = `${node.label} (${probe.dns})`;
+        node.color = 'green';
+        node.x = width - 50; // Position destination on the right
+        node.y = height / 2;
       }
     });
 
-    // Mark destination
-    if (nodes.has(previous)) {
-      const node = nodes.get(previous)!;
-      node.label = `${node.label} (${probe.dns})`;
-      node.color = 'green';
-      node.x = width - 50; // Position destination on the right
-      node.y = height / 2;
-    }
+    // Aggregate links (count occurrences)
+    const linkMap = new Map<string, { source: string, target: string, count: number }>();
+    links.forEach(link => {
+      const key = `${link.source}->${link.target}`;
+      if (linkMap.has(key)) {
+        linkMap.get(key)!.count++;
+      } else {
+        linkMap.set(key, { ...link });
+      }
+    });
+    const uniqueLinks = Array.from(linkMap.values());
+
+    // Update node labels with average times
+    nodes.forEach(node => {
+      if (node.times.length > 0) {
+        const avg = d3.mean(node.times) || 0;
+        node.label += `\n${avg.toFixed(2)} ms`;
+      }
+    });
+
+    const nodeArray = Array.from(nodes.values());
+    const linkArray = uniqueLinks;
+
+    // Simulation setup with hierarchical layout
+    this.simulation = d3.forceSimulation(nodeArray)
+      .force('link', d3.forceLink(linkArray).id(d => d.id).distance(150))
+      .force('charge', d3.forceManyBody().strength(-300))
+      .force('x', d3.forceX(d => d.x).strength(0.8)) // Strong horizontal positioning
+      .force('y', d3.forceY(d => d.y).strength(0.1)) // Maintain initial Y positions
+      .force('collision', d3.forceCollide().radius(20))
+      .on('tick', () => ticked(this.g.select('.links'), this.g.select('.nodes')));
+
+    // Initial node positions
+    nodeArray.forEach(node => {
+      node.x = node.x || Math.random() * width;
+      node.y = node.y || Math.random() * height;
+    });
+
+    // Draw links with smooth curves
+    const link = this.g.append('g')
+      .attr('class', 'links')
+      .selectAll('path')
+      .data(linkArray)
+      .join('path')
+      .attr('stroke', '#999')
+      .attr('stroke-width', d => Math.sqrt(d.count) * 2)
+      .attr('fill', 'none')
+      .attr('marker-end', 'url(#arrowhead)');
+
+    // Draw arrowheads
+    this.svg.append('defs').selectAll('marker')
+      .data(['arrowhead'])
+      .join('marker')
+      .attr('id', d => d)
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 15)
+      .attr('refY', 0)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', '#999');
+
+    // Draw nodes
+    const node = this.g.append('g')
+      .attr('class', 'nodes')
+      .selectAll('g')
+      .data(nodeArray)
+      .join('g')
+      .call(d3.drag()
+        .on('start', (event: any, d: any) => this.dragstarted(event, d))
+        .on('drag', (event: any, d: any) => this.dragged(event, d))
+        .on('end', (event: any, d: any) => this.dragended(event, d)));
+
+    node.append('circle')
+      .attr('r', 5)
+      .attr('fill', d => d.color);
+
+    node.append('text')
+      .attr('x', 8)
+      .attr('y', 3)
+      .text(d => d.label.split('\n')[0]) // Show only IP/location initially
+      .attr('font-size', '10px')
+      .attr('text-anchor', 'start');
+
+    // Add hover tooltip
+    node.append('title')
+      .text(d => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms`);
+  }
+
+  private fitToView(): void {
+    const width = 800;
+    const height = 600;
+    const nodes = d3.select(this.g).select('.nodes').selectAll('g').data();
+
+    if (nodes.length === 0) return;
+
+    const xExtent = d3.extent(nodes, (d: any) => d.x);
+    const yExtent = d3.extent(nodes, (d: any) => d.y);
+    const padding = 50;
+
+    const w = xExtent[1] - xExtent[0] + 2 * padding;
+    const h = yExtent[1] - yExtent[0] + 2 * padding;
+    const scale = Math.min(width / w, height / h) * 0.9; // 90% to avoid clipping
+
+    const tx = (width - scale * (xExtent[0] + xExtent[1]) / 2);
+    const ty = (height - scale * (yExtent[0] + yExtent[1]) / 2);
+
+    const initialTransform = d3.zoomIdentity.translate(tx, ty).scale(scale);
+    this.svg.transition().duration(750).call(this.zoom.transform, initialTransform);
+  }
+
+  private dragstarted(event: any, d: any): void {
+    if (!event.active) this.simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  private dragged(event: any, d: any): void {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  private dragended(event: any, d: any): void {
+    if (!event.active) this.simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+}
+
+// External ticked function
+function ticked(link: any, node: any) {
+  link.attr('d', (d: any) => {
+    const dx = d.target.x - d.source.x;
+    const dy = d.target.y - d.source.y;
+    const dr = Math.sqrt(dx * dx + dy * dy) * 0.5;
+    const midX = d.source.x + dx * 0.6;
+    const midY = d.source.y + dy * 0.4;
+    return `M${d.source.x},${d.source.y}C${midX},${d.source.y},${midX},${d.target.y},${d.target.x},${d.target.y}`;
   });
 
-  // Aggregate links (count occurrences)
-  const linkMap = new Map<string, { source: string, target: string, count: number }>();
-  links.forEach(link => {
-    const key = `${link.source}->${link.target}`;
-    if (linkMap.has(key)) {
-      linkMap.get(key)!.count++;
-    } else {
-      linkMap.set(key, { ...link });
-    }
-  });
-  const uniqueLinks = Array.from(linkMap.values());
-
-  // Update node labels with average times
-  nodes.forEach(node => {
-    if (node.times.length > 0) {
-      const avg = d3.mean(node.times) || 0;
-      node.label += `\n${avg.toFixed(2)} ms`;
-    }
-  });
-
-  const nodeArray = Array.from(nodes.values());
-  const linkArray = uniqueLinks;
-
-  // Simulation setup with hierarchical layout
-  this.simulation = d3.forceSimulation(nodeArray)
-    .force('link', d3.forceLink(linkArray).id(d => d.id).distance(150))
-    .force('charge', d3.forceManyBody().strength(-300))
-    .force('x', d3.forceX(d => d.x).strength(0.8)) // Strong horizontal positioning
-    .force('y', d3.forceY(d => d.y).strength(0.1)) // Maintain initial Y positions
-    .force('collision', d3.forceCollide().radius(20));
-
-  // Initial node positions
-  nodeArray.forEach(node => {
-    node.x = node.x || Math.random() * width;
-    node.y = node.y || Math.random() * height;
-  });
-
-  // Draw links with smooth curves
-  const link = this.svg.append('g')
-    .selectAll('path')
-    .data(linkArray)
-    .join('path')
-    .attr('stroke', '#999')
-    .attr('stroke-width', d => Math.sqrt(d.count) * 2)
-    .attr('fill', 'none')
-    .attr('marker-end', 'url(#arrowhead)');
-
-  // Draw arrowheads
-  this.svg.append('defs').selectAll('marker')
-    .data(['arrowhead'])
-    .join('marker')
-    .attr('id', d => d)
-    .attr('viewBox', '0 -5 10 10')
-    .attr('refX', 15)
-    .attr('refY', 0)
-    .attr('markerWidth', 6)
-    .attr('markerHeight', 6)
-    .attr('orient', 'auto')
-    .append('path')
-    .attr('d', 'M0,-5L10,0L0,5')
-    .attr('fill', '#999');
-
-  // Draw nodes
-  const node = this.svg.append('g')
-    .selectAll('g')
-    .data(nodeArray)
-    .join('g')
-    .call(d3.drag()
-      .on('start', (event: any, d: any) => this.dragstarted(event, d))
-      .on('drag', (event: any, d: any) => this.dragged(event, d))
-      .on('end', (event: any, d: any) => this.dragended(event, d)));
-
-  node.append('circle')
-    .attr('r', 5)
-    .attr('fill', d => d.color);
-
-  node.append('text')
-    .attr('x', 8)
-    .attr('y', 3)
-    .text(d => d.label.split('\n')[0]) // Show only IP/location initially
-    .attr('font-size', '10px')
-    .attr('text-anchor', 'start');
-
-  // Add hover tooltip
-  node.append('title')
-    .text(d => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms');
-
-  // Bind ticked function with link and node selections
-  this.simulation.on('tick', () => {
-    ticked.call(this, link, node);
-  });
+  node.attr('transform', (d: any) => `translate(${d.x},${d.y})`);
 }
