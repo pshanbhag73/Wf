@@ -1,212 +1,182 @@
-<!-- app.component.html -->
-<div class="header">
-  <h1>INCIDENT PULSE IN REVILYOUR VOSSPINESS</h1>
-</div>
+import * as d3 from 'd3';
 
-<div class="flow-container upper">
-  <svg class="road" viewBox="0 0 1000 400" preserveAspectRatio="none">
-    <path d="M50 300 C250 400 750 200 950 300" fill="none" stroke="#001f3f" stroke-width="60" stroke-dasharray="15 15"></path>
-  </svg>
-  <!-- Top labels (dark blue) -->
-  <div class="label top header-cell" style="left: 5%; top: 10%;">URL TRACKER</div>
-  <div class="label top header-cell" style="left: 30%; top: 0%;">Traftlers</div>
-  <div class="label top header-cell" style="left: 55%; top: 0%;">Seocs</div>
-  <div class="label top header-cell" style="left: 80%; top: 10%;">Abtcliior</div>
-  <!-- Main labels (white) -->
-  <div class="label main" style="left: 5%; top: 30%;">
-    EAPRCES
-    <svg class="icon computer" viewBox="0 0 50 40" xmlns="http://www.w3.org/2000/svg">
-      <rect x="5" y="5" width="40" height="25" rx="2" fill="#ccc"></rect>
-      <rect x="20" y="30" width="10" height="5" fill="#999"></rect>
-      <text x="25" y="20" text-anchor="middle" font-size="8" fill="#000">Αεροντιοο Εσνεβαιδα</text>
-    </svg>
-    <div class="sub-label red-icon">
-      <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-        <rect width="20" height="20" fill="#ff0000"></rect>
-        <text x="10" y="15" text-anchor="middle" fill="#fff" font-size="12">S</text>
-      </svg>
-      Burlex
-    </div>
-  </div>
-  <div class="label main" style="left: 30%; top: 40%;">
-    Sueles Diellerain
-    <p>Tuckie OUC Route</p>
-    <div class="sub-label">Device Tracker</div>
-  </div>
-  <div class="label main" style="left: 55%; top: 40%;">
-    <svg class="icon headphones" viewBox="0 0 50 40" xmlns="http://www.w3.org/2000/svg">
-      <rect x="10" y="10" width="10" height="20" rx="5" fill="#999"></rect>
-      <rect x="30" y="10" width="10" height="20" rx="5" fill="#999"></rect>
-      <path d="M15 10 Q25 0 35 10" fill="none" stroke="#999" stroke-width="5"></path>
-    </svg>
-    Eachigeler
-    <p>56.95 Ecridion</p>
-    <div class="sub-label">Imling Preranation</div>
-  </div>
-  <div class="label main" style="left: 80%; top: 30%;">
-    Reachability Cio; Sidaue
-    <p>Coatn sake UtteuadvaLele Dxhier</p>
-    <div class="sub-label">Arolnottnay Inserosts</div>
-  </div>
-  <!-- Cars -->
-  <svg class="car" style="left: 45%; top: 50%; transform: rotate(-30deg);">
-    <rect x="0" y="0" width="60" height="30" rx="5" fill="#fff" stroke="#000" stroke-width="2"></rect>
-    <circle cx="15" cy="35" r="10" fill="#333"></circle>
-    <circle cx="45" cy="35" r="10" fill="#333"></circle>
-  </svg>
-</div>
+function buildTracerouteVisualization(probes, containerId) {
+  // Sample data structure (replace with your probes input)
+  // probes = [
+  //   { location: "Location1", dns: "example.com", hops: [{hopNumber: 1, hopDetails: [{ip: "10.0.0.1", time: 22.52}]}, ...] },
+  //   ...
+  // ];
 
-<div class="flow-container lower">
-  <svg class="road" viewBox="0 0 1000 400" preserveAspectRatio="none">
-    <path d="M50 100 C250 0 750 200 950 100" fill="none" stroke="#001f3f" stroke-width="60" stroke-dasharray="15 15"></path>
-  </svg>
-  <!-- Top labels (dark blue) -->
-  <div class="label top header-cell" style="left: 5%; top: 10%;">Application Flow</div>
-  <div class="label graph-cell" style="left: 55%; top: 10%;">
-    <svg class="graph" viewBox="0 0 150 100" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="75" cy="50" r="15" fill="#4a90e2"></circle>
-      <text x="75" y="55" text-anchor="middle" fill="#fff" font-size="12">⏰</text>
-      <circle cx="50" cy="20" r="10" fill="#4a90e2"></circle>
-      <text x="50" y="25" text-anchor="middle" fill="#fff" font-size="10">Fosk</text>
-      <circle cx="100" cy="20" r="10" fill="#4a90e2"></circle>
-      <text x="100" y="25" text-anchor="middle" fill="#fff" font-size="10">Z Deslee</text>
-      <line x1="75" y1="50" x2="50" y2="20" stroke="#4a90e2" stroke-width="2"></line>
-      <line x1="75" y1="50" x2="100" y2="20" stroke="#4a90e2" stroke-width="2"></line>
-      <line x1="75" y1="50" x2="30" y2="80" stroke="#4a90e2" stroke-width="2"></line>
-      <line x1="75" y1="50" x2="120" y2="80" stroke="#4a90e2" stroke-width="2"></line>
-      <circle cx="30" cy="80" r="10" fill="#4a90e2"></circle>
-      <circle cx="120" cy="80" r="10" fill="#4a90e2"></circle>
-    </svg>
-  </div>
-  <!-- Main labels (white) -->
-  <div class="label main" style="left: 5%; top: 30%;">
-    Noartilaeo;
-    <p>8RA Treteha</p>
-  </div>
-  <div class="label main" style="left: 30%; top: 20%;">
-    Calecatioe
-    <p>21.4 Arttention</p>
-  </div>
-  <!-- Bottom labels -->
-  <div class="label main bottom" style="left: 5%; top: 60%;">
-    Core senehy
-    <p>58 Eoeoule</p>
-  </div>
-  <div class="label main bottom" style="left: 30%; top: 70%;">
-    Eacam:
-    <p>8y.50.10.25aue</p>
-  </div>
-  <div class="label main bottom" style="left: 55%; top: 70%;">
-    Sertility
-    <p>6A Attration</p>
-  </div>
-  <div class="label main bottom" style="left: 80%; top: 60%;">
-    Ihdrallel
-    <p>9.24.AL Erouction</p>
-  </div>
-  <!-- Car -->
-  <svg class="car" style="left: 70%; top: 40%; transform: rotate(30deg);">
-    <rect x="0" y="0" width="60" height="30" rx="5" fill="#fff" stroke="#000" stroke-width="2"></rect>
-    <circle cx="15" cy="35" r="10" fill="#333"></circle>
-    <circle cx="45" cy="35" r="10" fill="#333"></circle>
-  </svg>
-</div>
+  const width = 800;
+  const height = 600;
 
+  const svg = d3.select(`#${containerId}`)
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('style', 'border: 1px solid #ccc');
 
-// app.component.scss
-.header {
-  background: #ff0000;
-  color: white;
-  padding: 10px 20px;
-  border-radius: 20px;
-  text-align: center;
-  margin-bottom: 40px;
-  h1 {
-    font-size: 36px;
-    margin: 0;
+  // Prepare nodes and links
+  const nodes = new Map();
+  const links = [];
+
+  probes.forEach(probe => {
+    const sourceId = probe.location.replace(/\s/g, '_');
+    if (!nodes.has(sourceId)) {
+      nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [] });
+    }
+
+    let previous = sourceId;
+    probe.hops.forEach(hop => {
+      hop.hopDetails.forEach(detail => {
+        const current = detail.ip;
+        if (!nodes.has(current)) {
+          nodes.set(current, { id: current, label: current, color: 'blue', times: [] });
+        }
+
+        nodes.get(current).times.push(detail.time);
+        links.push({ source: previous, target: current, count: 1 });
+
+        previous = current;
+      });
+
+      // Handle multiple IPs per hop by branching
+      if (hop.hopDetails.length > 1) {
+        hop.hopDetails.slice(1).forEach(detail => {
+          const current = detail.ip;
+          if (!nodes.has(current)) {
+            nodes.set(current, { id: current, label: current, color: 'blue', times: [] });
+          }
+          nodes.get(current).times.push(detail.time);
+          links.push({ source: previous, target: current, count: 1 });
+        });
+      }
+    });
+
+    // Mark destination
+    if (nodes.has(previous)) {
+      const node = nodes.get(previous);
+      node.label = `${node.label} (${probe.dns})`;
+      node.color = 'green';
+    }
+  });
+
+  // Aggregate links (count occurrences)
+  const linkMap = new Map();
+  links.forEach(link => {
+    const key = `${link.source}->${link.target}`;
+    if (linkMap.has(key)) {
+      linkMap.get(key).count++;
+    } else {
+      linkMap.set(key, { ...link });
+    }
+  });
+  const uniqueLinks = Array.from(linkMap.values());
+
+  // Update node labels with average times
+  nodes.forEach(node => {
+    if (node.times.length > 0) {
+      const avg = d3.mean(node.times);
+      node.label += `\n${avg.toFixed(2)} ms`;
+    }
+  });
+
+  const nodeArray = Array.from(nodes.values());
+  const linkArray = uniqueLinks;
+
+  // Simulation setup
+  const simulation = d3.forceSimulation(nodeArray)
+    .force('link', d3.forceLink(linkArray).id(d => d.id).distance(100))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('y', d3.forceY(0).strength(0.1)); // Hierarchical tendency
+
+  // Draw links
+  const link = svg.append('g')
+    .selectAll('line')
+    .data(linkArray)
+    .join('line')
+    .attr('stroke', '#999')
+    .attr('stroke-width', d => Math.sqrt(d.count))
+    .attr('marker-end', 'url(#arrowhead)');
+
+  // Draw arrowheads
+  svg.append('defs').selectAll('marker')
+    .data(['arrowhead'])
+    .join('marker')
+    .attr('id', d => d)
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 15)
+    .attr('refY', 0)
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-5L10,0L0,5')
+    .attr('fill', '#999');
+
+  // Draw nodes
+  const node = svg.append('g')
+    .selectAll('g')
+    .data(nodeArray)
+    .join('g')
+    .call(d3.drag()
+      .on('start', dragstarted)
+      .on('drag', dragged)
+      .on('end', dragended));
+
+  node.append('circle')
+    .attr('r', 5)
+    .attr('fill', d => d.color);
+
+  node.append('text')
+    .attr('x', 8)
+    .attr('y', 3)
+    .text(d => d.label)
+    .attr('font-size', '10px')
+    .attr('text-anchor', 'start');
+
+  // Update positions
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+
+    node
+      .attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  // Drag functions
+  function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
   }
 }
 
-.flow-container {
-  position: relative;
-  width: 100%;
-  height: 400px;
-  margin-bottom: 40px;
-
-  .road {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
+// Example usage
+const probes = [
+  {
+    location: "22.52.156.1",
+    dns: "ca000",
+    hops: [
+      { hopNumber: 1, hopDetails: [{ ip: "10.65.231.251", time: 10.65 }] },
+      { hopNumber: 2, hopDetails: [{ ip: "162.100.14.54", time: 10.62 }, { ip: "162.100.14.55", time: 10.63 }] }
+    ]
   }
+];
 
-  .label {
-    position: absolute;
-    background: white;
-    color: #001f3f;
-    padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    text-align: center;
-    font-size: 14px;
-    transform: translate(-50%, -50%);
-    width: 150px;
-
-    p {
-      margin: 5px 0;
-      font-size: 12px;
-    }
-
-    .sub-label {
-      margin-top: 10px;
-      font-weight: bold;
-    }
-
-    &.header-cell {
-      background: #001f3f;
-      color: white;
-    }
-  }
-
-  .graph-cell {
-    position: absolute;
-    background: white;
-    padding: 0;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    transform: translate(-50%, -50%);
-    width: 200px;
-    height: 100px;
-
-    .graph {
-      width: 100%;
-      height: 100%;
-    }
-  }
-
-  .icon {
-    width: 40px;
-    height: 30px;
-    display: block;
-    margin: 0 auto;
-  }
-
-  .red-icon svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .car {
-    position: absolute;
-    width: 60px;
-    height: 40px;
-    transform: translate(-50%, -50%);
-  }
-
-  &.lower .road {
-    path {
-      d: path('M50 100 C250 0 750 200 950 100');
-    }
-  }
-}
+buildTracerouteVisualization(probes, 'traceroute-container');
