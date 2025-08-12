@@ -302,3 +302,40 @@ export class DnsGraphComponent implements OnInit, OnDestroy {
     // Cleanup
   }
 }
+
+.graph-container {
+  width: 100%;
+  height: 600px; /* Increased height to accommodate multiple lines */
+  position: relative;
+}
+
+.node {
+  transition: transform 0.2s ease;
+}
+
+.node:hover {
+  transform: scale(1.2);
+}
+
+.link {
+  stroke: #999;
+  stroke-width: 2;
+}
+
+text {
+  pointer-events: none;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  fill: #333;
+}
+
+.tooltip {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
