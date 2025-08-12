@@ -100,13 +100,19 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
     const height = 600;
 
     // Prepare nodes and links
-    const nodes = new Map<string, { id: string, label: string, color: string, times: number[], x: number, y: number }>();
+    const nodes = new Map<string, { id: string, label: string, color: string, times: number[], x: number, y: number, isSource?: boolean, isDestination?: boolean }>();
     const links: { source: string, target: string, count: number }[] = [];
+
+    // Define a single destination node
+    const commonDestinationId = 'commonDestination';
+    if (!nodes.has(commonDestinationId)) {
+      nodes.set(commonDestinationId, { id: commonDestinationId, label: 'Destination', color: 'green', times: [], x: width - 50, y: height / 2, isDestination: true });
+    }
 
     this.probes.forEach(probe => {
       const sourceId = probe.location.replace(/\s/g, '_');
       if (!nodes.has(sourceId)) {
-        nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [], x: 50, y: height / 2 });
+        nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [], x: 50, y: height / 2 + (this.probes.indexOf(probe) * 50), isSource: true });
       }
 
       let previous = sourceId;
@@ -114,7 +120,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
         hop.hopDetails.forEach(detail => {
           const current = detail.ip;
           if (!nodes.has(current)) {
-            nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 });
+            nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (this.probes.indexOf(probe) * 50) });
           }
 
           nodes.get(current)!.times.push(detail.time);
@@ -128,7 +134,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
           hop.hopDetails.slice(1).forEach((detail, i) => {
             const current = detail.ip;
             if (!nodes.has(current)) {
-              nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (i + 1) * 50 });
+              nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (this.probes.indexOf(probe) * 50) + (i + 1) * 50 });
             }
             nodes.get(current)!.times.push(detail.time);
             links.push({ source: previous, target: current, count: 1 });
@@ -136,13 +142,9 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
         }
       });
 
-      // Mark destination
-      if (nodes.has(previous)) {
-        const node = nodes.get(previous)!;
-        node.label = `${node.label} (${probe.dns})`;
-        node.color = 'green';
-        node.x = width - 50; // Position destination on the right
-        node.y = height / 2;
+      // Connect the last hop to the common destination
+      if (previous && nodes.has(previous)) {
+        links.push({ source: previous, target: commonDestinationId, count: 1 });
       }
     });
 
@@ -224,16 +226,17 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .attr('r', 5)
       .attr('fill', d => d.color);
 
+    // Add text with positioning based on node type
     this.node.append('text')
-      .attr('x', 8)
+      .attr('x', (d: any) => d.isSource ? -8 : (d.isDestination ? 8 : 8)) // Left for source, right for destination, right for others
       .attr('y', 3)
-      .text(d => d.label.split('\n')[0]) // Show only IP/location initially
+      .text((d: any) => d.label.split('\n')[0]) // Show only IP/location initially
       .attr('font-size', '10px')
-      .attr('text-anchor', 'start');
+      .attr('text-anchor', (d: any) => d.isSource ? 'end' : 'start'); // End for source (left), start for others (right)
 
     // Add hover tooltip
     this.node.append('title')
-      .text(d => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms');
+      .text((d: any) => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms`);
 
     // Bind ticked function with stored link and node selections
     this.simulation.on('tick', () => ticked(this.link, this.node));
