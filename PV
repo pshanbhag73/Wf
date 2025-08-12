@@ -30,6 +30,8 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
   private simulation: any;
   private g: any; // Group for zoom/pan
   private zoom: any;
+  private link: any; // Store link selection
+  private node: any; // Store node selection
 
   ngOnInit(): void {
     this.initializeVisualization();
@@ -173,8 +175,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .force('charge', d3.forceManyBody().strength(-300))
       .force('x', d3.forceX(d => d.x).strength(0.8)) // Strong horizontal positioning
       .force('y', d3.forceY(d => d.y).strength(0.1)) // Maintain initial Y positions
-      .force('collision', d3.forceCollide().radius(20))
-      .on('tick', () => ticked(this.g.select('.links'), this.g.select('.nodes')));
+      .force('collision', d3.forceCollide().radius(20));
 
     // Initial node positions
     nodeArray.forEach(node => {
@@ -183,7 +184,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
     });
 
     // Draw links with smooth curves
-    const link = this.g.append('g')
+    this.link = this.g.append('g')
       .attr('class', 'links')
       .selectAll('path')
       .data(linkArray)
@@ -209,7 +210,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .attr('fill', '#999');
 
     // Draw nodes
-    const node = this.g.append('g')
+    this.node = this.g.append('g')
       .attr('class', 'nodes')
       .selectAll('g')
       .data(nodeArray)
@@ -219,11 +220,11 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
         .on('drag', (event: any, d: any) => this.dragged(event, d))
         .on('end', (event: any, d: any) => this.dragended(event, d)));
 
-    node.append('circle')
+    this.node.append('circle')
       .attr('r', 5)
       .attr('fill', d => d.color);
 
-    node.append('text')
+    this.node.append('text')
       .attr('x', 8)
       .attr('y', 3)
       .text(d => d.label.split('\n')[0]) // Show only IP/location initially
@@ -231,8 +232,11 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .attr('text-anchor', 'start');
 
     // Add hover tooltip
-    node.append('title')
-      .text(d => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms`);
+    this.node.append('title')
+      .text(d => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms');
+
+    // Bind ticked function with stored link and node selections
+    this.simulation.on('tick', () => ticked(this.link, this.node));
   }
 
   private fitToView(): void {
