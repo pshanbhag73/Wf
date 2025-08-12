@@ -24,7 +24,7 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
   private svg: any;
   private simulation: any;
   private width = 800;
-  private height = 800; // Increased for better vertical spread
+  private height = 800;
   private nodes: any[] = [];
   private links: any[] = [];
   private subscription: Subscription | undefined;
@@ -60,14 +60,16 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .append('svg')
       .attr('width', this.width)
       .attr('height', this.height)
+      .attr('viewBox', `0 0 ${this.width} ${this.height}`) // Ensures proper scaling
       .style('background', '#f0f0f0');
 
     this.simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id((d: any) => d.id).distance(150))
-      .force('charge', d3.forceManyBody().strength(-500)) // Stronger repulsion for spread
-      .force('center', d3.forceCenter(this.width / 2, this.height / 2)) // Center the graph
-      .force('x', d3.forceX((d: any) => d.initialX || this.width / 2).strength(0.1)) // Weak horizontal pull based on initial X
-      .force('y', d3.forceY((d: any) => d.initialY || this.height / 2).strength(0.1)) // Weak vertical pull based on initial Y
+      .force('charge', d3.forceManyBody().strength(-600)) // Stronger repulsion
+      .force('collide', d3.forceCollide().radius(20).strength(0.5)) // Prevent overlap
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+      .force('x', d3.forceX((d: any) => d.initialX || this.width / 2).strength(0.05)) // Weaker to allow spread
+      .force('y', d3.forceY((d: any) => d.initialY || this.height / 2).strength(0.05))
       .on('tick', this.ticked.bind(this));
   }
 
@@ -75,34 +77,38 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
     if (results.status === 'finished') {
       this.nodes = [];
       this.links = [];
+      const numLocations = results.length;
+      const verticalSpacing = this.height / (numLocations + 1);
+
       results.forEach((result: any, locationIndex: number) => {
         const locationId = `Loc_${locationIndex}_${result.hostname}`;
-        const baseY = locationIndex * 120; // Vertical offset per location
-        this.nodes.push({ id: locationId, label: result.hostname, type: 'source', locationId, initialX: 50, initialY: baseY + 50 });
+        const baseY = (locationIndex + 1) * verticalSpacing; // Dynamic vertical centering
+        this.nodes.push({ id: locationId, label: result.hostname, type: 'source', locationId, initialX: 100, initialY: baseY });
 
         let prevId = locationId;
-        let hopX = 100; // Starting horizontal position for hops
+        let hopX = 200; // Start hops further right
         result.hops.forEach((hop: any, hopIndex: number) => {
           const hopId = `${locationId}_Hop_${hop.hopNumber}`;
           const uniqueIps = [...new Set(hop.hopDetails.map((detail: any) => detail.ipAddress))];
           const avgTime = hop.hopDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / hop.hopDetails.length;
 
-          // Parent hop node with initial position
-          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails, initialX: hopX, initialY: baseY + 50 });
+          // Parent hop node
+          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails, initialX: hopX, initialY: baseY });
           this.links.push({ source: prevId, target: hopId });
 
-          // Sub-nodes for each unique IP, offset slightly vertically
+          // Sub-nodes with random jitter for initial spread
           uniqueIps.forEach((ip, ipIndex) => {
             const subNodeId = `${hopId}_IP_${ipIndex}`;
-            const subY = baseY + 50 + (ipIndex * 30 - (uniqueIps.length * 15)); // Fan out vertically around parent
+            const subY = baseY + (ipIndex * 30 - (uniqueIps.length * 15)) + (Math.random() * 20 - 10); // Jitter for spread
+            const subX = hopX + 50 + (Math.random() * 20 - 10);
             const subDetails = hop.hopDetails.filter((detail: any) => detail.ipAddress === ip);
             const subAvgTime = subDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / subDetails.length;
-            this.nodes.push({ id: subNodeId, label: `${ip} (${subAvgTime.toFixed(1)}ms)`, type: 'subhop', locationId, parentId: hopId, details: subDetails, initialX: hopX + 50, initialY: subY });
+            this.nodes.push({ id: subNodeId, label: `${ip} (${subAvgTime.toFixed(1)}ms)`, type: 'subhop', locationId, parentId: hopId, details: subDetails, initialX: subX, initialY: subY });
             this.links.push({ source: hopId, target: subNodeId, type: 'sub' });
           });
 
           prevId = hopId;
-          hopX += 150; // Increment horizontal position for next hop
+          hopX += 200; // Larger increment for horizontal spread
         });
       });
 
@@ -112,14 +118,19 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
   }
 
   private redrawGraph() {
-    // Assign initial positions to simulation nodes
+    // Assign initial positions
     this.nodes.forEach(node => {
       node.x = node.initialX;
       node.y = node.initialY;
     });
 
     this.simulation.nodes(this.nodes).force('link').links(this.links);
-    this.simulation.alpha(1).restart();
+    this.simulation.alpha(1).restart(); // High alpha for strong initial force
+
+    // Warm-up simulation with a few ticks
+    for (let i = 0; i < 100; i++) {
+      this.simulation.tick();
+    }
 
     this.svg.selectAll('*').remove();
 
@@ -203,51 +214,3 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
     if (this.subscription) this.subscription.unsubscribe();
   }
 }
-
-
-
-
-.graph-container {
-  width: 100%;
-  height: 800px; /* Matches increased component height */
-  position: relative;
-}
-
-.node {
-  transition: transform 0.2s ease;
-}
-
-.node:hover {
-  transform: scale(1.2);
-}
-
-.link {
-  stroke: #999;
-  stroke-width: 2;
-}
-
-.sub-link {
-  stroke: #ccc;
-  stroke-width: 1;
-  stroke-dasharray: 2,2;
-}
-
-text {
-  pointer-events: none;
-  font-family: Arial, sans-serif;
-  fill: #333;
-}
-
-.tooltip {
-  position: absolute;
-  background: #fff;
-  border: 1px solid #ccc;
-  padding: 5px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-
-
-
