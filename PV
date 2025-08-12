@@ -28,7 +28,6 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
 
   private svg: any;
   private simulation: any;
-  private zoom: any;
 
   ngOnInit(): void {
     this.initializeVisualization();
@@ -62,14 +61,6 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .attr('width', width)
       .attr('height', height);
 
-    // Add zoom behavior
-    this.zoom = d3.zoom()
-      .scaleExtent([0.1, 10]) // Min and max zoom levels
-      .on('zoom', (event: any) => {
-        this.svg.attr('transform', event.transform);
-      });
-    this.svg.call(this.zoom);
-
     this.drawVisualization();
   }
 
@@ -92,21 +83,21 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
     const height = 600;
 
     // Prepare nodes and links
-    const nodes = new Map<string, { id: string, label: string, color: string, times: number[] }>();
+    const nodes = new Map<string, { id: string, label: string, color: string, times: number[], x: number, y: number }>();
     const links: { source: string, target: string, count: number }[] = [];
 
     this.probes.forEach(probe => {
       const sourceId = probe.location.replace(/\s/g, '_');
       if (!nodes.has(sourceId)) {
-        nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [] });
+        nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [], x: 50, y: height / 2 });
       }
 
       let previous = sourceId;
-      probe.hops.forEach(hop => {
+      probe.hops.forEach((hop, index) => {
         hop.hopDetails.forEach(detail => {
           const current = detail.ip;
           if (!nodes.has(current)) {
-            nodes.set(current, { id: current, label: current, color: 'blue', times: [] });
+            nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 });
           }
 
           nodes.get(current)!.times.push(detail.time);
@@ -117,10 +108,10 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
 
         // Handle multiple IPs per hop by branching
         if (hop.hopDetails.length > 1) {
-          hop.hopDetails.slice(1).forEach(detail => {
+          hop.hopDetails.slice(1).forEach((detail, i) => {
             const current = detail.ip;
             if (!nodes.has(current)) {
-              nodes.set(current, { id: current, label: current, color: 'blue', times: [] });
+              nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (i + 1) * 50 });
             }
             nodes.get(current)!.times.push(detail.time);
             links.push({ source: previous, target: current, count: 1 });
@@ -133,6 +124,8 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
         const node = nodes.get(previous)!;
         node.label = `${node.label} (${probe.dns})`;
         node.color = 'green';
+        node.x = width - 50; // Position destination on the right
+        node.y = height / 2;
       }
     });
 
@@ -159,14 +152,20 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
     const nodeArray = Array.from(nodes.values());
     const linkArray = uniqueLinks;
 
-    // Simulation setup with strong horizontal layout
+    // Simulation setup with hierarchical layout
     this.simulation = d3.forceSimulation(nodeArray)
       .force('link', d3.forceLink(linkArray).id(d => d.id).distance(150))
       .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('x', d3.forceX().strength(0.3)) // Stronger horizontal force
-      .force('y', d3.forceY(height / 2).strength(0.05)) // Center vertically
-      .force('collision', d3.forceCollide().radius(20));
+      .force('x', d3.forceX(d => d.x).strength(0.8)) // Strong horizontal positioning
+      .force('y', d3.forceY(d => d.y).strength(0.1)) // Maintain initial Y positions
+      .force('collision', d3.forceCollide().radius(20))
+      .on('tick', ticked);
+
+    // Initial node positions
+    nodeArray.forEach(node => {
+      node.x = node.x || Math.random() * width;
+      node.y = node.y || Math.random() * height;
+    });
 
     // Draw links with smooth curves
     const link = this.svg.append('g')
@@ -174,7 +173,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .data(linkArray)
       .join('path')
       .attr('stroke', '#999')
-      .attr('stroke-width', d => Math.sqrt(d.count) * 2) // Increased thickness for visibility
+      .attr('stroke-width', d => Math.sqrt(d.count) * 2)
       .attr('fill', 'none')
       .attr('marker-end', 'url(#arrowhead)');
 
@@ -218,17 +217,18 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
     node.append('title')
       .text(d => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms`);
 
-    // Update positions with smooth curves
-    this.simulation.on('tick', () => {
+    function ticked() {
       link.attr('d', d => {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
-        const dr = Math.sqrt(dx * dx + dy * dy) / 2; // Adjust curve radius
-        return `M${d.source.x},${d.source.y}C${d.source.x + dx / 3},${d.source.y + dy / 3},${d.target.x - dx / 3},${d.target.y - dy / 3},${d.target.x},${d.target.y}`;
+        const dr = Math.sqrt(dx * dx + dy * dy) * 0.5; // Adjust curve radius
+        const midX = d.source.x + dx * 0.6; // 60% along x for smoother curve
+        const midY = d.source.y + dy * 0.4; // 40% along y for vertical offset
+        return `M${d.source.x},${d.source.y}C${midX},${d.source.y},${midX},${d.target.y},${d.target.x},${d.target.y}`;
       });
 
       node.attr('transform', d => `translate(${d.x},${d.y})`);
-    });
+    }
   }
 
   private dragstarted(event: any, d: any): void {
