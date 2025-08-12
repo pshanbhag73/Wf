@@ -140,3 +140,165 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
     d3.select('.tooltip').remove();
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import { Component, ElementRef, OnInit, OnDestroy } from '@angular/core';
+import * as d3 from 'd3';
+import { GlobalpingService } from '../globalping.service'; // Adjust path, update service for DNS
+import { Subscription } from 'rxjs';
+
+@Component({
+  selector: 'app-dns-graph',
+  template: `<div>
+    <input type="text" [(ngModel)]="target" placeholder="Target domain (e.g., google.com)" />
+    <div *ngFor="let loc of locations; let i = index">
+      <input type="text" [(ngModel)]="loc.type" placeholder="Location Type (e.g., country)" />
+      <input type="text" [(ngModel)]="loc.value" placeholder="Value (e.g., US)" />
+      <input type="number" [(ngModel)]="loc.limit" placeholder="Probes per Location" />
+    </div>
+    <button (click)="addLocation()">Add Location</button>
+    <button (click)="runDnsLookup()">Run DNS Lookup</button>
+    <div class="graph-container"></div>
+  </div>`,
+  styleUrls: ['./dns-graph.component.css']
+})
+export class DnsGraphComponent implements OnInit, OnDestroy {
+  target: string = 'google.com';
+  locations: { type: string, value: string, limit: number }[] = [{ type: 'country', value: 'US', limit: 1 }];
+  private svg: any;
+  private simulation: any;
+  private width = 800;
+  private height = 400;
+  private nodes: any[] = [];
+  private links: any[] = [];
+  private subscription: Subscription | undefined;
+
+  constructor(private elementRef: ElementRef, private globalpingService: GlobalpingService) {}
+
+  ngOnInit(): void {
+    this.initSvg();
+  }
+
+  addLocation() {
+    this.locations.push({ type: '', value: '', limit: 1 });
+  }
+
+  runDnsLookup() {
+    const apiLocations = this.locations.map(loc => ({ [loc.type]: loc.value, limit: loc.limit }));
+    const body = {
+      type: 'dns',
+      target: this.target,
+      locations: apiLocations,
+      measurementOptions: { queryArgument: '+trace' } // Enable trace for resolution path
+    };
+    this.globalpingService.createMeasurement(body).subscribe((res: any) => { // Update service to accept body
+      const measurementId = res.id;
+      this.subscription = this.globalpingService.getResults(measurementId).subscribe((results: any) => {
+        this.updateGraphFromResults(results);
+      });
+    });
+  }
+
+  private initSvg() {
+    this.svg = d3.select(this.elementRef.nativeElement.querySelector('.graph-container'))
+      .append('svg')
+      .attr('width', this.width)
+      .attr('height', this.height)
+      .style('background', '#f0f0f0');
+
+    this.simulation = d3.forceSimulation()
+      .force('link', d3.forceLink().id((d: any) => d.id).distance(150))
+      .force('charge', d3.forceManyBody().strength(-200))
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+      .force('x', d3.forceX().strength(0.1)) // Horizontal alignment for paths
+      .on('tick', this.ticked.bind(this));
+  }
+
+  private updateGraphFromResults(results: any) {
+    if (results.status === 'finished') {
+      this.nodes = [];
+      this.links = [];
+      results.results.forEach((result: any, index: number) => {
+        const sourceId = `Location_${index}_${result.probe.location}`;
+        this.nodes.push({ id: sourceId, label: `Probe: ${result.probe.location}`, type: 'probe' });
+        let prevId = sourceId;
+        // Parse trace output (example parsing; adjust based on actual API response format)
+        const traceLines = result.rawOutput.split('\n').filter(line => line.trim() && line.includes('.'));
+        traceLines.forEach((line: string, hopIndex: number) => {
+          const parts = line.trim().split(/\s+/);
+          const domain = parts[0];
+          const ip = parts[parts.length - 1].replace(/[()]/g, '');
+          const hopId = `Hop_${index}_${hopIndex}`;
+          this.nodes.push({ id: hopId, label: `${domain} (${ip})` });
+          this.links.push({ source: prevId, target: hopId });
+          prevId = hopId;
+        });
+      });
+
+      this.redrawGraph();
+      if (this.subscription) this.subscription.unsubscribe();
+    }
+  }
+
+  private redrawGraph() {
+    this.simulation.nodes(this.nodes).force('link').links(this.links);
+    this.simulation.alpha(1).restart();
+
+    this.svg.selectAll('*').remove();
+
+    const link = this.svg.append('g').selectAll('line').data(this.links).enter().append('line').attr('stroke', '#999').attr('stroke-width', 2);
+
+    const node = this.svg.append('g').selectAll('circle').data(this.nodes).enter().append('circle').attr('r', 10).attr('fill', 'steelblue').call(this.drag(this.simulation));
+
+    const label = this.svg.append('g').selectAll('text').data(this.nodes).enter().append('text').text((d: any) => d.label).attr('dx', 12).attr('dy', '.35em').style('font-size', '12px');
+
+    // Add tooltips or other interactivity as needed
+
+    this.ticked = () => {
+      link.attr('x1', (d: any) => d.source.x).attr('y1', (d: any) => d.source.y).attr('x2', (d: any) => d.target.x).attr('y2', (d: any) => d.target.y);
+      node.attr('cx', (d: any) => d.x).attr('cy', (d: any) => d.y);
+      label.attr('x', (d: any) => d.x).attr('y', (d: any) => d.y);
+    };
+  }
+
+  private drag(simulation: any): any {
+    return d3.drag()
+      .on('start', (event: any, d: any) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event: any, d: any) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event: any, d: any) => {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      });
+  }
+
+  ngOnDestroy(): void {
+    if (this.simulation) this.simulation.stop();
+    if (this.subscription) this.subscription.unsubscribe();
+    // Cleanup
+  }
+}
