@@ -28,6 +28,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
 
   private svg: any;
   private simulation: any;
+  private zoom: any;
 
   ngOnInit(): void {
     this.initializeVisualization();
@@ -60,6 +61,14 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .append('svg')
       .attr('width', width)
       .attr('height', height);
+
+    // Add zoom behavior
+    this.zoom = d3.zoom()
+      .scaleExtent([0.1, 10]) // Min and max zoom levels
+      .on('zoom', (event: any) => {
+        this.svg.attr('transform', event.transform);
+      });
+    this.svg.call(this.zoom);
 
     this.drawVisualization();
   }
@@ -150,12 +159,13 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
     const nodeArray = Array.from(nodes.values());
     const linkArray = uniqueLinks;
 
-    // Simulation setup with hierarchical layout
+    // Simulation setup with strong horizontal layout
     this.simulation = d3.forceSimulation(nodeArray)
       .force('link', d3.forceLink(linkArray).id(d => d.id).distance(150))
       .force('charge', d3.forceManyBody().strength(-300))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('x', d3.forceX().strength(0.1)) // Horizontal tendency
+      .force('x', d3.forceX().strength(0.3)) // Stronger horizontal force
+      .force('y', d3.forceY(height / 2).strength(0.05)) // Center vertically
       .force('collision', d3.forceCollide().radius(20));
 
     // Draw links with smooth curves
@@ -164,7 +174,7 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       .data(linkArray)
       .join('path')
       .attr('stroke', '#999')
-      .attr('stroke-width', d => Math.sqrt(d.count))
+      .attr('stroke-width', d => Math.sqrt(d.count) * 2) // Increased thickness for visibility
       .attr('fill', 'none')
       .attr('marker-end', 'url(#arrowhead)');
 
@@ -213,8 +223,8 @@ export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDe
       link.attr('d', d => {
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
-        const dr = Math.sqrt(dx * dx + dy * dy);
-        return `M${d.source.x},${d.source.y}C${d.source.x + dx / 2},${d.source.y},${d.target.x - dx / 2},${d.target.y},${d.target.x},${d.target.y}`;
+        const dr = Math.sqrt(dx * dx + dy * dy) / 2; // Adjust curve radius
+        return `M${d.source.x},${d.source.y}C${d.source.x + dx / 3},${d.source.y + dy / 3},${d.target.x - dx / 3},${d.target.y - dy / 3},${d.target.x},${d.target.y}`;
       });
 
       node.attr('transform', d => `translate(${d.x},${d.y})`);
