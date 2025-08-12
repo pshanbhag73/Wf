@@ -24,7 +24,7 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
   private svg: any;
   private simulation: any;
   private width = 800;
-  private height = 600; // Increased for multiple paths
+  private height = 600;
   private nodes: any[] = [];
   private links: any[] = [];
   private subscription: Subscription | undefined;
@@ -45,7 +45,7 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       type: 'traceroute',
       target: this.target,
       locations: apiLocations,
-      measurementOptions: { packets: 3 } // 3 probes per hop
+      measurementOptions: { packets: 3 }
     };
     this.globalpingService.createMeasurement(body).subscribe((res: any) => {
       const measurementId = res.id;
@@ -63,12 +63,12 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .style('background', '#f0f0f0');
 
     this.simulation = d3.forceSimulation()
-      .force('link', d3.forceLink().id((d: any) => d.id).distance(150)) // Space between hops
-      .force('charge', d3.forceManyBody().strength(-300)) // Repulsion
+      .force('link', d3.forceLink().id((d: any) => d.id).distance(150))
+      .force('charge', d3.forceManyBody().strength(-300))
       .force('y', d3.forceY((d: any, i) => {
-        const locationIndex = this.nodes.findIndex(n => n.locationId === d.locationId);
-        return (locationIndex * 120) % this.height; // Vertical offset per location
-      }).strength(0.1)) // Vertical spread
+        const locationIndex = this.nodes.findIndex(n => n.locationId === d.locationId && n.type === 'source');
+        return (locationIndex * 120) % this.height;
+      }).strength(0.1))
       .on('tick', this.ticked.bind(this));
   }
 
@@ -83,10 +83,22 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
         let prevId = locationId;
         result.hops.forEach((hop: any, hopIndex: number) => {
           const hopId = `${locationId}_Hop_${hop.hopNumber}`;
+          const uniqueIps = [...new Set(hop.hopDetails.map((detail: any) => detail.ipAddress))]; // Get unique IPs
           const avgTime = hop.hopDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / hop.hopDetails.length;
-          const ip = hop.hopDetails[0].ipAddress; // Use first IP for node; tooltip shows all
-          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (${ip}, ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails });
+
+          // Parent hop node
+          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails });
           this.links.push({ source: prevId, target: hopId });
+
+          // Sub-nodes for each unique IP
+          uniqueIps.forEach((ip, ipIndex) => {
+            const subNodeId = `${hopId}_IP_${ipIndex}`;
+            const ipDetails = hop.hopDetails.filter((detail: any) => detail.ipAddress === ip);
+            const ipAvgTime = ipDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / ipDetails.length;
+            this.nodes.push({ id: subNodeId, label: `${ip} (${ipAvgTime.toFixed(1)}ms)`, type: 'subhop', locationId, parentId: hopId, details: ipDetails });
+            this.links.push({ source: hopId, target: subNodeId, type: 'sub' });
+          });
+
           prevId = hopId;
         });
       });
@@ -106,15 +118,17 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .selectAll('.link')
       .data(this.links)
       .enter().append('line')
-      .attr('class', 'link');
+      .attr('class', (d: any) => `link ${d.type === 'sub' ? 'sub-link' : ''}`)
+      .attr('stroke', (d: any) => d.type === 'sub' ? '#ccc' : '#999')
+      .attr('stroke-width', (d: any) => d.type === 'sub' ? 1 : 2);
 
     const node = this.svg.append('g')
       .selectAll('.node')
       .data(this.nodes)
       .enter().append('circle')
       .attr('class', 'node')
-      .attr('r', (d: any) => Math.min(15, d.avgTime || 10)) // Size by avg time
-      .attr('fill', (d: any) => d.type === 'source' ? 'green' : 'steelblue')
+      .attr('r', (d: any) => d.type === 'subhop' ? 5 : Math.min(15, d.avgTime || 10))
+      .attr('fill', (d: any) => d.type === 'source' ? 'green' : d.type === 'subhop' ? '#666' : 'steelblue')
       .call(this.drag(this.simulation));
 
     const label = this.svg.append('g')
@@ -125,16 +139,15 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
       .text((d: any) => d.label)
       .attr('dx', 12)
       .attr('dy', '.35em')
-      .style('font-size', '12px');
+      .style('font-size', (d: any) => d.type === 'subhop' ? '10px' : '12px');
 
-    // Add tooltip
     const tooltip = d3.select(this.elementRef.nativeElement).append('div')
       .attr('class', 'tooltip')
       .style('opacity', 0);
 
     node.on('mouseover', (event: any, d: any) => {
       tooltip.transition().duration(200).style('opacity', 0.9);
-      tooltip.html(`Hop ${d.label.split(' ')[1]}<br>Details: ${d.details.map((det: any) => `${det.ipAddress}: ${det.time}ms`).join('<br>')}`)
+      tooltip.html(`<strong>${d.label}</strong><br>Details: ${d.details.map((det: any) => `${det.ipAddress}: ${det.time}ms`).join('<br>')}`)
         .style('left', (event.pageX + 5) + 'px')
         .style('top', (event.pageY - 28) + 'px');
     }).on('mouseout', () => {
@@ -185,9 +198,10 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
 
 
 
+
 .graph-container {
   width: 100%;
-  height: 600px; /* Increased for multiple paths */
+  height: 600px;
   position: relative;
 }
 
@@ -204,11 +218,24 @@ export class TracerouteGraphComponent implements OnInit, OnDestroy {
   stroke-width: 2;
 }
 
+.sub-link {
+  stroke: #ccc;
+  stroke-width: 1;
+  stroke-dasharray: 2,2; /* Dashed for sub-links */
+}
+
 text {
   pointer-events: none;
   font-family: Arial, sans-serif;
-  font-size: 12px;
   fill: #333;
+}
+
+text.label {
+  font-size: 12px;
+}
+
+text.sub-label {
+  font-size: 10px;
 }
 
 .tooltip {
