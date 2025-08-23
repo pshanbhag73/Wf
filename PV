@@ -1,198 +1,73 @@
-package com.example.incidentpulse.service;
+package com.example.incidentpulse.controller;
 
+import com.example.incidentpulse.exception.BadRequestException;
+import com.example.incidentpulse.model.TestRequest;
 import com.example.incidentpulse.model.TestResult;
-import com.example.incidentpulse.repository.TestResultRepository;
+import com.example.incidentpulse.service.TestService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Service
-public class TestServiceImpl implements TestService {
+@RestController
+public class TestController {
 
     @Autowired
-    private TestResultRepository repository;
+    private TestService testService;
 
-    @Override
-    public TestResult performTest(String host, String testType, int count, String location, int timeoutSeconds) throws IOException {
-        String os = System.getProperty("os.name").toLowerCase();
-        boolean isWindows = os.contains("win");
+    // Regex for hostname (DNS-compliant: alphanumeric, hyphens, dots)
+    private static final Pattern HOSTNAME_PATTERN = 
+        Pattern.compile("^(?=.{1,253}$)(([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,})$");
 
-        StringBuilder rawOutputBuilder = new StringBuilder();
-        Map<String, Object> parsedResult = new HashMap<>();
-        String status = "SUCCESS"; // Default status
+    // Regex for IPv4 (xxx.xxx.xxx.xxx, each octet 0-255)
+    private static final Pattern IPV4_PATTERN = 
+        Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
 
-        TestResult result = new TestResult();
-        result.setHost(host);
-        result.setTestType(testType);
-        result.setLocation(location != null ? location : getDefaultLocation());
-        result.setTimestamp(new Date());
+    // Regex for IPv6 (full or abbreviated formats)
+    private static final Pattern IPV6_PATTERN = 
+        Pattern.compile("^(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,7}:|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|" +
+                       "[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|" +
+                       ":(?::[0-9a-fA-F]{1,4}){1,7}|::)$");
 
-        try {
-            if (testType.equalsIgnoreCase("ping")) {
-                String command = isWindows ? "ping -n " + count + " -w " + (timeoutSeconds * 1000) + " " + host 
-                                        : "ping -c " + count + " -W " + timeoutSeconds + " " + host;
-                executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
-                parsePingOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
-            } else if (testType.equalsIgnoreCase("traceroute")) {
-                String command = isWindows ? "tracert -w " + (timeoutSeconds * 1000) + " " + host 
-                                        : "traceroute -w " + timeoutSeconds + " " + host;
-                for (int i = 0; i < count; i++) {
-                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
-                    rawOutputBuilder.append("\n");
-                }
-                parseTracerouteOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
-            } else if (testType.equalsIgnoreCase("dns")) {
-                String command = "nslookup " + host;
-                for (int i = 0; i < count; i++) {
-                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
-                    rawOutputBuilder.append("\n");
-                }
-                parseDnsOutput(rawOutputBuilder.toString(), parsedResult);
-            } else {
-                throw new IllegalArgumentException("Unsupported test type: " + testType);
-            }
-
-            // Check for failure conditions in output
-            if (rawOutputBuilder.toString().toLowerCase().contains("request timed out") ||
-                rawOutputBuilder.toString().toLowerCase().contains("destination unreachable") ||
-                rawOutputBuilder.toString().toLowerCase().contains("no answer")) {
-                status = "FAILURE";
-            }
-        } catch (InterruptedException e) {
-            status = "TIMEOUT";
-            rawOutputBuilder.append("ERROR: Test timed out after ").append(timeoutSeconds).append(" seconds\n");
-        } catch (Exception e) {
-            status = "FAILURE";
-            rawOutputBuilder.append("ERROR: ").append(e.getMessage()).append("\n");
+    @PostMapping("/test")
+    public ResponseEntity<TestResult> performTest(@RequestBody TestRequest request) throws IOException {
+        // Validate host
+        String host = request.getHost();
+        if (host == null || host.trim().isEmpty()) {
+            throw new BadRequestException("Host cannot be null or empty");
         }
 
-        result.setRawOutput(rawOutputBuilder.toString());
-        result.setParsedResult(parsedResult);
-        result.setStatus(status);
+        // Check for dangerous characters
+        if (host.contains(";") || host.contains("|") || host.contains("&") || 
+            host.contains("<") || host.contains(">") || host.contains("*") || 
+            host.contains("`") || host.contains("$")) {
+            throw new BadRequestException("Host contains invalid characters");
+        }
 
-        repository.save(result);
-        return result;
-    }
+        // Validate as hostname, IPv4, or IPv6
+        if (!HOSTNAME_PATTERN.matcher(host).matches() && 
+            !IPV4_PATTERN.matcher(host).matches() && 
+            !IPV6_PATTERN.matcher(host).matches()) {
+            throw new BadRequestException("Invalid host: must be a valid hostname, IPv4, or IPv6 address");
+        }
 
-    private void executeCommand(String command, boolean isWindows, StringBuilder outputBuilder, int timeoutSeconds) 
-            throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder();
-        if (isWindows) {
-            pb.command("cmd.exe", "/c", command);
-        } else {
-            pb.command("sh", "-c", command);
-        }
-        Process process = pb.start();
-        
-        // Read output
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            outputBuilder.append(line).append("\n");
-        }
-        
-        // Read errors
-        BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-        while ((line = errorReader.readLine()) != null) {
-            outputBuilder.append("ERROR: ").append(line).append("\n");
-        }
-        
-        // Wait for process with timeout
-        boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-        if (!exited) {
-            process.destroy();
-            throw new InterruptedException("Process timed out");
-        }
-    }
-
-    private void parsePingOutput(String output, Map<String, Object> parsed, boolean isWindows) {
-        if (isWindows) {
-            Pattern lossPattern = Pattern.compile("Lost = (\\d+) \\((\\d+)% loss\\)");
-            Pattern rttPattern = Pattern.compile("Minimum = (\\d+)ms, Maximum = (\\d+)ms, Average = (\\d+)ms");
-            Matcher lossMatcher = lossPattern.matcher(output);
-            if (lossMatcher.find()) {
-                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(2)));
-            }
-            Matcher rttMatcher = rttPattern.matcher(output);
-            if (rttMatcher.find()) {
-                parsed.put("min_rtt_ms", Integer.parseInt(rttMatcher.group(1)));
-                parsed.put("max_rtt_ms", Integer.parseInt(rttMatcher.group(2)));
-                parsed.put("avg_rtt_ms", Integer.parseInt(rttMatcher.group(3)));
-            }
-        } else {
-            Pattern lossPattern = Pattern.compile("(\\d+) packets transmitted, (\\d+) received, (\\d+)% packet loss");
-            Pattern rttPattern = Pattern.compile("rtt min/avg/max/mdev = (\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+) ms");
-            Matcher lossMatcher = lossPattern.matcher(output);
-            if (lossMatcher.find()) {
-                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(3)));
-            }
-            Matcher rttMatcher = rttPattern.matcher(output);
-            if (rttMatcher.find()) {
-                parsed.put("min_rtt_ms", Double.parseDouble(rttMatcher.group(1)));
-                parsed.put("avg_rtt_ms", Double.parseDouble(rttMatcher.group(2)));
-                parsed.put("max_rtt_ms", Double.parseDouble(rttMatcher.group(3)));
-                parsed.put("mdev_rtt_ms", Double.parseDouble(rttMatcher.group(4)));
-            }
-        }
-    }
-
-    private void parseTracerouteOutput(String output, Map<String, Object> parsed, boolean isWindows) {
-        List<Map<String, Object>> hops = new ArrayList<>();
-        String[] lines = output.split("\n");
-        Pattern hopPattern = isWindows ? Pattern.compile("^(\\d+)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+)") :
-                Pattern.compile("^(\\d+)\\s+(\\S+)\\s+\\((\\S+)\\)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms");
-        for (String line : lines) {
-            Matcher matcher = hopPattern.matcher(line.trim());
-            if (matcher.find()) {
-                Map<String, Object> hop = new HashMap<>();
-                hop.put("hop_number", Integer.parseInt(matcher.group(1)));
-                if (isWindows) {
-                    hop.put("rtt1_ms", matcher.group(2));
-                    hop.put("rtt2_ms", matcher.group(3));
-                    hop.put("rtt3_ms", matcher.group(4));
-                    hop.put("host", matcher.group(5));
-                } else {
-                    hop.put("host", matcher.group(2));
-                    hop.put("ip", matcher.group(3));
-                    hop.put("rtt1_ms", matcher.group(4));
-                    hop.put("rtt2_ms", matcher.group(5));
-                    hop.put("rtt3_ms", matcher.group(6));
-                }
-                hops.add(hop);
-            }
-        }
-        parsed.put("hops", hops);
-    }
-
-    private void parseDnsOutput(String output, Map<String, Object> parsed) {
-        List<String> addresses = new ArrayList<>();
-        Pattern addressPattern = Pattern.compile("Address: (\\S+)");
-        Matcher matcher = addressPattern.matcher(output);
-        while (matcher.find()) {
-            addresses.add(matcher.group(1));
-        }
-        parsed.put("addresses", addresses);
-    }
-
-    private String getDefaultLocation() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (Exception e) {
-            return "unknown";
-        }
+        TestResult result = testService.performTest(
+            request.getHost(),
+            request.getTestType(),
+            request.getCount(),
+            request.getLocation(),
+            request.getTimeoutSeconds()
+        );
+        return ResponseEntity.ok(result);
     }
 }
