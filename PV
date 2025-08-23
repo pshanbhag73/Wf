@@ -43,14 +43,14 @@ public class TestServiceImpl implements TestService {
             if (testType.equalsIgnoreCase("ping")) {
                 String command = isWindows ? "ping -n " + count + " -w " + (timeoutSeconds * 1000) + " " + host 
                                         : "ping -c " + count + " -W " + timeoutSeconds + " " + host;
-                executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
                 parsePingOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
             } else if (testType.equalsIgnoreCase("traceroute")) {
                 String command = isWindows ? "tracert -w " + (timeoutSeconds * 1000) + " " + host 
                                         : "traceroute -w " + timeoutSeconds + " " + host;
                 for (int i = 0; i < count; i++) {
                     rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
                     rawOutputBuilder.append("\n");
                 }
                 parseTracerouteOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
@@ -58,19 +58,24 @@ public class TestServiceImpl implements TestService {
                 String command = "nslookup " + host;
                 for (int i = 0; i < count; i++) {
                     rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
                     rawOutputBuilder.append("\n");
                 }
                 parseDnsOutput(rawOutputBuilder.toString(), parsedResult);
+                // Check if no addresses or CNAMEs were found (indicates failure)
+                List<?> addresses = (List<?>) parsedResult.getOrDefault("addresses", new ArrayList<>());
+                List<?> cnames = (List<?>) parsedResult.getOrDefault("cnames", new ArrayList<>());
+                if (addresses.isEmpty() && cnames.isEmpty()) {
+                    status = "FAILURE";
+                }
             } else {
                 throw new IllegalArgumentException("Unsupported test type: " + testType);
             }
 
-            // Check for failure conditions in output
+            // Check for failure conditions in output (excluding non-authoritative answer)
             if (rawOutputBuilder.toString().toLowerCase().contains("request timed out") ||
                 rawOutputBuilder.toString().toLowerCase().contains("destination unreachable") ||
-                rawOutputBuilder.toString().toLowerCase().contains("non-existent domain") ||
-                rawOutputBuilder.toString().toLowerCase().contains("no answer")) {
+                rawOutputBuilder.toString().toLowerCase().contains("non-existent domain")) {
                 status = "FAILURE";
             }
         } catch (InterruptedException e) {
@@ -89,7 +94,7 @@ public class TestServiceImpl implements TestService {
         return result;
     }
 
-    private void executeCommand(String command, boolean isWindows, StringBuilder outputBuilder, int timeoutSeconds) 
+    private void executeCommand(String command, boolean isWindows, StringBuilder outputBuilder, int timeoutSeconds, String testType) 
             throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder();
         if (isWindows) {
@@ -106,10 +111,15 @@ public class TestServiceImpl implements TestService {
             outputBuilder.append(line).append("\n");
         }
         
-        // Read errors (stderr)
+        // Read errors (stderr) with special handling for DNS
         BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
         boolean hasError = false;
         while ((line = errorReader.readLine()) != null) {
+            // For DNS, skip non-error stderr lines like "Non-authoritative answer:"
+            if (testType.equalsIgnoreCase("dns") && line.contains("Non-authoritative answer:")) {
+                outputBuilder.append(line).append("\n"); // Add to output without ERROR: prefix
+                continue;
+            }
             outputBuilder.append("ERROR: ").append(line).append("\n");
             hasError = true;
         }
@@ -121,9 +131,9 @@ public class TestServiceImpl implements TestService {
             throw new InterruptedException("Process timed out");
         }
 
-        // Check exit code for additional error detection
+        // Append exit code error only if no stderr errors were captured and exit code is non-zero
         int exitCode = process.exitValue();
-        if (exitCode != 0 && !hasError) {
+        if (exitCode != 0 && !hasError && !testType.equalsIgnoreCase("dns")) {
             outputBuilder.append("ERROR: Process exited with code ").append(exitCode).append("\n");
         }
     }
@@ -191,14 +201,18 @@ public class TestServiceImpl implements TestService {
         List<String> addresses = new ArrayList<>();
         List<String> cnames = new ArrayList<>();
         
-        // Patterns for parsing nslookup output
-        Pattern addressPattern = Pattern.compile("Address: (\\S+)");
-        Pattern cnamePattern = Pattern.compile("Name:\\s+(\\S+)\\s*\\n\\s*Address");
+        // Updated patterns to handle spaces
+        Pattern addressPattern = Pattern.compile("Address:\\s*(\\S+)");
+        Pattern cnamePattern = Pattern.compile("Name:\\s+(\\S+)");
         
         String[] lines = output.split("\n");
         String currentName = null;
         for (String line : lines) {
-            // Match CNAME (appears as "Name:" before "Address:")
+            // Reset currentName at the start of each run
+            if (line.startsWith("Run ")) {
+                currentName = null;
+            }
+            
             Matcher cnameMatcher = cnamePattern.matcher(line);
             if (cnameMatcher.find()) {
                 currentName = cnameMatcher.group(1);
@@ -207,9 +221,8 @@ public class TestServiceImpl implements TestService {
                 }
             }
             
-            // Match IP addresses
             Matcher addressMatcher = addressPattern.matcher(line);
-            if (addressMatcher.find()) {
+            if (addressMatcher.find() && currentName != null) {
                 String address = addressMatcher.group(1);
                 if (!addresses.contains(address)) {
                     addresses.add(address);
@@ -218,9 +231,7 @@ public class TestServiceImpl implements TestService {
         }
         
         parsed.put("addresses", addresses);
-        if (!cnames.isEmpty()) {
-            parsed.put("cnames", cnames);
-        }
+        parsed.put("cnames", cnames); // Always include, even if empty
     }
 
     private String getDefaultLocation() {
