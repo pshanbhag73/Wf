@@ -1,86 +1,233 @@
-package com.example.incidentpulse.controller;
+package com.example.incidentpulse.service;
 
-import com.example.incidentpulse.exception.BadRequestException;
-import com.example.incidentpulse.model.TestRequest;
 import com.example.incidentpulse.model.TestResult;
-import com.example.incidentpulse.service.TestService;
+import com.example.incidentpulse.repository.TestResultRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@RestController
-public class TestController {
+@Service
+public class TestServiceImpl implements TestService {
 
     @Autowired
-    private TestService testService;
+    private TestResultRepository repository;
 
-    // Simplified regex: alphanumeric, hyphens, dots for hostname
-    private static final Pattern HOSTNAME_PATTERN = 
-        Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9.-]{0,251}[a-zA-Z0-9]$");
+    @Override
+    public TestResult performTest(String host, String testType, int count, String location, int timeoutSeconds) throws IOException {
+        String os = System.getProperty("os.name").toLowerCase();
+        boolean isWindows = os.contains("win");
 
-    // Simplified regex: digits and dots for IPv4
-    private static final Pattern IPV4_PATTERN = 
-        Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+        StringBuilder rawOutputBuilder = new StringBuilder();
+        Map<String, Object> parsedResult = new HashMap<>();
+        String status = "SUCCESS";
 
-    // Simplified regex: hex digits, colons, and double colons for IPv6
-    private static final Pattern IPV6_PATTERN = 
-        Pattern.compile("^[0-9a-fA-F:]{2,39}$|^::$");
+        TestResult result = new TestResult();
+        result.setHost(host);
+        result.setTestType(testType);
+        result.setLocation(location != null ? location : getDefaultLocation());
+        result.setTimestamp(new Date());
 
-    @PostMapping("/test")
-    public ResponseEntity<TestResult> performTest(@RequestBody TestRequest request) throws IOException {
-        // Validate host
-        String host = request.getHost();
-        if (host == null || host.trim().isEmpty()) {
-            throw new BadRequestException("Host cannot be null or empty");
+        try {
+            if (testType.equalsIgnoreCase("ping")) {
+                String command = isWindows ? "ping -n " + count + " -w " + (timeoutSeconds * 1000) + " " + host 
+                                        : "ping -c " + count + " -W " + timeoutSeconds + " " + host;
+                executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                parsePingOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
+            } else if (testType.equalsIgnoreCase("traceroute")) {
+                String command = isWindows ? "tracert -w " + (timeoutSeconds * 1000) + " " + host 
+                                        : "traceroute -w " + timeoutSeconds + " " + host;
+                for (int i = 0; i < count; i++) {
+                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
+                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                    rawOutputBuilder.append("\n");
+                }
+                parseTracerouteOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
+            } else if (testType.equalsIgnoreCase("dns")) {
+                String command = "nslookup " + host;
+                for (int i = 0; i < count; i++) {
+                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
+                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                    rawOutputBuilder.append("\n");
+                }
+                parseDnsOutput(rawOutputBuilder.toString(), parsedResult);
+            } else {
+                throw new IllegalArgumentException("Unsupported test type: " + testType);
+            }
+
+            // Check for failure conditions in output
+            if (rawOutputBuilder.toString().toLowerCase().contains("request timed out") ||
+                rawOutputBuilder.toString().toLowerCase().contains("destination unreachable") ||
+                rawOutputBuilder.toString().toLowerCase().contains("non-existent domain") ||
+                rawOutputBuilder.toString().toLowerCase().contains("no answer")) {
+                status = "FAILURE";
+            }
+        } catch (InterruptedException e) {
+            status = "TIMEOUT";
+            rawOutputBuilder.append("ERROR: Test timed out after ").append(timeoutSeconds).append(" seconds\n");
+        } catch (Exception e) {
+            status = "FAILURE";
+            rawOutputBuilder.append("ERROR: ").append(e.getMessage()).append("\n");
         }
 
-        // Check for dangerous characters
-        if (host.contains(";") || host.contains("|") || host.contains("&") || 
-            host.contains("<") || host.contains(">") || host.contains("*") || 
-            host.contains("`") || host.contains("$") || host.contains(" ")) {
-            throw new BadRequestException("Host contains invalid characters");
-        }
+        result.setRawOutput(rawOutputBuilder.toString());
+        result.setParsedResult(parsedResult);
+        result.setStatus(status);
 
-        // Validate as hostname, IPv4, or IPv6
-        boolean isValidHost = HOSTNAME_PATTERN.matcher(host).matches() || 
-                              IPV4_PATTERN.matcher(host).matches() || 
-                              (IPV6_PATTERN.matcher(host).matches() && isValidIPv6(host));
-        if (!isValidHost) {
-            throw new BadRequestException("Invalid host: must be a valid hostname, IPv4, or IPv6 address");
-        }
-
-        TestResult result = testService.performTest(
-            request.getHost(),
-            request.getTestType(),
-            request.getCount(),
-            request.getLocation(),
-            request.getTimeoutSeconds()
-        );
-        return ResponseEntity.ok(result);
+        repository.save(result);
+        return result;
     }
 
-    // Additional check for IPv6 to ensure proper format (beyond regex)
-    private boolean isValidIPv6(String host) {
-        try {
-            // Split by :: to check for valid segments
-            String[] parts = host.split("::", -1);
-            if (parts.length > 2) {
-                return false; // More than one :: is invalid
+    private void executeCommand(String command, boolean isWindows, StringBuilder outputBuilder, int timeoutSeconds) 
+            throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder();
+        if (isWindows) {
+            pb.command("cmd.exe", "/c", command);
+        } else {
+            pb.command("sh", "-c", command);
+        }
+        Process process = pb.start();
+        
+        // Read output (stdout)
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        while ((line = reader.readLine()) != null) {
+            outputBuilder.append(line).append("\n");
+        }
+        
+        // Read errors (stderr)
+        BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+        boolean hasError = false;
+        while ((line = errorReader.readLine()) != null) {
+            outputBuilder.append("ERROR: ").append(line).append("\n");
+            hasError = true;
+        }
+        
+        // Wait for process with timeout
+        boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+        if (!exited) {
+            process.destroy();
+            throw new InterruptedException("Process timed out");
+        }
+
+        // Check exit code for additional error detection
+        int exitCode = process.exitValue();
+        if (exitCode != 0 && !hasError) {
+            outputBuilder.append("ERROR: Process exited with code ").append(exitCode).append("\n");
+        }
+    }
+
+    private void parsePingOutput(String output, Map<String, Object> parsed, boolean isWindows) {
+        if (isWindows) {
+            Pattern lossPattern = Pattern.compile("Lost = (\\d+) \\((\\d+)% loss\\)");
+            Pattern rttPattern = Pattern.compile("Minimum = (\\d+)ms, Maximum = (\\d+)ms, Average = (\\d+)ms");
+            Matcher lossMatcher = lossPattern.matcher(output);
+            if (lossMatcher.find()) {
+                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(2)));
             }
-            // Check each segment
-            for (String part : host.replace("::", ":").split(":")) {
-                if (!part.isEmpty() && Integer.parseInt(part, 16) > 0xFFFF) {
-                    return false; // Segment exceeds 16-bit value
+            Matcher rttMatcher = rttPattern.matcher(output);
+            if (rttMatcher.find()) {
+                parsed.put("min_rtt_ms", Integer.parseInt(rttMatcher.group(1)));
+                parsed.put("max_rtt_ms", Integer.parseInt(rttMatcher.group(2)));
+                parsed.put("avg_rtt_ms", Integer.parseInt(rttMatcher.group(3)));
+            }
+        } else {
+            Pattern lossPattern = Pattern.compile("(\\d+) packets transmitted, (\\d+) received, (\\d+)% packet loss");
+            Pattern rttPattern = Pattern.compile("rtt min/avg/max/mdev = (\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+) ms");
+            Matcher lossMatcher = lossPattern.matcher(output);
+            if (lossMatcher.find()) {
+                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(3)));
+            }
+            Matcher rttMatcher = rttPattern.matcher(output);
+            if (rttMatcher.find()) {
+                parsed.put("min_rtt_ms", Double.parseDouble(rttMatcher.group(1)));
+                parsed.put("avg_rtt_ms", Double.parseDouble(rttMatcher.group(2)));
+                parsed.put("max_rtt_ms", Double.parseDouble(rttMatcher.group(3)));
+                parsed.put("mdev_rtt_ms", Double.parseDouble(rttMatcher.group(4)));
+            }
+        }
+    }
+
+    private void parseTracerouteOutput(String output, Map<String, Object> parsed, boolean isWindows) {
+        List<Map<String, Object>> hops = new ArrayList<>();
+        String[] lines = output.split("\n");
+        Pattern hopPattern = isWindows ? Pattern.compile("^(\\d+)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+)") :
+                Pattern.compile("^(\\d+)\\s+(\\S+)\\s+\\((\\S+)\\)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms");
+        for (String line : lines) {
+            Matcher matcher = hopPattern.matcher(line.trim());
+            if (matcher.find()) {
+                Map<String, Object> hop = new HashMap<>();
+                hop.put("hop_number", Integer.parseInt(matcher.group(1)));
+                if (isWindows) {
+                    hop.put("rtt1_ms", matcher.group(2));
+                    hop.put("rtt2_ms", matcher.group(3));
+                    hop.put("rtt3_ms", matcher.group(4));
+                    hop.put("host", matcher.group(5));
+                } else {
+                    hop.put("host", matcher.group(2));
+                    hop.put("ip", matcher.group(3));
+                    hop.put("rtt1_ms", matcher.group(4));
+                    hop.put("rtt2_ms", matcher.group(5));
+                    hop.put("rtt3_ms", matcher.group(6));
+                }
+                hops.add(hop);
+            }
+        }
+        parsed.put("hops", hops);
+    }
+
+    private void parseDnsOutput(String output, Map<String, Object> parsed) {
+        List<String> addresses = new ArrayList<>();
+        List<String> cnames = new ArrayList<>();
+        
+        // Patterns for parsing nslookup output
+        Pattern addressPattern = Pattern.compile("Address: (\\S+)");
+        Pattern cnamePattern = Pattern.compile("Name:\\s+(\\S+)\\s*\\n\\s*Address");
+        
+        String[] lines = output.split("\n");
+        String currentName = null;
+        for (String line : lines) {
+            // Match CNAME (appears as "Name:" before "Address:")
+            Matcher cnameMatcher = cnamePattern.matcher(line);
+            if (cnameMatcher.find()) {
+                currentName = cnameMatcher.group(1);
+                if (!cnames.contains(currentName)) {
+                    cnames.add(currentName);
                 }
             }
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
+            
+            // Match IP addresses
+            Matcher addressMatcher = addressPattern.matcher(line);
+            if (addressMatcher.find()) {
+                String address = addressMatcher.group(1);
+                if (!addresses.contains(address)) {
+                    addresses.add(address);
+                }
+            }
+        }
+        
+        parsed.put("addresses", addresses);
+        if (!cnames.isEmpty()) {
+            parsed.put("cnames", cnames);
+        }
+    }
+
+    private String getDefaultLocation() {
+        try {
+            return InetAddress.getLocalHost().getHostName();
+        } catch (Exception e) {
+            return "unknown";
         }
     }
 }
