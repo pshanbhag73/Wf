@@ -1,297 +1,198 @@
-import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, SimpleChanges, ViewChild } from '@angular/core';
-import * as d3 from 'd3';
+package com.example.incidentpulse.service;
 
-interface Probe {
-  location: string;
-  dns: string;
-  hops: Hop[];
-}
+import com.example.incidentpulse.model.TestResult;
+import com.example.incidentpulse.repository.TestResultRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-interface Hop {
-  hopNumber: number;
-  hopDetails: HopDetail[];
-}
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-interface HopDetail {
-  ip: string;
-  time: number;
-}
+@Service
+public class TestServiceImpl implements TestService {
 
-@Component({
-  selector: 'app-traceroute-visualization',
-  template: `<div #tracerouteContainer style="height: 600px; width: 100%; border: 1px solid #ccc;"></div>`,
-  styles: []
-})
-export class TracerouteVisualizationComponent implements OnInit, OnChanges, OnDestroy {
-  @ViewChild('tracerouteContainer') container!: ElementRef;
-  @Input() probes: Probe[] = [];
+    @Autowired
+    private TestResultRepository repository;
 
-  private svg: any;
-  private simulation: any;
-  private g: any; // Group for zoom/pan
-  private zoom: any;
-  private link: any; // Store link selection
-  private node: any; // Store node selection
+    @Override
+    public TestResult performTest(String host, String testType, int count, String location, int timeoutSeconds) throws IOException {
+        String os = System.getProperty("os.name").toLowerCase();
+        boolean isWindows = os.contains("win");
 
-  ngOnInit(): void {
-    this.initializeVisualization();
-  }
+        StringBuilder rawOutputBuilder = new StringBuilder();
+        Map<String, Object> parsedResult = new HashMap<>();
+        String status = "SUCCESS"; // Default status
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['probes'] && !changes['probes'].firstChange) {
-      this.updateVisualization();
-    }
-  }
+        TestResult result = new TestResult();
+        result.setHost(host);
+        result.setTestType(testType);
+        result.setLocation(location != null ? location : getDefaultLocation());
+        result.setTimestamp(new Date());
 
-  ngOnDestroy(): void {
-    if (this.simulation) {
-      this.simulation.stop();
-    }
-    if (this.svg) {
-      this.svg.remove();
-    }
-  }
-
-  private initializeVisualization(): void {
-    if (!this.probes || this.probes.length === 0) {
-      return;
-    }
-
-    const width = 800;
-    const height = 600;
-
-    this.svg = d3.select(this.container.nativeElement)
-      .append('svg')
-      .attr('width', width)
-      .attr('height', height);
-
-    // Add a group for zoom/pan
-    this.g = this.svg.append('g');
-
-    // Add zoom behavior
-    this.zoom = d3.zoom()
-      .scaleExtent([0.1, 10]) // Min and max zoom levels
-      .on('zoom', (event: any) => {
-        this.g.attr('transform', event.transform);
-      });
-    this.svg.call(this.zoom);
-
-    this.drawVisualization();
-    this.fitToView(); // Fit content on load
-  }
-
-  private updateVisualization(): void {
-    if (!this.probes || this.probes.length === 0) {
-      return;
-    }
-
-    // Remove existing elements
-    this.g.selectAll('*').remove();
-    if (this.simulation) {
-      this.simulation.stop();
-    }
-
-    this.drawVisualization();
-    this.fitToView(); // Fit content after update
-  }
-
-  private drawVisualization(): void {
-    const width = 800;
-    const height = 600;
-
-    // Prepare nodes and links
-    const nodes = new Map<string, { id: string, label: string, color: string, times: number[], x: number, y: number, isSource?: boolean, isDestination?: boolean }>();
-    const links: { source: string, target: string, count: number }[] = [];
-
-    // Define a single destination node
-    const commonDestinationId = 'commonDestination';
-    if (!nodes.has(commonDestinationId)) {
-      nodes.set(commonDestinationId, { id: commonDestinationId, label: 'Destination', color: 'green', times: [], x: width - 50, y: height / 2, isDestination: true });
-    }
-
-    this.probes.forEach(probe => {
-      const sourceId = probe.location.replace(/\s/g, '_');
-      if (!nodes.has(sourceId)) {
-        nodes.set(sourceId, { id: sourceId, label: probe.location, color: 'green', times: [], x: 50, y: height / 2 + (this.probes.indexOf(probe) * 50), isSource: true });
-      }
-
-      let previous = sourceId;
-      probe.hops.forEach((hop, index) => {
-        hop.hopDetails.forEach(detail => {
-          const current = detail.ip;
-          if (!nodes.has(current)) {
-            nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (this.probes.indexOf(probe) * 50) });
-          }
-
-          nodes.get(current)!.times.push(detail.time);
-          links.push({ source: previous, target: current, count: 1 });
-
-          previous = current;
-        });
-
-        // Handle multiple IPs per hop by branching
-        if (hop.hopDetails.length > 1) {
-          hop.hopDetails.slice(1).forEach((detail, i) => {
-            const current = detail.ip;
-            if (!nodes.has(current)) {
-              nodes.set(current, { id: current, label: current, color: 'blue', times: [], x: 150 + (index + 1) * 150, y: height / 2 + (this.probes.indexOf(probe) * 50) + (i + 1) * 50 });
+        try {
+            if (testType.equalsIgnoreCase("ping")) {
+                String command = isWindows ? "ping -n " + count + " -w " + (timeoutSeconds * 1000) + " " + host 
+                                        : "ping -c " + count + " -W " + timeoutSeconds + " " + host;
+                executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                parsePingOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
+            } else if (testType.equalsIgnoreCase("traceroute")) {
+                String command = isWindows ? "tracert -w " + (timeoutSeconds * 1000) + " " + host 
+                                        : "traceroute -w " + timeoutSeconds + " " + host;
+                for (int i = 0; i < count; i++) {
+                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
+                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                    rawOutputBuilder.append("\n");
+                }
+                parseTracerouteOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
+            } else if (testType.equalsIgnoreCase("dns")) {
+                String command = "nslookup " + host;
+                for (int i = 0; i < count; i++) {
+                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
+                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds);
+                    rawOutputBuilder.append("\n");
+                }
+                parseDnsOutput(rawOutputBuilder.toString(), parsedResult);
+            } else {
+                throw new IllegalArgumentException("Unsupported test type: " + testType);
             }
-            nodes.get(current)!.times.push(detail.time);
-            links.push({ source: previous, target: current, count: 1 });
-          });
+
+            // Check for failure conditions in output
+            if (rawOutputBuilder.toString().toLowerCase().contains("request timed out") ||
+                rawOutputBuilder.toString().toLowerCase().contains("destination unreachable") ||
+                rawOutputBuilder.toString().toLowerCase().contains("no answer")) {
+                status = "FAILURE";
+            }
+        } catch (InterruptedException e) {
+            status = "TIMEOUT";
+            rawOutputBuilder.append("ERROR: Test timed out after ").append(timeoutSeconds).append(" seconds\n");
+        } catch (Exception e) {
+            status = "FAILURE";
+            rawOutputBuilder.append("ERROR: ").append(e.getMessage()).append("\n");
         }
-      });
 
-      // Connect the last hop to the common destination
-      if (previous && nodes.has(previous)) {
-        links.push({ source: previous, target: commonDestinationId, count: 1 });
-      }
-    });
+        result.setRawOutput(rawOutputBuilder.toString());
+        result.setParsedResult(parsedResult);
+        result.setStatus(status);
 
-    // Aggregate links (count occurrences)
-    const linkMap = new Map<string, { source: string, target: string, count: number }>();
-    links.forEach(link => {
-      const key = `${link.source}->${link.target}`;
-      if (linkMap.has(key)) {
-        linkMap.get(key)!.count++;
-      } else {
-        linkMap.set(key, { ...link });
-      }
-    });
-    const uniqueLinks = Array.from(linkMap.values());
+        repository.save(result);
+        return result;
+    }
 
-    // Update node labels with average times
-    nodes.forEach(node => {
-      if (node.times.length > 0) {
-        const avg = d3.mean(node.times) || 0;
-        node.label += `\n${avg.toFixed(2)} ms`;
-      }
-    });
+    private void executeCommand(String command, boolean isWindows, StringBuilder outputBuilder, int timeoutSeconds) 
+            throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder();
+        if (isWindows) {
+            pb.command("cmd.exe", "/c", command);
+        } else {
+            pb.command("sh", "-c", command);
+        }
+        Process process = pb.start();
+        
+        // Read output
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        while ((line = reader.readLine()) != null) {
+            outputBuilder.append(line).append("\n");
+        }
+        
+        // Read errors
+        BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+        while ((line = errorReader.readLine()) != null) {
+            outputBuilder.append("ERROR: ").append(line).append("\n");
+        }
+        
+        // Wait for process with timeout
+        boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+        if (!exited) {
+            process.destroy();
+            throw new InterruptedException("Process timed out");
+        }
+    }
 
-    const nodeArray = Array.from(nodes.values());
-    const linkArray = uniqueLinks;
+    private void parsePingOutput(String output, Map<String, Object> parsed, boolean isWindows) {
+        if (isWindows) {
+            Pattern lossPattern = Pattern.compile("Lost = (\\d+) \\((\\d+)% loss\\)");
+            Pattern rttPattern = Pattern.compile("Minimum = (\\d+)ms, Maximum = (\\d+)ms, Average = (\\d+)ms");
+            Matcher lossMatcher = lossPattern.matcher(output);
+            if (lossMatcher.find()) {
+                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(2)));
+            }
+            Matcher rttMatcher = rttPattern.matcher(output);
+            if (rttMatcher.find()) {
+                parsed.put("min_rtt_ms", Integer.parseInt(rttMatcher.group(1)));
+                parsed.put("max_rtt_ms", Integer.parseInt(rttMatcher.group(2)));
+                parsed.put("avg_rtt_ms", Integer.parseInt(rttMatcher.group(3)));
+            }
+        } else {
+            Pattern lossPattern = Pattern.compile("(\\d+) packets transmitted, (\\d+) received, (\\d+)% packet loss");
+            Pattern rttPattern = Pattern.compile("rtt min/avg/max/mdev = (\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+) ms");
+            Matcher lossMatcher = lossPattern.matcher(output);
+            if (lossMatcher.find()) {
+                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(3)));
+            }
+            Matcher rttMatcher = rttPattern.matcher(output);
+            if (rttMatcher.find()) {
+                parsed.put("min_rtt_ms", Double.parseDouble(rttMatcher.group(1)));
+                parsed.put("avg_rtt_ms", Double.parseDouble(rttMatcher.group(2)));
+                parsed.put("max_rtt_ms", Double.parseDouble(rttMatcher.group(3)));
+                parsed.put("mdev_rtt_ms", Double.parseDouble(rttMatcher.group(4)));
+            }
+        }
+    }
 
-    // Simulation setup with hierarchical layout
-    this.simulation = d3.forceSimulation(nodeArray)
-      .force('link', d3.forceLink(linkArray).id(d => d.id).distance(150))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('x', d3.forceX(d => d.x).strength(0.8)) // Strong horizontal positioning
-      .force('y', d3.forceY(d => d.y).strength(0.1)) // Maintain initial Y positions
-      .force('collision', d3.forceCollide().radius(20));
+    private void parseTracerouteOutput(String output, Map<String, Object> parsed, boolean isWindows) {
+        List<Map<String, Object>> hops = new ArrayList<>();
+        String[] lines = output.split("\n");
+        Pattern hopPattern = isWindows ? Pattern.compile("^(\\d+)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+)") :
+                Pattern.compile("^(\\d+)\\s+(\\S+)\\s+\\((\\S+)\\)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms");
+        for (String line : lines) {
+            Matcher matcher = hopPattern.matcher(line.trim());
+            if (matcher.find()) {
+                Map<String, Object> hop = new HashMap<>();
+                hop.put("hop_number", Integer.parseInt(matcher.group(1)));
+                if (isWindows) {
+                    hop.put("rtt1_ms", matcher.group(2));
+                    hop.put("rtt2_ms", matcher.group(3));
+                    hop.put("rtt3_ms", matcher.group(4));
+                    hop.put("host", matcher.group(5));
+                } else {
+                    hop.put("host", matcher.group(2));
+                    hop.put("ip", matcher.group(3));
+                    hop.put("rtt1_ms", matcher.group(4));
+                    hop.put("rtt2_ms", matcher.group(5));
+                    hop.put("rtt3_ms", matcher.group(6));
+                }
+                hops.add(hop);
+            }
+        }
+        parsed.put("hops", hops);
+    }
 
-    // Initial node positions
-    nodeArray.forEach(node => {
-      node.x = node.x || Math.random() * width;
-      node.y = node.y || Math.random() * height;
-    });
+    private void parseDnsOutput(String output, Map<String, Object> parsed) {
+        List<String> addresses = new ArrayList<>();
+        Pattern addressPattern = Pattern.compile("Address: (\\S+)");
+        Matcher matcher = addressPattern.matcher(output);
+        while (matcher.find()) {
+            addresses.add(matcher.group(1));
+        }
+        parsed.put("addresses", addresses);
+    }
 
-    // Draw links with smooth curves
-    this.link = this.g.append('g')
-      .attr('class', 'links')
-      .selectAll('path')
-      .data(linkArray)
-      .join('path')
-      .attr('stroke', '#999')
-      .attr('stroke-width', d => Math.sqrt(d.count) * 2)
-      .attr('fill', 'none')
-      .attr('marker-end', 'url(#arrowhead)');
-
-    // Draw arrowheads
-    this.svg.append('defs').selectAll('marker')
-      .data(['arrowhead'])
-      .join('marker')
-      .attr('id', d => d)
-      .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 15)
-      .attr('refY', 0)
-      .attr('markerWidth', 6)
-      .attr('markerHeight', 6)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', '#999');
-
-    // Draw nodes
-    this.node = this.g.append('g')
-      .attr('class', 'nodes')
-      .selectAll('g')
-      .data(nodeArray)
-      .join('g')
-      .call(d3.drag()
-        .on('start', (event: any, d: any) => this.dragstarted(event, d))
-        .on('drag', (event: any, d: any) => this.dragged(event, d))
-        .on('end', (event: any, d: any) => this.dragended(event, d)));
-
-    this.node.append('circle')
-      .attr('r', 5)
-      .attr('fill', d => d.color);
-
-    // Add text with positioning based on node type
-    this.node.append('text')
-      .attr('x', (d: any) => d.isSource ? -12 : (d.isDestination ? 12 : 8)) // Left for source (-12), right for destination (+12), right for others (+8)
-      .attr('y', 3)
-      .text((d: any) => d.label.split('\n')[0]) // Show only IP/location initially
-      .attr('font-size', '10px')
-      .attr('text-anchor', (d: any) => d.isSource ? 'end' : (d.isDestination ? 'start' : 'start')) // End for source, start for destination, start for others
-
-    // Add hover tooltip
-    this.node.append('title')
-      .text((d: any) => `IP: ${d.id}\nAvg Time: ${d.times.length > 0 ? d3.mean(d.times)?.toFixed(2) : 'N/A'} ms`);
-
-    // Bind ticked function with stored link and node selections
-    this.simulation.on('tick', () => ticked(this.link, this.node));
-  }
-
-  private fitToView(): void {
-    const width = 800;
-    const height = 600;
-    const nodes = d3.select(this.g).select('.nodes').selectAll('g').data();
-
-    if (nodes.length === 0) return;
-
-    const xExtent = d3.extent(nodes, (d: any) => d.x);
-    const yExtent = d3.extent(nodes, (d: any) => d.y);
-    const padding = 50;
-
-    const w = xExtent[1] - xExtent[0] + 2 * padding;
-    const h = yExtent[1] - yExtent[0] + 2 * padding;
-    const scale = Math.min(width / w, height / h) * 0.9; // 90% to avoid clipping
-
-    const tx = (width - scale * (xExtent[0] + xExtent[1]) / 2);
-    const ty = (height - scale * (yExtent[0] + yExtent[1]) / 2);
-
-    const initialTransform = d3.zoomIdentity.translate(tx, ty).scale(scale);
-    this.svg.transition().duration(750).call(this.zoom.transform, initialTransform);
-  }
-
-  private dragstarted(event: any, d: any): void {
-    if (!event.active) this.simulation.alphaTarget(0.3).restart();
-    d.fx = d.x;
-    d.fy = d.y;
-  }
-
-  private dragged(event: any, d: any): void {
-    d.fx = event.x;
-    d.fy = event.y;
-  }
-
-  private dragended(event: any, d: any): void {
-    if (!event.active) this.simulation.alphaTarget(0);
-    d.fx = null;
-    d.fy = null;
-  }
-}
-
-// External ticked function
-function ticked(link: any, node: any) {
-  link.attr('d', (d: any) => {
-    const dx = d.target.x - d.source.x;
-    const dy = d.target.y - d.source.y;
-    const dr = Math.sqrt(dx * dx + dy * dy) * 0.5;
-    const midX = d.source.x + dx * 0.6;
-    const midY = d.source.y + dy * 0.4;
-    return `M${d.source.x},${d.source.y}C${midX},${d.source.y},${midX},${d.target.y},${d.target.x},${d.target.y}`;
-  });
-
-  node.attr('transform', (d: any) => `translate(${d.x},${d.y})`);
+    private String getDefaultLocation() {
+        try {
+            return InetAddress.getLocalHost().getHostName();
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
 }
