@@ -18,12 +18,30 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Implementation of the {@link TestService} interface for executing network diagnostic tests
+ * (ping, traceroute, dns) and storing results in MongoDB. Handles cross-platform command execution
+ * (Windows and Linux) with timeout support and secure input processing.
+ */
 @Service
 public class TestServiceImpl implements TestService {
 
     @Autowired
     private TestResultRepository repository;
 
+    /**
+     * Performs a network diagnostic test (ping, traceroute, or dns) on the specified host,
+     * executes it multiple times as specified, and saves the results to MongoDB.
+     *
+     * @param host          The hostname or IP address to test (e.g., "google.com", "192.168.1.1").
+     * @param testType      The type of test to perform ("ping", "traceroute", or "dns").
+     * @param count         Number of times to execute the test (for ping, uses built-in count; for others, loops).
+     * @param location      The location from which the test is run (e.g., "us-east-1"). If null, uses default.
+     * @param timeoutSeconds Timeout for each test execution in seconds.
+     * @return A {@link TestResult} containing the raw output, parsed results, and status ("SUCCESS", "FAILURE", or "TIMEOUT").
+     * @throws IOException If an I/O error occurs during command execution.
+     * @throws IllegalArgumentException If the test type is unsupported.
+     */
     @Override
     public TestResult performTest(String host, String testType, int count, String location, int timeoutSeconds) throws IOException {
         String os = System.getProperty("os.name").toLowerCase();
@@ -46,14 +64,21 @@ public class TestServiceImpl implements TestService {
                 executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
                 parsePingOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
             } else if (testType.equalsIgnoreCase("traceroute")) {
-                String command = isWindows ? "tracert -w " + (timeoutSeconds * 1000) + " " + host 
-                                        : "traceroute -w " + timeoutSeconds + " " + host;
+                // Calculate per-hop timeout to fit within total timeoutSeconds
+                int perHopTimeoutMs = Math.max(100, (timeoutSeconds * 1000) / 30); // Minimum 100ms, assuming max 30 hops
+                String command = isWindows ? "tracert -w " + perHopTimeoutMs + " " + host 
+                                        : "traceroute -w " + (perHopTimeoutMs / 1000.0) + " " + host;
                 for (int i = 0; i < count; i++) {
                     rawOutputBuilder.append("Run " + (i + 1) + ":\n");
                     executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
                     rawOutputBuilder.append("\n");
                 }
                 parseTracerouteOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
+                // Check if no hops were parsed (indicates failure)
+                List<?> hops = (List<?>) parsedResult.getOrDefault("hops", new ArrayList<>());
+                if (hops.isEmpty()) {
+                    status = "FAILURE";
+                }
             } else if (testType.equalsIgnoreCase("dns")) {
                 String command = "nslookup " + host;
                 for (int i = 0; i < count; i++) {
@@ -72,7 +97,7 @@ public class TestServiceImpl implements TestService {
                 throw new IllegalArgumentException("Unsupported test type: " + testType);
             }
 
-            // Check for failure conditions in output (excluding non-authoritative answer)
+            // Check for failure conditions in output
             if (rawOutputBuilder.toString().toLowerCase().contains("request timed out") ||
                 rawOutputBuilder.toString().toLowerCase().contains("destination unreachable") ||
                 rawOutputBuilder.toString().toLowerCase().contains("non-existent domain")) {
@@ -94,6 +119,18 @@ public class TestServiceImpl implements TestService {
         return result;
     }
 
+    /**
+     * Executes a system command using ProcessBuilder, capturing stdout and stderr output.
+     * Applies a timeout and handles DNS-specific output (e.g., skipping non-error stderr lines).
+     *
+     * @param command        The command to execute (e.g., "nslookup google.com").
+     * @param isWindows      True if running on Windows, false for Linux/Unix.
+     * @param outputBuilder  StringBuilder to append command output and errors.
+     * @param timeoutSeconds Timeout for the command execution in seconds.
+     * @param testType       Type of test ("ping", "traceroute", "dns") for specific handling.
+     * @throws IOException If an I/O error occurs during command execution.
+     * @throws InterruptedException If the command times out.
+     */
     private void executeCommand(String command, boolean isWindows, StringBuilder outputBuilder, int timeoutSeconds, String testType) 
             throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder();
@@ -117,7 +154,7 @@ public class TestServiceImpl implements TestService {
         while ((line = errorReader.readLine()) != null) {
             // For DNS, skip non-error stderr lines like "Non-authoritative answer:"
             if (testType.equalsIgnoreCase("dns") && line.contains("Non-authoritative answer:")) {
-                outputBuilder.append(line).append("\n"); // Add to output without ERROR: prefix
+                outputBuilder.append(line).append("\n");
                 continue;
             }
             outputBuilder.append("ERROR: ").append(line).append("\n");
@@ -127,7 +164,7 @@ public class TestServiceImpl implements TestService {
         // Wait for process with timeout
         boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
         if (!exited) {
-            process.destroy();
+            process.destroyForcibly(); // Forcefully terminate process on timeout
             throw new InterruptedException("Process timed out");
         }
 
@@ -138,6 +175,13 @@ public class TestServiceImpl implements TestService {
         }
     }
 
+    /**
+     * Parses ping command output to extract packet loss and round-trip time metrics.
+     *
+     * @param output     The raw command output from the ping command.
+     * @param parsed     Map to store parsed results (e.g., packet_loss_percent, min_rtt_ms).
+     * @param isWindows  True if running on Windows, false for Linux/Unix.
+     */
     private void parsePingOutput(String output, Map<String, Object> parsed, boolean isWindows) {
         if (isWindows) {
             Pattern lossPattern = Pattern.compile("Lost = (\\d+) \\((\\d+)% loss\\)");
@@ -169,6 +213,13 @@ public class TestServiceImpl implements TestService {
         }
     }
 
+    /**
+     * Parses traceroute command output to extract hop details (e.g., hop number, host, RTTs).
+     *
+     * @param output     The raw command output from the traceroute command.
+     * @param parsed     Map to store parsed results (e.g., list of hops with details).
+     * @param isWindows  True if running on Windows, false for Linux/Unix.
+     */
     private void parseTracerouteOutput(String output, Map<String, Object> parsed, boolean isWindows) {
         List<Map<String, Object>> hops = new ArrayList<>();
         String[] lines = output.split("\n");
@@ -197,11 +248,18 @@ public class TestServiceImpl implements TestService {
         parsed.put("hops", hops);
     }
 
+    /**
+     * Parses nslookup command output to extract IP addresses and CNAME records.
+     * Handles spaces in "Address:" and "Name:" lines and processes each run independently.
+     *
+     * @param output The raw command output from the nslookup command.
+     * @param parsed Map to store parsed results (e.g., addresses, cnames).
+     */
     private void parseDnsOutput(String output, Map<String, Object> parsed) {
         List<String> addresses = new ArrayList<>();
         List<String> cnames = new ArrayList<>();
         
-        // Updated patterns to handle spaces
+        // Patterns to handle spaces
         Pattern addressPattern = Pattern.compile("Address:\\s*(\\S+)");
         Pattern cnamePattern = Pattern.compile("Name:\\s+(\\S+)");
         
@@ -222,7 +280,7 @@ public class TestServiceImpl implements TestService {
             }
             
             Matcher addressMatcher = addressPattern.matcher(line);
-            if (addressMatcher.find() && currentName != null) {
+            if (addressMatcher.find()) {
                 String address = addressMatcher.group(1);
                 if (!addresses.contains(address)) {
                     addresses.add(address);
@@ -234,6 +292,11 @@ public class TestServiceImpl implements TestService {
         parsed.put("cnames", cnames); // Always include, even if empty
     }
 
+    /**
+     * Retrieves the default location (hostname) of the local machine.
+     *
+     * @return The hostname of the local machine, or "unknown" if an error occurs.
+     */
     private String getDefaultLocation() {
         try {
             return InetAddress.getLocalHost().getHostName();
