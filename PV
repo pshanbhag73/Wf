@@ -1,91 +1,3 @@
-import { Component } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
-import { Subject, forkJoin, BehaviorSubject, Observable, of } from 'rxjs';
-import { takeUntil, finalize, catchError } from 'rxjs/operators';
-
-@Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
-})
-export class AppComponent {
-  testForm: FormGroup;
-  running = false;
-  results: any[] = [];
-  progressSubject = new BehaviorSubject<number>(0);
-  progress = 0;
-  private stopSubject = new Subject<void>();
-  private totalTests = 0;
-  private completedTests = 0;
-  private apiUrl = 'http://localhost:8080/test'; // Update to your backend URL
-
-  constructor(private fb: FormBuilder, private http: HttpClient) {
-    this.testForm = fb.group({
-      host: ['', Validators.required],
-      testType: ['', Validators.required],
-      count: [4, [Validators.required, Validators.min(1), Validators.max(100)]],
-      timeoutSeconds: [2, [Validators.required, Validators.min(1), Validators.max(60)]],
-      locations: ['', Validators.required]  // Comma-separated locations
-    });
-
-    this.progressSubject.subscribe(value => this.progress = value);
-  }
-
-  runTests() {
-    if (this.testForm.invalid) return;
-
-    this.running = true;
-    this.results = [];
-    this.completedTests = 0;
-    this.stopSubject = new Subject<void>();  // Reset stop subject
-
-    const formValue = this.testForm.value;
-    const locations = formValue.locations.split(',').map((loc: string) => loc.trim());
-    this.totalTests = locations.length;
-
-    const requests: Observable<any>[] = locations.map(loc => 
-      this.http.post(this.apiUrl, {
-        host: formValue.host,
-        testType: formValue.testType,
-        count: formValue.count,
-        location: loc,
-        timeoutSeconds: formValue.timeoutSeconds
-      }).pipe(
-        takeUntil(this.stopSubject),
-        finalize(() => this.updateProgress()),
-        catchError(err => {
-          console.error(err);
-          return of({ error: err.message, location: loc });
-        })
-      )
-    );
-
-    forkJoin(requests).subscribe(res => {
-      this.results = res;
-      this.running = false;
-    }, err => {
-      console.error(err);
-      this.running = false;
-    });
-  }
-
-  stopTests() {
-    this.stopSubject.next();
-    this.stopSubject.complete();
-    this.running = false;
-  }
-
-  private updateProgress() {
-    this.completedTests++;
-    const progressValue = (this.completedTests / this.totalTests) * 100;
-    this.progressSubject.next(progressValue);
-  }
-}
-
-
-
-
 <div style="padding: 20px;">
   <h1>Incident Pulse Test UI</h1>
   
@@ -124,16 +36,17 @@ export class AppComponent {
     <button type="button" (click)="stopTests()" [disabled]="!running">Stop Tests</button>
   </form>
   
-  <div *ngIf="running">
-    <h2>Progress: {{ progress | number:'1.0-0' }}%</h2>
+  <div *ngIf="running" class="progress-container">
+    <span>Test Completion: {{ progress | number:'1.0-0' }}%</span>
     <progress [value]="progress" max="100"></progress>
+    <button type="button" (click)="stopTests()" [disabled]="!running">Stop</button>
   </div>
   
   <div *ngIf="results.length > 0">
     <h2>Test Results</h2>
     <div *ngFor="let res of results">
       <h3>Location: {{ res.location || 'Default' }}</h3>
-      <div *if="res.error; else showStats">
+      <div *ngIf="res.error; else showStats">
         <p>Error: {{ res.error }}</p>
       </div>
       <ng-template #showStats>
@@ -146,3 +59,34 @@ export class AppComponent {
     </div>
   </div>
 </div>
+
+
+form div {
+  margin-bottom: 10px;
+}
+
+pre {
+  background-color: #f4f4f4;
+  padding: 10px;
+  border: 1px solid #ddd;
+  overflow-x: auto;
+}
+
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.progress-container span {
+  white-space: nowrap;
+}
+
+.progress-container progress {
+  flex-grow: 1;
+}
+
+.progress-container button {
+  padding: 5px 10px;
+}
