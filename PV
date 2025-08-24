@@ -1,3 +1,158 @@
+package com.example.incidentpulse.controller;
+
+import com.example.incidentpulse.exception.BadRequestException;
+import com.example.incidentpulse.model.TestRequest;
+import com.example.incidentpulse.model.TestResult;
+import com.example.incidentpulse.service.TestService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.regex.Pattern;
+
+/**
+ * REST controller for handling network diagnostic test requests.
+ */
+@RestController
+public class TestController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TestController.class);
+
+    @Autowired
+    private TestService testService;
+
+    // Strict regex: alphanumeric, hyphens, dots for hostname
+    private static final Pattern HOSTNAME_PATTERN = 
+        Pattern.compile("^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$");
+
+    // Strict regex: digits and dots for IPv4
+    private static final Pattern IPV4_PATTERN = 
+        Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+
+    // Strict regex: hex digits, colons, and double colons for IPv6
+    private static final Pattern IPV6_PATTERN = 
+        Pattern.compile("^(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,7}:|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|" +
+                       "(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|" +
+                       "[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|" +
+                       ":(?::[0-9a-fA-F]{1,4}){1,7}|::)$");
+
+    /**
+     * Handles POST requests to perform network diagnostic tests (ping, traceroute, dns).
+     *
+     * @param request The test request containing host, test type, count, location, and timeout.
+     * @return ResponseEntity containing the test result.
+     * @throws IOException If an I/O error occurs during command execution.
+     * @throws BadRequestException If the request contains invalid parameters.
+     */
+    @PostMapping("/test")
+    public ResponseEntity<TestResult> performTest(@RequestBody TestRequest request) throws IOException {
+        // Validate host
+        String host = request.getHost();
+        if (host == null || host.trim().isEmpty()) {
+            logger.warn("Invalid host: null or empty");
+            throw new BadRequestException("Host cannot be null or empty");
+        }
+        if (host.contains(";") || host.contains("|") || host.contains("&") || 
+            host.contains("<") || host.contains(">") || host.contains("*") || 
+            host.contains("`") || host.contains("$") || host.contains(" ") ||
+            host.contains("\"") || host.contains("'")) {
+            logger.warn("Invalid host: contains dangerous characters - {}", host.replaceAll("[^a-zA-Z0-9.-:]", "_"));
+            throw new BadRequestException("Host contains invalid characters");
+        }
+        boolean isValidHost = HOSTNAME_PATTERN.matcher(host).matches() || 
+                              IPV4_PATTERN.matcher(host).matches() || 
+                              (IPV6_PATTERN.matcher(host).matches() && isValidIPv6(host));
+        if (!isValidHost) {
+            logger.warn("Invalid host format: {}", host.replaceAll("[^a-zA-Z0-9.-:]", "_"));
+            throw new BadRequestException("Invalid host: must be a valid hostname, IPv4, or IPv6 address");
+        }
+
+        // Additional validation using InetAddress to ensure host resolves
+        try {
+            InetAddress.getByName(host);
+        } catch (UnknownHostException e) {
+            logger.warn("Host does not resolve: {}", host.replaceAll("[^a-zA-Z0-9.-:]", "_"));
+            throw new BadRequestException("Host does not resolve to a valid IP address");
+        }
+
+        // Validate testType
+        String testType = request.getTestType();
+        if (testType == null || !testType.matches("^(?i)(ping|traceroute|dns)$")) {
+            logger.warn("Invalid test type: {}", testType != null ? testType.replaceAll("[^a-zA-Z]", "_") : "null");
+            throw new BadRequestException("Invalid test type: must be 'ping', 'traceroute', or 'dns'");
+        }
+
+        // Validate count
+        int count = request.getCount();
+        if (count < 1 || count > 100) {
+            logger.warn("Invalid count: {}", count);
+            throw new BadRequestException("Count must be between 1 and 100");
+        }
+
+        // Validate timeoutSeconds
+        int timeoutSeconds = request.getTimeoutSeconds();
+        if (timeoutSeconds < 1 || timeoutSeconds > 60) {
+            logger.warn("Invalid timeout: {}", timeoutSeconds);
+            throw new BadRequestException("Timeout must be between 1 and 60 seconds");
+        }
+
+        // Validate location
+        String location = request.getLocation();
+        if (location != null && !location.matches("^[a-zA-Z0-9-]{0,50}$")) {
+            logger.warn("Invalid location: {}", location.replaceAll("[^a-zA-Z0-9-]", "_"));
+            throw new BadRequestException("Invalid location: must be alphanumeric with hyphens, max 50 characters");
+        }
+
+        TestResult result = testService.performTest(
+            request.getHost(),
+            request.getTestType(),
+            request.getCount(),
+            request.getLocation(),
+            request.getTimeoutSeconds()
+        );
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Validates an IPv6 address to ensure proper format beyond the regex check.
+     *
+     * @param host The IPv6 address to validate.
+     * @return True if the IPv6 address is valid, false otherwise.
+     */
+    private boolean isValidIPv6(String host) {
+        try {
+            String[] parts = host.split("::", -1);
+            if (parts.length > 2) {
+                return false;
+            }
+            for (String part : host.replace("::", ":").split(":")) {
+                if (!part.isEmpty() && Integer.parseInt(part, 16) > 0xFFFF) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+}
+
+
+
+
+
 package com.example.incidentpulse.service;
 
 import com.example.incidentpulse.model.TestResult;
