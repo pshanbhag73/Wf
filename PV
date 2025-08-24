@@ -1,3 +1,6 @@
+^(?:https?://)?[a-z0-9.-]+(?:\.[a-z]{2,})(?::[0-9]{1,5})?(?:/[^?\s#]*)?(?:\?[^#\s]*)?(?:#[^\s]*)?$
+
+
 package com.example.incidentpulse.service;
 
 import com.example.incidentpulse.model.TestResult;
