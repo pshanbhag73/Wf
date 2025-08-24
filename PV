@@ -1,158 +1,3 @@
-package com.example.incidentpulse.controller;
-
-import com.example.incidentpulse.exception.BadRequestException;
-import com.example.incidentpulse.model.TestRequest;
-import com.example.incidentpulse.model.TestResult;
-import com.example.incidentpulse.service.TestService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.regex.Pattern;
-
-/**
- * REST controller for handling network diagnostic test requests.
- */
-@RestController
-public class TestController {
-
-    private static final Logger logger = LoggerFactory.getLogger(TestController.class);
-
-    @Autowired
-    private TestService testService;
-
-    // Strict regex: alphanumeric, hyphens, dots for hostname
-    private static final Pattern HOSTNAME_PATTERN = 
-        Pattern.compile("^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$");
-
-    // Strict regex: digits and dots for IPv4
-    private static final Pattern IPV4_PATTERN = 
-        Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
-
-    // Strict regex: hex digits, colons, and double colons for IPv6
-    private static final Pattern IPV6_PATTERN = 
-        Pattern.compile("^(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|" +
-                       "(?:[0-9a-fA-F]{1,4}:){1,7}:|" +
-                       "(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|" +
-                       "(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|" +
-                       "(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|" +
-                       "(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|" +
-                       "(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|" +
-                       "[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|" +
-                       ":(?::[0-9a-fA-F]{1,4}){1,7}|::)$");
-
-    /**
-     * Handles POST requests to perform network diagnostic tests (ping, traceroute, dns).
-     *
-     * @param request The test request containing host, test type, count, location, and timeout.
-     * @return ResponseEntity containing the test result.
-     * @throws IOException If an I/O error occurs during command execution.
-     * @throws BadRequestException If the request contains invalid parameters.
-     */
-    @PostMapping("/test")
-    public ResponseEntity<TestResult> performTest(@RequestBody TestRequest request) throws IOException {
-        // Validate host
-        String host = request.getHost();
-        if (host == null || host.trim().isEmpty()) {
-            logger.warn("Invalid host: null or empty");
-            throw new BadRequestException("Host cannot be null or empty");
-        }
-        if (host.contains(";") || host.contains("|") || host.contains("&") || 
-            host.contains("<") || host.contains(">") || host.contains("*") || 
-            host.contains("`") || host.contains("$") || host.contains(" ") ||
-            host.contains("\"") || host.contains("'")) {
-            logger.warn("Invalid host: contains dangerous characters - {}", host.replaceAll("[^a-zA-Z0-9.-:]", "_"));
-            throw new BadRequestException("Host contains invalid characters");
-        }
-        boolean isValidHost = HOSTNAME_PATTERN.matcher(host).matches() || 
-                              IPV4_PATTERN.matcher(host).matches() || 
-                              (IPV6_PATTERN.matcher(host).matches() && isValidIPv6(host));
-        if (!isValidHost) {
-            logger.warn("Invalid host format: {}", host.replaceAll("[^a-zA-Z0-9.-:]", "_"));
-            throw new BadRequestException("Invalid host: must be a valid hostname, IPv4, or IPv6 address");
-        }
-
-        // Additional validation using InetAddress to ensure host resolves
-        try {
-            InetAddress.getByName(host);
-        } catch (UnknownHostException e) {
-            logger.warn("Host does not resolve: {}", host.replaceAll("[^a-zA-Z0-9.-:]", "_"));
-            throw new BadRequestException("Host does not resolve to a valid IP address");
-        }
-
-        // Validate testType
-        String testType = request.getTestType();
-        if (testType == null || !testType.matches("^(?i)(ping|traceroute|dns)$")) {
-            logger.warn("Invalid test type: {}", testType != null ? testType.replaceAll("[^a-zA-Z]", "_") : "null");
-            throw new BadRequestException("Invalid test type: must be 'ping', 'traceroute', or 'dns'");
-        }
-
-        // Validate count
-        int count = request.getCount();
-        if (count < 1 || count > 100) {
-            logger.warn("Invalid count: {}", count);
-            throw new BadRequestException("Count must be between 1 and 100");
-        }
-
-        // Validate timeoutSeconds
-        int timeoutSeconds = request.getTimeoutSeconds();
-        if (timeoutSeconds < 1 || timeoutSeconds > 60) {
-            logger.warn("Invalid timeout: {}", timeoutSeconds);
-            throw new BadRequestException("Timeout must be between 1 and 60 seconds");
-        }
-
-        // Validate location
-        String location = request.getLocation();
-        if (location != null && !location.matches("^[a-zA-Z0-9-]{0,50}$")) {
-            logger.warn("Invalid location: {}", location.replaceAll("[^a-zA-Z0-9-]", "_"));
-            throw new BadRequestException("Invalid location: must be alphanumeric with hyphens, max 50 characters");
-        }
-
-        TestResult result = testService.performTest(
-            request.getHost(),
-            request.getTestType(),
-            request.getCount(),
-            request.getLocation(),
-            request.getTimeoutSeconds()
-        );
-        return ResponseEntity.ok(result);
-    }
-
-    /**
-     * Validates an IPv6 address to ensure proper format beyond the regex check.
-     *
-     * @param host The IPv6 address to validate.
-     * @return True if the IPv6 address is valid, false otherwise.
-     */
-    private boolean isValidIPv6(String host) {
-        try {
-            String[] parts = host.split("::", -1);
-            if (parts.length > 2) {
-                return false;
-            }
-            for (String part : host.replace("::", ":").split(":")) {
-                if (!part.isEmpty() && Integer.parseInt(part, 16) > 0xFFFF) {
-                    return false;
-                }
-            }
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-}
-
-
-
-
-
 package com.example.incidentpulse.service;
 
 import com.example.incidentpulse.model.TestResult;
@@ -164,6 +9,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -175,7 +26,7 @@ import java.util.regex.Pattern;
 
 /**
  * Implementation of the {@link TestService} interface for executing network diagnostic tests
- * (ping, traceroute, dns) and storing results in MongoDB. Handles cross-platform command execution
+ * (ping, traceroute, dns, http) and storing results in MongoDB. Handles cross-platform command execution
  * (Windows and Linux) with timeout support and secure input processing.
  */
 @Service
@@ -185,16 +36,16 @@ public class TestServiceImpl implements TestService {
     private TestResultRepository repository;
 
     /**
-     * Performs a network diagnostic test (ping, traceroute, or dns) on the specified host,
+     * Performs a network diagnostic test (ping, traceroute, dns, or http) on the specified host,
      * executes it multiple times as specified, and saves the results to MongoDB.
      *
-     * @param host          The hostname or IP address to test (e.g., "google.com", "192.168.1.1").
-     * @param testType      The type of test to perform ("ping", "traceroute", or "dns").
+     * @param host          The hostname or IP address to test (e.g., "google.com", "192.168.1.1", or "http://google.com" for http).
+     * @param testType      The type of test to perform ("ping", "traceroute", "dns", "http").
      * @param count         Number of times to execute the test (for ping, uses built-in count; for others, loops).
      * @param location      The location from which the test is run (e.g., "us-east-1"). If null, uses default.
      * @param timeoutSeconds Timeout for each test execution in seconds.
      * @return A {@link TestResult} containing the raw output, parsed results, and status ("SUCCESS", "FAILURE", or "TIMEOUT").
-     * @throws IOException If an I/O error occurs during command execution.
+     * @throws IOException If an I/O error occurs during test execution.
      * @throws IllegalArgumentException If the test type is unsupported.
      */
     @Override
@@ -250,6 +101,18 @@ public class TestServiceImpl implements TestService {
                 List<?> addresses = (List<?>) parsedResult.getOrDefault("addresses", new ArrayList<>());
                 List<?> cnames = (List<?>) parsedResult.getOrDefault("cnames", new ArrayList<>());
                 if (addresses.isEmpty() && cnames.isEmpty()) {
+                    status = "FAILURE";
+                }
+            } else if (testType.equalsIgnoreCase("http")) {
+                // Prepend http:// if no scheme is provided
+                String url = host.startsWith("http://") || host.startsWith("https://") ? host : "http://" + host;
+                for (int i = 0; i < count; i++) {
+                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
+                    executeHttpTest(url, rawOutputBuilder, parsedResult, timeoutSeconds);
+                    rawOutputBuilder.append("\n");
+                }
+                List<?> responses = (List<?>) parsedResult.getOrDefault("responses", new ArrayList<>());
+                if (responses.isEmpty()) {
                     status = "FAILURE";
                 }
             } else {
@@ -319,6 +182,50 @@ public class TestServiceImpl implements TestService {
         int exitCode = process.exitValue();
         if (exitCode != 0 && !hasError && !testType.equalsIgnoreCase("dns")) {
             outputBuilder.append("ERROR: Process exited with code ").append(exitCode).append("\n");
+        }
+    }
+
+    /**
+     * Executes an HTTP GET request using HttpClient, capturing response code and time.
+     *
+     * @param url            The URL to test (e.g., "http://google.com").
+     * @param outputBuilder  StringBuilder to append response details.
+     * @param parsedResult   Map to store parsed results (e.g., response code, time).
+     * @param timeoutSeconds Timeout for the HTTP request in seconds.
+     * @throws IOException If an I/O error occurs during the request.
+     * @throws InterruptedException If the request times out.
+     */
+    private void executeHttpTest(String url, StringBuilder outputBuilder, Map<String, Object> parsedResult, int timeoutSeconds) 
+            throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(timeoutSeconds))
+            .build();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(timeoutSeconds))
+            .GET()
+            .build();
+
+        List<Map<String, Object>> responses = (List<Map<String, Object>>) parsedResult.computeIfAbsent("responses", k -> new ArrayList<>());
+        Map<String, Object> responseData = new HashMap<>();
+
+        try {
+            Instant start = Instant.now();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            Instant end = Instant.now();
+            long responseTimeMs = Duration.between(start, end).toMillis();
+
+            outputBuilder.append("HTTP GET ").append(url).append("\n")
+                         .append("Status Code: ").append(response.statusCode()).append("\n")
+                         .append("Response Time: ").append(responseTimeMs).append(" ms\n");
+
+            responseData.put("status_code", response.statusCode());
+            responseData.put("response_time_ms", responseTimeMs);
+            responses.add(responseData);
+        } catch (IOException e) {
+            outputBuilder.append("ERROR: ").append(e.getMessage()).append("\n");
+            responseData.put("error", e.getMessage());
+            responses.add(responseData);
         }
     }
 
