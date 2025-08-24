@@ -1,420 +1,148 @@
-^(?:https?://)?[a-z0-9.-]+(?:\.[a-z]{2,})(?::[0-9]{1,5})?(?:/[^?\s#]*)?(?:\?[^#\s]*)?(?:#[^\s]*)?$
+import { Component } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { Subject, forkJoin, BehaviorSubject, Observable, of } from 'rxjs';
+import { takeUntil, finalize, catchError } from 'rxjs/operators';
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css']
+})
+export class AppComponent {
+  testForm: FormGroup;
+  running = false;
+  results: any[] = [];
+  progressSubject = new BehaviorSubject<number>(0);
+  progress = 0;
+  private stopSubject = new Subject<void>();
+  private totalTests = 0;
+  private completedTests = 0;
+  private apiUrl = 'http://localhost:8080/test'; // Update to your backend URL
 
-public class UrlHostExtractor {
-    public static void main(String[] args) {
-        // Test URLs
-        String[] urls = {
-            "http://example.com",
-            "https://subdomain.example.co.uk",
-            "example.com:8080",
-            "HTTP://EXAMPLE.COM/PATH?KEY=VALUE#ANCHOR",
-            "example.com/path?query=1#fragment",
-            "subdomain.example.com:3000/path"
-        };
+  constructor(private fb: FormBuilder, private http: HttpClient) {
+    this.testForm = fb.group({
+      host: ['', Validators.required],
+      testType: ['', Validators.required],
+      count: [4, [Validators.required, Validators.min(1), Validators.max(100)]],
+      timeoutSeconds: [2, [Validators.required, Validators.min(1), Validators.max(60)]],
+      locations: ['', Validators.required]  // Comma-separated locations
+    });
 
-        // Regex pattern to extract host
-        String regex = "(?:https?://)?([a-z0-9.-]+\\.[a-z]{2,})(?::[0-9]{1,5})?(?:/[^?\\s#]*)?(?:\\?[^#\\s]*)?(?:#[^\\s]*)?";
-        Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+    this.progressSubject.subscribe(value => this.progress = value);
+  }
 
-        // Process each URL
-        for (String url : urls) {
-            Matcher matcher = pattern.matcher(url);
-            if (matcher.matches()) {
-                String host = matcher.group(1); // Extract host from group 1
-                System.out.println("URL: " + url + " => Host: " + host);
-            } else {
-                System.out.println("URL: " + url + " => Invalid URL");
-            }
-        }
-    }
+  runTests() {
+    if (this.testForm.invalid) return;
+
+    this.running = true;
+    this.results = [];
+    this.completedTests = 0;
+    this.stopSubject = new Subject<void>();  // Reset stop subject
+
+    const formValue = this.testForm.value;
+    const locations = formValue.locations.split(',').map((loc: string) => loc.trim());
+    this.totalTests = locations.length;
+
+    const requests: Observable<any>[] = locations.map(loc => 
+      this.http.post(this.apiUrl, {
+        host: formValue.host,
+        testType: formValue.testType,
+        count: formValue.count,
+        location: loc,
+        timeoutSeconds: formValue.timeoutSeconds
+      }).pipe(
+        takeUntil(this.stopSubject),
+        finalize(() => this.updateProgress()),
+        catchError(err => {
+          console.error(err);
+          return of({ error: err.message, location: loc });
+        })
+      )
+    );
+
+    forkJoin(requests).subscribe(res => {
+      this.results = res;
+      this.running = false;
+    }, err => {
+      console.error(err);
+      this.running = false;
+    });
+  }
+
+  stopTests() {
+    this.stopSubject.next();
+    this.stopSubject.complete();
+    this.running = false;
+  }
+
+  private updateProgress() {
+    this.completedTests++;
+    const progressValue = (this.completedTests / this.totalTests) * 100;
+    this.progressSubject.next(progressValue);
+  }
 }
 
-package com.example.incidentpulse.service;
 
-import com.example.incidentpulse.model.TestResult;
-import com.example.incidentpulse.repository.TestResultRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-/**
- * Implementation of the {@link TestService} interface for executing network diagnostic tests
- * (ping, traceroute, dns, http) and storing results in MongoDB. Handles cross-platform command execution
- * (Windows and Linux) with timeout support and secure input processing.
- */
-@Service
-public class TestServiceImpl implements TestService {
-
-    @Autowired
-    private TestResultRepository repository;
-
-    /**
-     * Performs a network diagnostic test (ping, traceroute, dns, or http) on the specified host,
-     * executes it multiple times as specified, and saves the results to MongoDB.
-     *
-     * @param host          The hostname or IP address to test (e.g., "google.com", "192.168.1.1", or "http://google.com" for http).
-     * @param testType      The type of test to perform ("ping", "traceroute", "dns", "http").
-     * @param count         Number of times to execute the test (for ping, uses built-in count; for others, loops).
-     * @param location      The location from which the test is run (e.g., "us-east-1"). If null, uses default.
-     * @param timeoutSeconds Timeout for each test execution in seconds.
-     * @return A {@link TestResult} containing the raw output, parsed results, and status ("SUCCESS", "FAILURE", or "TIMEOUT").
-     * @throws IOException If an I/O error occurs during test execution.
-     * @throws IllegalArgumentException If the test type is unsupported.
-     */
-    @Override
-    public TestResult performTest(String host, String testType, int count, String location, int timeoutSeconds) throws IOException {
-        String os = System.getProperty("os.name").toLowerCase();
-        boolean isWindows = os.contains("win");
-
-        StringBuilder rawOutputBuilder = new StringBuilder();
-        Map<String, Object> parsedResult = new HashMap<>();
-        String status = "SUCCESS";
-
-        TestResult result = new TestResult();
-        result.setHost(host);
-        result.setTestType(testType);
-        result.setLocation(location != null ? location : getDefaultLocation());
-        result.setTimestamp(new Date());
-
-        try {
-            if (testType.equalsIgnoreCase("ping")) {
-                int perPacketTimeoutMs = Math.max(100, (timeoutSeconds * 1000) / count);
-                List<String> command = isWindows ? 
-                    List.of("ping", "-n", String.valueOf(count), "-w", String.valueOf(perPacketTimeoutMs), host) :
-                    List.of("ping", "-c", String.valueOf(count), "-W", String.valueOf(perPacketTimeoutMs / 1000.0), host);
-                executeCommand(command, rawOutputBuilder, timeoutSeconds, testType);
-                parsePingOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
-                List<?> packetsReceived = (List<?>) parsedResult.getOrDefault("packets_received", new ArrayList<>());
-                if (packetsReceived.isEmpty() || parsedResult.getOrDefault("packet_loss_percent", 100).equals(100)) {
-                    status = "FAILURE";
-                }
-            } else if (testType.equalsIgnoreCase("traceroute")) {
-                int perHopTimeoutMs = Math.max(100, (timeoutSeconds * 1000) / 30);
-                List<String> command = isWindows ? 
-                    List.of("tracert", "-w", String.valueOf(perHopTimeoutMs), host) :
-                    List.of("traceroute", "-q", "1", "-w", String.valueOf(perHopTimeoutMs / 1000.0), host);
-                for (int i = 0; i < count; i++) {
-                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, rawOutputBuilder, timeoutSeconds, testType);
-                    rawOutputBuilder.append("\n");
-                }
-                parseTracerouteOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
-                List<?> hops = (List<?>) parsedResult.getOrDefault("hops", new ArrayList<>());
-                if (hops.isEmpty()) {
-                    status = "FAILURE";
-                }
-            } else if (testType.equalsIgnoreCase("dns")) {
-                List<String> command = List.of("nslookup", host);
-                for (int i = 0; i < count; i++) {
-                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, rawOutputBuilder, timeoutSeconds, testType);
-                    rawOutputBuilder.append("\n");
-                }
-                parseDnsOutput(rawOutputBuilder.toString(), parsedResult);
-                List<?> addresses = (List<?>) parsedResult.getOrDefault("addresses", new ArrayList<>());
-                List<?> cnames = (List<?>) parsedResult.getOrDefault("cnames", new ArrayList<>());
-                if (addresses.isEmpty() && cnames.isEmpty()) {
-                    status = "FAILURE";
-                }
-            } else if (testType.equalsIgnoreCase("http")) {
-                // Prepend http:// if no scheme is provided
-                String url = host.startsWith("http://") || host.startsWith("https://") ? host : "http://" + host;
-                for (int i = 0; i < count; i++) {
-                    rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeHttpTest(url, rawOutputBuilder, parsedResult, timeoutSeconds);
-                    rawOutputBuilder.append("\n");
-                }
-                List<?> responses = (List<?>) parsedResult.getOrDefault("responses", new ArrayList<>());
-                if (responses.isEmpty()) {
-                    status = "FAILURE";
-                }
-            } else {
-                throw new IllegalArgumentException("Unsupported test type: " + testType);
-            }
-
-            if (rawOutputBuilder.toString().toLowerCase().contains("request timed out") ||
-                rawOutputBuilder.toString().toLowerCase().contains("destination unreachable") ||
-                rawOutputBuilder.toString().toLowerCase().contains("non-existent domain")) {
-                status = "FAILURE";
-            }
-        } catch (InterruptedException e) {
-            status = "TIMEOUT";
-            rawOutputBuilder.append("ERROR: Test timed out after ").append(timeoutSeconds).append(" seconds\n");
-        } catch (Exception e) {
-            status = "FAILURE";
-            rawOutputBuilder.append("ERROR: ").append(e.getMessage()).append("\n");
-        }
-
-        result.setRawOutput(rawOutputBuilder.toString());
-        result.setParsedResult(parsedResult);
-        result.setStatus(status);
-
-        repository.save(result);
-        return result;
-    }
-
-    /**
-     * Executes a system command using ProcessBuilder, capturing stdout and stderr output.
-     * Applies a timeout and handles DNS-specific output (e.g., skipping non-error stderr lines).
-     *
-     * @param command        List of command arguments to execute (e.g., ["ping", "-c", "4", "google.com"]).
-     * @param outputBuilder  StringBuilder to append command output and errors.
-     * @param timeoutSeconds Timeout for the command execution in seconds.
-     * @param testType       Type of test ("ping", "traceroute", "dns") for specific handling.
-     * @throws IOException If an I/O error occurs during command execution.
-     * @throws InterruptedException If the command times out.
-     */
-    private void executeCommand(List<String> command, StringBuilder outputBuilder, int timeoutSeconds, String testType) 
-            throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder(command);
-        Process process = pb.start();
-        
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            outputBuilder.append(line).append("\n");
-        }
-        
-        BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-        boolean hasError = false;
-        while ((line = errorReader.readLine()) != null) {
-            if (testType.equalsIgnoreCase("dns") && line.contains("Non-authoritative answer:")) {
-                outputBuilder.append(line).append("\n");
-                continue;
-            }
-            outputBuilder.append("ERROR: ").append(line).append("\n");
-            hasError = true;
-        }
-        
-        boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-        if (!exited) {
-            process.destroyForcibly();
-            throw new InterruptedException("Process timed out");
-        }
-
-        int exitCode = process.exitValue();
-        if (exitCode != 0 && !hasError && !testType.equalsIgnoreCase("dns")) {
-            outputBuilder.append("ERROR: Process exited with code ").append(exitCode).append("\n");
-        }
-    }
-
-    /**
-     * Executes an HTTP GET request using HttpClient, capturing response code and time.
-     *
-     * @param url            The URL to test (e.g., "http://google.com").
-     * @param outputBuilder  StringBuilder to append response details.
-     * @param parsedResult   Map to store parsed results (e.g., response code, time).
-     * @param timeoutSeconds Timeout for the HTTP request in seconds.
-     * @throws IOException If an I/O error occurs during the request.
-     * @throws InterruptedException If the request times out.
-     */
-    private void executeHttpTest(String url, StringBuilder outputBuilder, Map<String, Object> parsedResult, int timeoutSeconds) 
-            throws IOException, InterruptedException {
-        HttpClient client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(timeoutSeconds))
-            .build();
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .timeout(Duration.ofSeconds(timeoutSeconds))
-            .GET()
-            .build();
-
-        List<Map<String, Object>> responses = (List<Map<String, Object>>) parsedResult.computeIfAbsent("responses", k -> new ArrayList<>());
-        Map<String, Object> responseData = new HashMap<>();
-
-        try {
-            Instant start = Instant.now();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            Instant end = Instant.now();
-            long responseTimeMs = Duration.between(start, end).toMillis();
-
-            outputBuilder.append("HTTP GET ").append(url).append("\n")
-                         .append("Status Code: ").append(response.statusCode()).append("\n")
-                         .append("Response Time: ").append(responseTimeMs).append(" ms\n");
-
-            responseData.put("status_code", response.statusCode());
-            responseData.put("response_time_ms", responseTimeMs);
-            responses.add(responseData);
-        } catch (IOException e) {
-            outputBuilder.append("ERROR: ").append(e.getMessage()).append("\n");
-            responseData.put("error", e.getMessage());
-            responses.add(responseData);
-        }
-    }
-
-    /**
-     * Parses ping command output to extract packet loss and round-trip time metrics.
-     * Ensures the number of packets sent matches the requested count.
-     *
-     * @param output     The raw command output from the ping command.
-     * @param parsed     Map to store parsed results (e.g., packet_loss_percent, min_rtt_ms).
-     * @param isWindows  True if running on Windows, false for Linux/Unix.
-     */
-    private void parsePingOutput(String output, Map<String, Object> parsed, boolean isWindows) {
-        if (isWindows) {
-            Pattern lossPattern = Pattern.compile("Lost = (\\d+) \\((\\d+)% loss\\)");
-            Pattern rttPattern = Pattern.compile("Minimum = (\\d+)ms, Maximum = (\\d+)ms, Average = (\\d+)ms");
-            Pattern sentPattern = Pattern.compile("Sent = (\\d+)");
-            Matcher lossMatcher = lossPattern.matcher(output);
-            if (lossMatcher.find()) {
-                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(2)));
-            }
-            Matcher rttMatcher = rttPattern.matcher(output);
-            if (rttMatcher.find()) {
-                parsed.put("min_rtt_ms", Integer.parseInt(rttMatcher.group(1)));
-                parsed.put("max_rtt_ms", Integer.parseInt(rttMatcher.group(2)));
-                parsed.put("avg_rtt_ms", Integer.parseInt(rttMatcher.group(3)));
-            }
-            Matcher sentMatcher = sentPattern.matcher(output);
-            if (sentMatcher.find()) {
-                parsed.put("packets_sent", Integer.parseInt(sentMatcher.group(1)));
-            }
-        } else {
-            Pattern lossPattern = Pattern.compile("(\\d+) packets transmitted, (\\d+) received, (\\d+)% packet loss");
-            Pattern rttPattern = Pattern.compile("rtt min/avg/max/mdev = (\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+) ms");
-            Matcher lossMatcher = lossPattern.matcher(output);
-            if (lossMatcher.find()) {
-                parsed.put("packets_sent", Integer.parseInt(lossMatcher.group(1)));
-                parsed.put("packets_received", Integer.parseInt(lossMatcher.group(2)));
-                parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(3)));
-            }
-            Matcher rttMatcher = rttPattern.matcher(output);
-            if (rttMatcher.find()) {
-                parsed.put("min_rtt_ms", Double.parseDouble(rttMatcher.group(1)));
-                parsed.put("avg_rtt_ms", Double.parseDouble(rttMatcher.group(2)));
-                parsed.put("max_rtt_ms", Double.parseDouble(rttMatcher.group(3)));
-                parsed.put("mdev_rtt_ms", Double.parseDouble(rttMatcher.group(4)));
-            }
-        }
-    }
-
-    /**
-     * Parses traceroute command output to extract hop details (e.g., hop number, host, IPs, RTTs).
-     * Handles Linux single-probe output with "-q 1" (e.g., "hop_number host (IP) RTT ms").
-     *
-     * @param output     The raw command output from the traceroute command.
-     * @param parsed     Map to store parsed results (e.g., list of hops with details).
-     * @param isWindows  True if running on Windows, false for Linux/Unix.
-     */
-    private void parseTracerouteOutput(String output, Map<String, Object> parsed, boolean isWindows) {
-        List<Map<String, Object>> hops = new ArrayList<>();
-        String[] lines = output.split("\n");
-        
-        Pattern windowsHopPattern = Pattern.compile("^(\\d+)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+)");
-        Pattern linuxHopPattern = Pattern.compile("^(\\d+)\\s+(\\S+)\\s+\\((\\S+)\\)\\s+(\\S+)\\s+ms");
-        
-        for (String line : lines) {
-            line = line.trim();
-            if (isWindows) {
-                Matcher matcher = windowsHopPattern.matcher(line);
-                if (matcher.find()) {
-                    Map<String, Object> hop = new HashMap<>();
-                    hop.put("hop_number", Integer.parseInt(matcher.group(1)));
-                    hop.put("rtt1_ms", matcher.group(2));
-                    hop.put("rtt2_ms", matcher.group(3));
-                    hop.put("rtt3_ms", matcher.group(4));
-                    hop.put("host", matcher.group(5));
-                    hops.add(hop);
-                }
-            } else {
-                Matcher matcher = linuxHopPattern.matcher(line);
-                if (matcher.find()) {
-                    Map<String, Object> hop = new HashMap<>();
-                    hop.put("hop_number", Integer.parseInt(matcher.group(1)));
-                    hop.put("host", matcher.group(2));
-                    hop.put("ip", matcher.group(3));
-                    hop.put("rtt1_ms", matcher.group(4));
-                    hop.put("rtt2_ms", "*");
-                    hop.put("rtt3_ms", "*");
-                    hops.add(hop);
-                } else if (line.matches("^(\\d+)\\s+\\*.*")) {
-                    Map<String, Object> hop = new HashMap<>();
-                    hop.put("hop_number", Integer.parseInt(line.split("\\s+")[0]));
-                    hop.put("host", null);
-                    hop.put("ip", null);
-                    hop.put("rtt1_ms", "*");
-                    hop.put("rtt2_ms", "*");
-                    hop.put("rtt3_ms", "*");
-                    hops.add(hop);
-                }
-            }
-        }
-        parsed.put("hops", hops);
-    }
-
-    /**
-     * Parses nslookup command output to extract IP addresses and CNAME records.
-     * Handles spaces in "Address:" and "Name:" lines and processes each run independently.
-     *
-     * @param output The raw command output from the nslookup command.
-     * @param parsed Map to store parsed results (e.g., addresses, cnames).
-     */
-    private void parseDnsOutput(String output, Map<String, Object> parsed) {
-        List<String> addresses = new ArrayList<>();
-        List<String> cnames = new ArrayList<>();
-        
-        Pattern addressPattern = Pattern.compile("Address:\\s*(\\S+)");
-        Pattern cnamePattern = Pattern.compile("Name:\\s+(\\S+)");
-        
-        String[] lines = output.split("\n");
-        String currentName = null;
-        for (String line : lines) {
-            if (line.startsWith("Run ")) {
-                currentName = null;
-            }
-            
-            Matcher cnameMatcher = cnamePattern.matcher(line);
-            if (cnameMatcher.find()) {
-                currentName = cnameMatcher.group(1);
-                if (!cnames.contains(currentName)) {
-                    cnames.add(currentName);
-                }
-            }
-            
-            Matcher addressMatcher = addressPattern.matcher(line);
-            if (addressMatcher.find()) {
-                String address = addressMatcher.group(1);
-                if (!addresses.contains(address)) {
-                    addresses.add(address);
-                }
-            }
-        }
-        
-        parsed.put("addresses", addresses);
-        parsed.put("cnames", cnames);
-    }
-
-    /**
-     * Retrieves the default location (hostname) of the local machine.
-     *
-     * @return The hostname of the local machine, or "unknown" if an error occurs.
-     */
-    private String getDefaultLocation() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (Exception e) {
-            return "unknown";
-        }
-    }
-}
+<div style="padding: 20px;">
+  <h1>Incident Pulse Test UI</h1>
+  
+  <form [formGroup]="testForm" (ngSubmit)="runTests()">
+    <div>
+      <label for="host">Host/URL:</label>
+      <input id="host" formControlName="host" placeholder="e.g., google.com or http://google.com" required>
+    </div>
+    
+    <div>
+      <label for="testType">Test Type:</label>
+      <select id="testType" formControlName="testType" required>
+        <option value="ping">Ping</option>
+        <option value="traceroute">Traceroute</option>
+        <option value="dns">DNS</option>
+        <option value="http">HTTP</option>
+      </select>
+    </div>
+    
+    <div>
+      <label for="count">Count:</label>
+      <input id="count" type="number" formControlName="count" required>
+    </div>
+    
+    <div>
+      <label for="timeoutSeconds">Timeout Seconds:</label>
+      <input id="timeoutSeconds" type="number" formControlName="timeoutSeconds" required>
+    </div>
+    
+    <div>
+      <label for="locations">Locations (comma-separated):</label>
+      <input id="locations" formControlName="locations" placeholder="e.g., us-east-1,us-west-2" required>
+    </div>
+    
+    <button type="submit" [disabled]="running">Run Tests</button>
+    <button type="button" (click)="stopTests()" [disabled]="!running">Stop Tests</button>
+  </form>
+  
+  <div *ngIf="running">
+    <h2>Progress: {{ progress | number:'1.0-0' }}%</h2>
+    <progress [value]="progress" max="100"></progress>
+  </div>
+  
+  <div *ngIf="results.length > 0">
+    <h2>Test Results</h2>
+    <div *ngFor="let res of results">
+      <h3>Location: {{ res.location || 'Default' }}</h3>
+      <div *if="res.error; else showStats">
+        <p>Error: {{ res.error }}</p>
+      </div>
+      <ng-template #showStats>
+        <p>Status: {{ res.status }}</p>
+        <p>Raw Output:</p>
+        <pre>{{ res.rawOutput }}</pre>
+        <p>Parsed Result:</p>
+        <pre>{{ res.parsedResult | json }}</pre>
+      </ng-template>
+    </div>
+  </div>
+</div>
