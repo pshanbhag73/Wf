@@ -59,35 +59,39 @@ public class TestServiceImpl implements TestService {
 
         try {
             if (testType.equalsIgnoreCase("ping")) {
-                String command = isWindows ? "ping -n " + count + " -w " + (timeoutSeconds * 1000) + " " + host 
-                                        : "ping -c " + count + " -W " + timeoutSeconds + " " + host;
-                executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
+                int perPacketTimeoutMs = Math.max(100, (timeoutSeconds * 1000) / count);
+                List<String> command = isWindows ? 
+                    List.of("ping", "-n", String.valueOf(count), "-w", String.valueOf(perPacketTimeoutMs), host) :
+                    List.of("ping", "-c", String.valueOf(count), "-W", String.valueOf(perPacketTimeoutMs / 1000.0), host);
+                executeCommand(command, rawOutputBuilder, timeoutSeconds, testType);
                 parsePingOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
+                List<?> packetsReceived = (List<?>) parsedResult.getOrDefault("packets_received", new ArrayList<>());
+                if (packetsReceived.isEmpty() || parsedResult.getOrDefault("packet_loss_percent", 100).equals(100)) {
+                    status = "FAILURE";
+                }
             } else if (testType.equalsIgnoreCase("traceroute")) {
-                // Calculate per-hop timeout to fit within total timeoutSeconds
-                int perHopTimeoutMs = Math.max(100, (timeoutSeconds * 1000) / 30); // Minimum 100ms, assuming max 30 hops
-                String command = isWindows ? "tracert -w " + perHopTimeoutMs + " " + host 
-                                        : "traceroute -w " + (perHopTimeoutMs / 1000.0) + " " + host;
+                int perHopTimeoutMs = Math.max(100, (timeoutSeconds * 1000) / 30);
+                List<String> command = isWindows ? 
+                    List.of("tracert", "-w", String.valueOf(perHopTimeoutMs), host) :
+                    List.of("traceroute", "-q", "1", "-w", String.valueOf(perHopTimeoutMs / 1000.0), host);
                 for (int i = 0; i < count; i++) {
                     rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
+                    executeCommand(command, rawOutputBuilder, timeoutSeconds, testType);
                     rawOutputBuilder.append("\n");
                 }
                 parseTracerouteOutput(rawOutputBuilder.toString(), parsedResult, isWindows);
-                // Check if no hops were parsed (indicates failure)
                 List<?> hops = (List<?>) parsedResult.getOrDefault("hops", new ArrayList<>());
                 if (hops.isEmpty()) {
                     status = "FAILURE";
                 }
             } else if (testType.equalsIgnoreCase("dns")) {
-                String command = "nslookup " + host;
+                List<String> command = List.of("nslookup", host);
                 for (int i = 0; i < count; i++) {
                     rawOutputBuilder.append("Run " + (i + 1) + ":\n");
-                    executeCommand(command, isWindows, rawOutputBuilder, timeoutSeconds, testType);
+                    executeCommand(command, rawOutputBuilder, timeoutSeconds, testType);
                     rawOutputBuilder.append("\n");
                 }
                 parseDnsOutput(rawOutputBuilder.toString(), parsedResult);
-                // Check if no addresses or CNAMEs were found (indicates failure)
                 List<?> addresses = (List<?>) parsedResult.getOrDefault("addresses", new ArrayList<>());
                 List<?> cnames = (List<?>) parsedResult.getOrDefault("cnames", new ArrayList<>());
                 if (addresses.isEmpty() && cnames.isEmpty()) {
@@ -97,7 +101,6 @@ public class TestServiceImpl implements TestService {
                 throw new IllegalArgumentException("Unsupported test type: " + testType);
             }
 
-            // Check for failure conditions in output
             if (rawOutputBuilder.toString().toLowerCase().contains("request timed out") ||
                 rawOutputBuilder.toString().toLowerCase().contains("destination unreachable") ||
                 rawOutputBuilder.toString().toLowerCase().contains("non-existent domain")) {
@@ -123,36 +126,27 @@ public class TestServiceImpl implements TestService {
      * Executes a system command using ProcessBuilder, capturing stdout and stderr output.
      * Applies a timeout and handles DNS-specific output (e.g., skipping non-error stderr lines).
      *
-     * @param command        The command to execute (e.g., "nslookup google.com").
-     * @param isWindows      True if running on Windows, false for Linux/Unix.
+     * @param command        List of command arguments to execute (e.g., ["ping", "-c", "4", "google.com"]).
      * @param outputBuilder  StringBuilder to append command output and errors.
      * @param timeoutSeconds Timeout for the command execution in seconds.
      * @param testType       Type of test ("ping", "traceroute", "dns") for specific handling.
      * @throws IOException If an I/O error occurs during command execution.
      * @throws InterruptedException If the command times out.
      */
-    private void executeCommand(String command, boolean isWindows, StringBuilder outputBuilder, int timeoutSeconds, String testType) 
+    private void executeCommand(List<String> command, StringBuilder outputBuilder, int timeoutSeconds, String testType) 
             throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder();
-        if (isWindows) {
-            pb.command("cmd.exe", "/c", command);
-        } else {
-            pb.command("sh", "-c", command);
-        }
+        ProcessBuilder pb = new ProcessBuilder(command);
         Process process = pb.start();
         
-        // Read output (stdout)
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
         String line;
         while ((line = reader.readLine()) != null) {
             outputBuilder.append(line).append("\n");
         }
         
-        // Read errors (stderr) with special handling for DNS
         BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
         boolean hasError = false;
         while ((line = errorReader.readLine()) != null) {
-            // For DNS, skip non-error stderr lines like "Non-authoritative answer:"
             if (testType.equalsIgnoreCase("dns") && line.contains("Non-authoritative answer:")) {
                 outputBuilder.append(line).append("\n");
                 continue;
@@ -161,14 +155,12 @@ public class TestServiceImpl implements TestService {
             hasError = true;
         }
         
-        // Wait for process with timeout
         boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
         if (!exited) {
-            process.destroyForcibly(); // Forcefully terminate process on timeout
+            process.destroyForcibly();
             throw new InterruptedException("Process timed out");
         }
 
-        // Append exit code error only if no stderr errors were captured and exit code is non-zero
         int exitCode = process.exitValue();
         if (exitCode != 0 && !hasError && !testType.equalsIgnoreCase("dns")) {
             outputBuilder.append("ERROR: Process exited with code ").append(exitCode).append("\n");
@@ -177,6 +169,7 @@ public class TestServiceImpl implements TestService {
 
     /**
      * Parses ping command output to extract packet loss and round-trip time metrics.
+     * Ensures the number of packets sent matches the requested count.
      *
      * @param output     The raw command output from the ping command.
      * @param parsed     Map to store parsed results (e.g., packet_loss_percent, min_rtt_ms).
@@ -186,6 +179,7 @@ public class TestServiceImpl implements TestService {
         if (isWindows) {
             Pattern lossPattern = Pattern.compile("Lost = (\\d+) \\((\\d+)% loss\\)");
             Pattern rttPattern = Pattern.compile("Minimum = (\\d+)ms, Maximum = (\\d+)ms, Average = (\\d+)ms");
+            Pattern sentPattern = Pattern.compile("Sent = (\\d+)");
             Matcher lossMatcher = lossPattern.matcher(output);
             if (lossMatcher.find()) {
                 parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(2)));
@@ -196,11 +190,17 @@ public class TestServiceImpl implements TestService {
                 parsed.put("max_rtt_ms", Integer.parseInt(rttMatcher.group(2)));
                 parsed.put("avg_rtt_ms", Integer.parseInt(rttMatcher.group(3)));
             }
+            Matcher sentMatcher = sentPattern.matcher(output);
+            if (sentMatcher.find()) {
+                parsed.put("packets_sent", Integer.parseInt(sentMatcher.group(1)));
+            }
         } else {
             Pattern lossPattern = Pattern.compile("(\\d+) packets transmitted, (\\d+) received, (\\d+)% packet loss");
             Pattern rttPattern = Pattern.compile("rtt min/avg/max/mdev = (\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+)/(\\d+\\.\\d+) ms");
             Matcher lossMatcher = lossPattern.matcher(output);
             if (lossMatcher.find()) {
+                parsed.put("packets_sent", Integer.parseInt(lossMatcher.group(1)));
+                parsed.put("packets_received", Integer.parseInt(lossMatcher.group(2)));
                 parsed.put("packet_loss_percent", Integer.parseInt(lossMatcher.group(3)));
             }
             Matcher rttMatcher = rttPattern.matcher(output);
@@ -214,7 +214,8 @@ public class TestServiceImpl implements TestService {
     }
 
     /**
-     * Parses traceroute command output to extract hop details (e.g., hop number, host, RTTs).
+     * Parses traceroute command output to extract hop details (e.g., hop number, host, IPs, RTTs).
+     * Handles Linux single-probe output with "-q 1" (e.g., "hop_number host (IP) RTT ms").
      *
      * @param output     The raw command output from the traceroute command.
      * @param parsed     Map to store parsed results (e.g., list of hops with details).
@@ -223,26 +224,44 @@ public class TestServiceImpl implements TestService {
     private void parseTracerouteOutput(String output, Map<String, Object> parsed, boolean isWindows) {
         List<Map<String, Object>> hops = new ArrayList<>();
         String[] lines = output.split("\n");
-        Pattern hopPattern = isWindows ? Pattern.compile("^(\\d+)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+)") :
-                Pattern.compile("^(\\d+)\\s+(\\S+)\\s+\\((\\S+)\\)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms");
+        
+        Pattern windowsHopPattern = Pattern.compile("^(\\d+)\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+) ms\\s+(\\S+)");
+        Pattern linuxHopPattern = Pattern.compile("^(\\d+)\\s+(\\S+)\\s+\\((\\S+)\\)\\s+(\\S+)\\s+ms");
+        
         for (String line : lines) {
-            Matcher matcher = hopPattern.matcher(line.trim());
-            if (matcher.find()) {
-                Map<String, Object> hop = new HashMap<>();
-                hop.put("hop_number", Integer.parseInt(matcher.group(1)));
-                if (isWindows) {
+            line = line.trim();
+            if (isWindows) {
+                Matcher matcher = windowsHopPattern.matcher(line);
+                if (matcher.find()) {
+                    Map<String, Object> hop = new HashMap<>();
+                    hop.put("hop_number", Integer.parseInt(matcher.group(1)));
                     hop.put("rtt1_ms", matcher.group(2));
                     hop.put("rtt2_ms", matcher.group(3));
                     hop.put("rtt3_ms", matcher.group(4));
                     hop.put("host", matcher.group(5));
-                } else {
+                    hops.add(hop);
+                }
+            } else {
+                Matcher matcher = linuxHopPattern.matcher(line);
+                if (matcher.find()) {
+                    Map<String, Object> hop = new HashMap<>();
+                    hop.put("hop_number", Integer.parseInt(matcher.group(1)));
                     hop.put("host", matcher.group(2));
                     hop.put("ip", matcher.group(3));
                     hop.put("rtt1_ms", matcher.group(4));
-                    hop.put("rtt2_ms", matcher.group(5));
-                    hop.put("rtt3_ms", matcher.group(6));
+                    hop.put("rtt2_ms", "*");
+                    hop.put("rtt3_ms", "*");
+                    hops.add(hop);
+                } else if (line.matches("^(\\d+)\\s+\\*.*")) {
+                    Map<String, Object> hop = new HashMap<>();
+                    hop.put("hop_number", Integer.parseInt(line.split("\\s+")[0]));
+                    hop.put("host", null);
+                    hop.put("ip", null);
+                    hop.put("rtt1_ms", "*");
+                    hop.put("rtt2_ms", "*");
+                    hop.put("rtt3_ms", "*");
+                    hops.add(hop);
                 }
-                hops.add(hop);
             }
         }
         parsed.put("hops", hops);
@@ -259,14 +278,12 @@ public class TestServiceImpl implements TestService {
         List<String> addresses = new ArrayList<>();
         List<String> cnames = new ArrayList<>();
         
-        // Patterns to handle spaces
         Pattern addressPattern = Pattern.compile("Address:\\s*(\\S+)");
         Pattern cnamePattern = Pattern.compile("Name:\\s+(\\S+)");
         
         String[] lines = output.split("\n");
         String currentName = null;
         for (String line : lines) {
-            // Reset currentName at the start of each run
             if (line.startsWith("Run ")) {
                 currentName = null;
             }
@@ -289,7 +306,7 @@ public class TestServiceImpl implements TestService {
         }
         
         parsed.put("addresses", addresses);
-        parsed.put("cnames", cnames); // Always include, even if empty
+        parsed.put("cnames", cnames);
     }
 
     /**
