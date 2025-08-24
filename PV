@@ -1,5 +1,36 @@
 ^(?:https?://)?[a-z0-9.-]+(?:\.[a-z]{2,})(?::[0-9]{1,5})?(?:/[^?\s#]*)?(?:\?[^#\s]*)?(?:#[^\s]*)?$
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class UrlHostExtractor {
+    public static void main(String[] args) {
+        // Test URLs
+        String[] urls = {
+            "http://example.com",
+            "https://subdomain.example.co.uk",
+            "example.com:8080",
+            "HTTP://EXAMPLE.COM/PATH?KEY=VALUE#ANCHOR",
+            "example.com/path?query=1#fragment",
+            "subdomain.example.com:3000/path"
+        };
+
+        // Regex pattern to extract host
+        String regex = "(?:https?://)?([a-z0-9.-]+\\.[a-z]{2,})(?::[0-9]{1,5})?(?:/[^?\\s#]*)?(?:\\?[^#\\s]*)?(?:#[^\\s]*)?";
+        Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+
+        // Process each URL
+        for (String url : urls) {
+            Matcher matcher = pattern.matcher(url);
+            if (matcher.matches()) {
+                String host = matcher.group(1); // Extract host from group 1
+                System.out.println("URL: " + url + " => Host: " + host);
+            } else {
+                System.out.println("URL: " + url + " => Invalid URL");
+            }
+        }
+    }
+}
 
 package com.example.incidentpulse.service;
 
