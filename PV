@@ -27,26 +27,59 @@ export class TestVisualizationComponent implements OnInit {
     const nodes: any[] = [];
     const links: any[] = [];
     const categories = [
-      { name: 'Location' },
-      { name: 'Hop' },
-      { name: 'Host' }
+      { name: 'Location', itemStyle: { color: '#007bff' } }, // Blue for locations
+      { name: 'Hop', itemStyle: { color: '#ff9800' } }, // Orange for hops
+      { name: 'Host', itemStyle: { color: '#4caf50' } } // Green for host
     ];
+
+    // Map to track unique node IDs
+    const nodeIdMap = new Map<string, string>();
+    let nodeIdCounter = 0;
 
     results.forEach((result, index) => {
       const location = result.location || 'Default';
       const host = result.host;
 
+      // Generate unique IDs for location and host
+      const locationId = `location_${index}_${location}`;
+      const hostId = `host_${index}_${host}`;
+
       // Add location node
-      nodes.push({ name: location, category: 0, x: 0, y: index * 100 }); // Left side
+      if (!nodeIdMap.has(locationId)) {
+        nodes.push({
+          id: locationId,
+          name: location,
+          category: 0,
+          x: 0, // Left side
+          y: index * 100, // Separate paths vertically
+          symbolSize: 50,
+          label: { show: true }
+        });
+        nodeIdMap.set(locationId, locationId);
+      }
 
       // Add host node
-      nodes.push({ name: host, category: 2, x: 800, y: index * 100 }); // Right side
+      if (!nodeIdMap.has(hostId)) {
+        nodes.push({
+          id: hostId,
+          name: host,
+          category: 2,
+          x: 800, // Right side
+          y: index * 100,
+          symbolSize: 50,
+          label: { show: true }
+        });
+        nodeIdMap.set(hostId, hostId);
+      }
 
-      links.push({ source: location, target: host });
+      // Link location to host (fallback link)
+      links.push({ source: locationId, target: hostId });
 
+      // Process hops
       if (result.parsedResult && result.parsedResult.hops) {
-        let prevNode = location;
+        let prevNodeId = locationId;
         result.parsedResult.hops.forEach((hop: any, hopIndex: number) => {
+          // Create hop name
           let hopName = `Hop ${hop.hop_number}`;
           if (hop.host) {
             hopName += ` (${hop.host})`;
@@ -56,25 +89,31 @@ export class TestVisualizationComponent implements OnInit {
             hopName += ' (*)';
           }
 
-          // Handle duplicates by adding unique identifier if needed
-          let uniqueHopName = hopName;
-          let suffix = 1;
-          while (nodes.some(n => n.name === uniqueHopName)) {
-            uniqueHopName = hopName + `_${suffix}`;
-            suffix++;
-          }
-
-          nodes.push({ name: uniqueHopName, category: 1, x: (hopIndex + 1) * 150, y: index * 100, symbolSize: 50, itemStyle: { color: '#ff9800' }, label: { show: true } }); // Horizontal positioning
+          // Generate unique hop ID
+          const hopId = `hop_${index}_${hop.hop_number}_${nodeIdCounter++}`;
+          nodes.push({
+            id: hopId,
+            name: hopName,
+            category: 1,
+            x: (hopIndex + 1) * 150, // Horizontal positioning
+            y: index * 100,
+            symbolSize: 50,
+            label: { show: true },
+            rtt1_ms: hop.rtt1_ms, // Store RTT for tooltip
+            rtt2_ms: hop.rtt2_ms,
+            rtt3_ms: hop.rtt3_ms
+          });
 
           // Link to previous node
-          links.push({ source: prevNode, target: uniqueHopName, lineStyle: { color: '#999' } });
+          links.push({ source: prevNodeId, target: hopId, lineStyle: { color: '#999' } });
 
-          prevNode = uniqueHopName;
+          // Update previous node
+          prevNodeId = hopId;
         });
 
         // Link last hop to host
         if (result.parsedResult.hops.length > 0) {
-            links.push({ source: prevNode, target: host });
+          links.push({ source: prevNodeId, target: hostId });
         }
       }
     });
@@ -92,11 +131,11 @@ export class TestVisualizationComponent implements OnInit {
       legend: [{ data: categories.map(a => a.name) }],
       series: [{
         type: 'graph',
-        layout: 'none', // Use none layout for fixed positions
+        layout: 'none', // Fixed positions for left-to-right
         data: nodes,
         links: links,
         categories: categories,
-        roam: true,
+        roam: true, // Enable zoom and drag
         label: {
           show: true,
           position: 'right',
