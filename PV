@@ -137,3 +137,113 @@ class AppComponent {
     </div>
   </div>
 </div>
+
+
+
+
+<div style="padding: 20px;">
+  <h1>Incident Pulse Test UI</h1>
+  
+  <form [formGroup]="testForm" (ngSubmit)="runTests()">
+    <div>
+      <label for="host">Host/URL:</label>
+      <input id="host" formControlName="host" placeholder="e.g., google.com or http://google.com" required>
+    </div>
+    
+    <div>
+      <label for="testType">Test Type:</label>
+      <select id="testType" formControlName="testType" required>
+        <option value="ping">Ping</option>
+        <option value="traceroute">Traceroute</option>
+        <option value="dns">DNS</option>
+        <option value="http">HTTP</option>
+      </select>
+    </div>
+    
+    <div>
+      <label for="count">Count:</label>
+      <input id="count" type="number" formControlName="count" required>
+    </div>
+    
+    <div>
+      <label for="timeoutSeconds">Timeout Seconds:</label>
+      <input id="timeoutSeconds" type="number" formControlName="timeoutSeconds" required>
+    </div>
+    
+    <div>
+      <label for="locations">Locations (comma-separated):</label>
+      <input id="locations" formControlName="locations" placeholder="e.g., us-east-1,us-west-2" required>
+    </div>
+    
+    <button type="submit" [disabled]="running">Run Tests</button>
+    <button type="button" (click)="stopTests()" [disabled]="!running">Stop Tests</button>
+  </form>
+  
+  <div *ngIf="running" class="progress-container">
+    <span class="progress-text">Test Completion: </span>
+    <span class="progress-percent">{{ progress | number:'1.0-0' }}%</span>
+    <progress [value]="progress" max="100"></progress>
+    <button type="button" (click)="stopTests()" [disabled]="!running">Stop</button>
+  </div>
+  
+  <div *ngIf="results.length > 0">
+    <h2>Test Results</h2>
+    <table mat-table [dataSource]="results" class="mat-elevation-z8">
+      <ng-container matColumnDef="location">
+        <th mat-header-cell *matHeaderCellDef> Location </th>
+        <td mat-cell *matCellDef="let element"> {{element.location || 'Default'}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef> Status </th>
+        <td mat-cell *matCellDef="let element" [ngClass]="getStatusClass(element.status)"> {{element.status}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="testType">
+        <th mat-header-cell *matHeaderCellDef> Test Type </th>
+        <td mat-cell *matCellDef="let element"> {{element.testType}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="host">
+        <th mat-header-cell *matHeaderCellDef> Host </th>
+        <td mat-cell *matCellDef="let element"> {{element.host}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="timestamp">
+        <th mat-header-cell *matHeaderCellDef> Timestamp </th>
+        <td mat-cell *matCellDef="let element"> {{element.timestamp}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="expand">
+        <th mat-header-cell *matHeaderCellDef aria-label="row actions"></th>
+        <td mat-cell *matCellDef="let element">
+          <button mat-icon-button aria-label="expand row" (click)="expandedElement = expandedElement === element ? null : element">
+            <mat-icon *ngIf="expandedElement === element; else showExpand">keyboard_arrow_up</mat-icon>
+            <ng-template #showExpand>
+              <mat-icon>keyboard_arrow_down</mat-icon>
+            </ng-template>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let element; columns: displayedColumns;" 
+          class="element-row" 
+          [class.expanded-row]="expandedElement === element">
+      </tr>
+
+      <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="detail-row"></tr>
+
+      <ng-container matColumnDef="expandedDetail">
+        <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
+          <div class="element-detail" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+            <h4>Raw Output</h4>
+            <pre>{{element.rawOutput}}</pre>
+            <h4>Parsed Result (Transformed)</h4>
+            <pre>{{ getTransformedParsedResult(element) | json }}</pre>
+          </div>
+        </td>
+      </ng-container>
+    </table>
+  </div>
+</div>
