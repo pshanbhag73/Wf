@@ -1,3 +1,80 @@
+import { Component, ViewChild } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { Subject, forkJoin, BehaviorSubject, Observable, of } from 'rxjs';
+import { takeUntil, finalize, catchError } from 'rxjs/operators';
+import { animate, state, style, transition, trigger } from '@angular/animations';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css'],
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
+      state('expanded', style({ height: '*' })),
+      transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
+    ]),
+  ]
+})
+class AppComponent {
+  // ... existing code ...
+
+  getTransformedParsedResult(result: any): any {
+    const parsed = result.parsedResult;
+    switch (result.testType.toLowerCase()) {
+      case 'ping':
+        return {
+          packetLoss: parsed.packet_loss_percent + '%',
+          avgRtt: parsed.avg_rtt_ms + ' ms',
+          packetsSent: parsed.packets_sent,
+          packetsReceived: parsed.packets_received || 'N/A'
+        };
+      case 'traceroute':
+        return parsed.hops.map((hop: any) => ({
+          hopNumber: hop.hop_number,
+          host: hop.host || hop.ip || '*',
+          rtt: `${hop.rtt1_ms} / ${hop.rtt2_ms} / ${hop.rtt3_ms} ms`
+        }));
+      case 'dns':
+        return {
+          addresses: parsed.addresses.join(', '),
+          cnames: parsed.cnames.join(', ')
+        };
+      case 'http':
+        const avgTime = parsed.responses.reduce((sum: number, res: any) => sum + (res.response_time_ms || 0), 0) / parsed.responses.length;
+        return {
+          averageResponseTime: avgTime.toFixed(2) + ' ms',
+          responses: parsed.responses.map((res: any) => ({
+            statusCode: res.status_code || 'Error',
+            responseTime: res.response_time_ms ? res.response_time_ms + ' ms' : res.error
+          }))
+        };
+      default:
+        return parsed;
+    }
+  }
+
+  getStatusClass(status: string): string {
+    switch (status.toLowerCase()) {
+      case 'success':
+        return 'status-success';
+      case 'failure':
+        return 'status-failure';
+      case 'timeout':
+        return 'status-timeout';
+      default:
+        return '';
+    }
+  }
+
+
+
+
+
+
+
+
 <div style="padding: 20px;">
   <h1>Incident Pulse Test UI</h1>
   
@@ -37,7 +114,8 @@
   </form>
   
   <div *ngIf="running" class="progress-container">
-    <span>Test Completion: {{ progress | number:'1.0-0' }}%</span>
+    <span class="progress-text">Test Completion: </span>
+    <span class="progress-percent">{{ progress | number:'1.0-0' }}%</span>
     <progress [value]="progress" max="100"></progress>
     <button type="button" (click)="stopTests()" [disabled]="!running">Stop</button>
   </div>
@@ -59,34 +137,3 @@
     </div>
   </div>
 </div>
-
-
-form div {
-  margin-bottom: 10px;
-}
-
-pre {
-  background-color: #f4f4f4;
-  padding: 10px;
-  border: 1px solid #ddd;
-  overflow-x: auto;
-}
-
-.progress-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.progress-container span {
-  white-space: nowrap;
-}
-
-.progress-container progress {
-  flex-grow: 1;
-}
-
-.progress-container button {
-  padding: 5px 10px;
-}
