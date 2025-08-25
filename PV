@@ -20,7 +20,6 @@ export class TestVisualizationComponent implements OnInit {
   chartOption: any = {};
 
   ngOnInit() {
-    // Assuming results contain parsed data for visualization
     this.chartOption = this.getTracerouteChartOption(this.results);
   }
 
@@ -37,31 +36,63 @@ export class TestVisualizationComponent implements OnInit {
       const location = result.location || 'Default';
       const host = result.host;
 
-      nodes.push({ name: location, category: 0 }); // Location
-      nodes.push({ name: host, category: 2 }); // Host
+      // Add location node
+      nodes.push({ name: location, category: 0, x: 0, y: index * 100 }); // Left side
+
+      // Add host node
+      nodes.push({ name: host, category: 2, x: 800, y: index * 100 }); // Right side
 
       links.push({ source: location, target: host });
 
       if (result.parsedResult && result.parsedResult.hops) {
+        let prevNode = location;
         result.parsedResult.hops.forEach((hop: any, hopIndex: number) => {
-          const hopName = `Hop ${hop.hop_number} (${hop.host || hop.ip || '*'})`;
-          nodes.push({ name: hopName, category: 1 }); // Hop
-
-          links.push({ source: hopIndex === 0 ? location : `Hop ${hop.hop_number - 1} (${result.parsedResult.hops[hopIndex - 1].host || result.parsedResult.hops[hopIndex - 1].ip || '*'})`, target: hopName });
-          if (hopIndex === result.parsedResult.hops.length - 1) {
-            links.push({ source: hopName, target: host });
+          let hopName = `Hop ${hop.hop_number}`;
+          if (hop.host) {
+            hopName += ` (${hop.host})`;
+          } else if (hop.ip) {
+            hopName += ` (${hop.ip})`;
+          } else {
+            hopName += ' (*)';
           }
+
+          // Handle duplicates by adding unique identifier if needed
+          let uniqueHopName = hopName;
+          let suffix = 1;
+          while (nodes.some(n => n.name === uniqueHopName)) {
+            uniqueHopName = hopName + `_${suffix}`;
+            suffix++;
+          }
+
+          nodes.push({ name: uniqueHopName, category: 1, x: (hopIndex + 1) * 150, y: index * 100, symbolSize: 50, itemStyle: { color: '#ff9800' }, label: { show: true } }); // Horizontal positioning
+
+          // Link to previous node
+          links.push({ source: prevNode, target: uniqueHopName, lineStyle: { color: '#999' } });
+
+          prevNode = uniqueHopName;
         });
+
+        // Link last hop to host
+        if (result.parsedResult.hops.length > 0) {
+            links.push({ source: prevNode, target: host });
+        }
       }
     });
 
     return {
       title: { text: 'Traceroute Path Visualization' },
-      tooltip: {},
+      tooltip: {
+        formatter: (params: any) => {
+          if (params.data.category === 1) { // Hop
+            return `Hop: ${params.name}<br>RTT1: ${params.data.rtt1_ms || '*'} ms<br>RTT2: ${params.data.rtt2_ms || '*'} ms<br>RTT3: ${params.data.rtt3_ms || '*'} ms`;
+          }
+          return params.name;
+        }
+      },
       legend: [{ data: categories.map(a => a.name) }],
       series: [{
         type: 'graph',
-        layout: 'force',
+        layout: 'none', // Use none layout for fixed positions
         data: nodes,
         links: links,
         categories: categories,
@@ -74,9 +105,6 @@ export class TestVisualizationComponent implements OnInit {
         lineStyle: {
           color: 'source',
           curveness: 0.3
-        },
-        force: {
-          repulsion: 100
         }
       }]
     };
