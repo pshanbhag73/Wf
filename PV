@@ -1,378 +1,84 @@
-^(\\d+)\\s+(\\S+)?\\s*(?:\\((\\S+)\\))?\\s*(\\S+)?\\s*(?:ms)?
-
-
-import { Component } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
-import { Subject, forkJoin, BehaviorSubject, Observable, of } from 'rxjs';
-import { takeUntil, finalize, catchError } from 'rxjs/operators';
-import { animate, state, style, transition, trigger } from '@angular/animations';
+import { Component, Input, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css'],
-  animations: [
-    trigger('detailExpand', [
-      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
-      state('expanded', style({ height: '*' })),
-      transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
-    ]),
-  ]
+  selector: 'app-test-visualization',
+  template: `<div *ngIf="results && results.length > 0">
+    <div *ngFor="let result of results">
+      <div [ngSwitch]="result.testType.toLowerCase()">
+        <div *ngSwitchCase="'traceroute'">
+          <div echarts [options]="chartOption" style="height: 400px; width: 100%;"></div>
+        </div>
+        <div *ngSwitchDefault>
+          <p>No visualization available for {{ result.testType }}.</p>
+        </div>
+      </div>
+    </div>
+  </div>`,
 })
-export class AppComponent {
-  testForm: FormGroup;
-  running = false;
-  results: any[] = [];
-  expandedElement: any | null = null;
-  displayedColumns: string[] = ['location', 'status', 'testType', 'host', 'timestamp', 'expand'];
-  progressSubject = new BehaviorSubject<number>(0);
-  progress = 0;
-  private stopSubject = new Subject<void>();
-  private totalTests = 0;
-  private completedTests = 0;
-  private apiUrl = 'http://localhost:8080/test';
+export class TestVisualizationComponent implements OnInit {
+  @Input() results: any[] = [];
+  chartOption: any = {};
 
-  constructor(private fb: FormBuilder, private http: HttpClient) {
-    this.testForm = fb.group({
-      host: ['', Validators.required],
-      testType: ['', Validators.required],
-      count: [4, [Validators.required, Validators.min(1), Validators.max(100)]],
-      timeoutSeconds: [2, [Validators.required, Validators.min(1), Validators.max(60)]],
-      locations: ['', Validators.required]
+  ngOnInit() {
+    // Assuming results contain parsed data for visualization
+    this.chartOption = this.getTracerouteChartOption(this.results);
+  }
+
+  private getTracerouteChartOption(results: any[]) {
+    const nodes: any[] = [];
+    const links: any[] = [];
+    const categories = [
+      { name: 'Location' },
+      { name: 'Hop' },
+      { name: 'Host' }
+    ];
+
+    results.forEach((result, index) => {
+      const location = result.location || 'Default';
+      const host = result.host;
+
+      nodes.push({ name: location, category: 0 }); // Location
+      nodes.push({ name: host, category: 2 }); // Host
+
+      links.push({ source: location, target: host });
+
+      if (result.parsedResult && result.parsedResult.hops) {
+        result.parsedResult.hops.forEach((hop: any, hopIndex: number) => {
+          const hopName = `Hop ${hop.hop_number} (${hop.host || hop.ip || '*'})`;
+          nodes.push({ name: hopName, category: 1 }); // Hop
+
+          links.push({ source: hopIndex === 0 ? location : `Hop ${hop.hop_number - 1} (${result.parsedResult.hops[hopIndex - 1].host || result.parsedResult.hops[hopIndex - 1].ip || '*'})`, target: hopName });
+          if (hopIndex === result.parsedResult.hops.length - 1) {
+            links.push({ source: hopName, target: host });
+          }
+        });
+      }
     });
 
-    this.progressSubject.subscribe(value => this.progress = value);
-  }
-
-  runTests() {
-    if (this.testForm.invalid) return;
-
-    this.running = true;
-    this.results = [];
-    this.completedTests = 0;
-    this.stopSubject = new Subject<void>();
-
-    const formValue = this.testForm.value;
-    const locations = formValue.locations.split(',').map((loc: string) => loc.trim());
-    this.totalTests = locations.length;
-
-    const requests: Observable<any>[] = locations.map(loc => 
-      this.http.post(this.apiUrl, {
-        host: formValue.host,
-        testType: formValue.testType,
-        count: formValue.count,
-        location: loc,
-        timeoutSeconds: formValue.timeoutSeconds
-      }).pipe(
-        takeUntil(this.stopSubject),
-        finalize(() => this.updateProgress()),
-        catchError(err => {
-          console.error(err);
-          return of({ error: err.message, location: loc });
-        })
-      )
-    );
-
-    forkJoin(requests).subscribe(res => {
-      this.results = res;
-      this.running = false;
-    }, err => {
-      console.error(err);
-      this.running = false;
-    });
-  }
-
-  stopTests() {
-    this.stopSubject.next();
-    this.stopSubject.complete();
-    this.running = false;
-  }
-
-  private updateProgress() {
-    this.completedTests++;
-    const progressValue = (this.completedTests / this.totalTests) * 100;
-    this.progressSubject.next(progressValue);
-  }
-
-  getTransformedParsedResult(result: any): any {
-    const parsed = result.parsedResult || {};
-    const status = result.status.toLowerCase();
-    const testType = result.testType.toLowerCase();
-
-    // Default transformation for all statuses
-    if (result.error) {
-      return { error: result.error };
-    }
-
-    switch (testType) {
-      case 'ping':
-        if (status === 'success') {
-          return {
-            packetLoss: parsed.packet_loss_percent + '%',
-            avgRtt: parsed.avg_rtt_ms ? parsed.avg_rtt_ms + ' ms' : 'N/A',
-            packetsSent: parsed.packets_sent || 0,
-            packetsReceived: parsed.packets_received || parsed.packet_loss_percent === 100 ? 0 : 'N/A'
-          };
-        } else if (status === 'failure' || status === 'timeout') {
-          return {
-            packetLoss: parsed.packet_loss_percent ? parsed.packet_loss_percent + '%' : 'N/A',
-            avgRtt: parsed.avg_rtt_ms ? parsed.avg_rtt_ms + ' ms' : 'N/A',
-            packetsSent: parsed.packets_sent || 0,
-            packetsReceived: parsed.packets_received || 0,
-            error: parsed.packet_loss_percent === 100 ? 'No packets received' : 'Partial or no data'
-          };
+    return {
+      title: { text: 'Traceroute Path Visualization' },
+      tooltip: {},
+      legend: [{ data: categories.map(a => a.name) }],
+      series: [{
+        type: 'graph',
+        layout: 'force',
+        data: nodes,
+        links: links,
+        categories: categories,
+        roam: true,
+        label: {
+          show: true,
+          position: 'right',
+          formatter: '{b}'
+        },
+        lineStyle: {
+          color: 'source',
+          curveness: 0.3
+        },
+        force: {
+          repulsion: 100
         }
-        break;
-
-      case 'traceroute':
-        const hops = parsed.hops || [];
-        if (status === 'success' || status === 'timeout') {
-          return hops.length > 0 ? hops.map((hop: any) => ({
-            hopNumber: hop.hop_number,
-            host: hop.host || hop.ip || '*',
-            rtt: `${hop.rtt1_ms} / ${hop.rtt2_ms} / ${hop.rtt3_ms} ms`
-          })) : { error: 'No hops recorded' };
-        } else if (status === 'failure') {
-          return hops.length > 0 ? hops.map((hop: any) => ({
-            hopNumber: hop.hop_number,
-            host: hop.host || hop.ip || '*',
-            rtt: `${hop.rtt1_ms} / ${hop.rtt2_ms} / ${hop.rtt3_ms} ms`
-          })) : { error: 'Destination unreachable or no hops recorded' };
-        }
-        break;
-
-      case 'dns':
-        if (status === 'success') {
-          return {
-            addresses: parsed.addresses && parsed.addresses.length > 0 ? parsed.addresses.join(', ') : 'None',
-            cnames: parsed.cnames && parsed.cnames.length > 0 ? parsed.cnames.join(', ') : 'None'
-          };
-        } else if (status === 'failure' || status === 'timeout') {
-          return {
-            addresses: parsed.addresses && parsed.addresses.length > 0 ? parsed.addresses.join(', ') : 'None',
-            cnames: parsed.cnames && parsed.cnames.length > 0 ? parsed.cnames.join(', ') : 'None',
-            error: parsed.addresses && parsed.addresses.length > 0 ? 'Partial DNS resolution' : 'No DNS records found'
-          };
-        }
-        break;
-
-      case 'http':
-        const responses = parsed.responses || [];
-        if (status === 'success') {
-          const avgTime = responses.reduce((sum: number, res: any) => sum + (res.response_time_ms || 0), 0) / responses.length;
-          return {
-            averageResponseTime: avgTime ? avgTime.toFixed(2) + ' ms' : 'N/A',
-            responses: responses.map((res: any) => ({
-              statusCode: res.status_code || 'Error',
-              responseTime: res.response_time_ms ? res.response_time_ms + ' ms' : res.error || 'N/A'
-            }))
-          };
-        } else if (status === 'failure' || status === 'timeout') {
-          return {
-            averageResponseTime: responses.length > 0 ? (responses.reduce((sum: number, res: any) => sum + (res.response_time_ms || 0), 0) / responses.length).toFixed(2) + ' ms' : 'N/A',
-            responses: responses.map((res: any) => ({
-              statusCode: res.status_code || 'Error',
-              responseTime: res.response_time_ms ? res.response_time_ms + ' ms' : res.error || 'Timeout'
-            })),
-            error: responses.length === 0 ? 'No responses received' : 'Partial or failed responses'
-          };
-        }
-        break;
-
-      default:
-        return parsed;
-    }
-  }
-
-  getStatusClass(status: string): string {
-    switch (status.toLowerCase()) {
-      case 'success':
-        return 'status-success';
-      case 'failure':
-        return 'status-failure';
-      case 'timeout':
-        return 'status-timeout';
-      default:
-        return '';
-    }
+      }]
+    };
   }
 }
-
-
-
-
-
-
-<div style="padding: 20px;">
-  <h1>Incident Pulse Test UI</h1>
-  
-  <form [formGroup]="testForm" (ngSubmit)="runTests()">
-    <div>
-      <label for="host">Host/URL:</label>
-      <input id="host" formControlName="host" placeholder="e.g., google.com or http://google.com" required>
-    </div>
-    
-    <div>
-      <label for="testType">Test Type:</label>
-      <select id="testType" formControlName="testType" required>
-        <option value="ping">Ping</option>
-        <option value="traceroute">Traceroute</option>
-        <option value="dns">DNS</option>
-        <option value="http">HTTP</option>
-      </select>
-    </div>
-    
-    <div>
-      <label for="count">Count:</label>
-      <input id="count" type="number" formControlName="count" required>
-    </div>
-    
-    <div>
-      <label for="timeoutSeconds">Timeout Seconds:</label>
-      <input id="timeoutSeconds" type="number" formControlName="timeoutSeconds" required>
-    </div>
-    
-    <div>
-      <label for="locations">Locations (comma-separated):</label>
-      <input id="locations" formControlName="locations" placeholder="e.g., us-east-1,us-west-2" required>
-    </div>
-    
-    <button type="submit" [disabled]="running">Run Tests</button>
-    <button type="button" (click)="stopTests()" [disabled]="!running">Stop Tests</button>
-  </form>
-  
-  <div *ngIf="running" class="progress-container">
-    <span class="progress-text">Test Completion: </span>
-    <span class="progress-percent">{{ progress | number:'1.0-0' }}%</span>
-    <progress [value]="progress" max="100"></progress>
-    <button type="button" (click)="stopTests()" [disabled]="!running">Stop</button>
-  </div>
-  
-  <div *ngIf="results.length > 0">
-    <h2>Test Results</h2>
-    <div *ngFor="let res of results">
-      <h3>Location: {{ res.location || 'Default' }}</h3>
-      <div *ngIf="res.error; else showStats">
-        <p>Error: {{ res.error }}</p>
-      </div>
-      <ng-template #showStats>
-        <p>Status: {{ res.status }}</p>
-        <p>Raw Output:</p>
-        <pre>{{ res.rawOutput }}</pre>
-        <p>Parsed Result:</p>
-        <pre>{{ res.parsedResult | json }}</pre>
-      </ng-template>
-    </div>
-  </div>
-</div>
-
-
-
-
-<div style="padding: 20px;">
-  <h1>Incident Pulse Test UI</h1>
-  
-  <form [formGroup]="testForm" (ngSubmit)="runTests()">
-    <div>
-      <label for="host">Host/URL:</label>
-      <input id="host" formControlName="host" placeholder="e.g., google.com or http://google.com" required>
-    </div>
-    
-    <div>
-      <label for="testType">Test Type:</label>
-      <select id="testType" formControlName="testType" required>
-        <option value="ping">Ping</option>
-        <option value="traceroute">Traceroute</option>
-        <option value="dns">DNS</option>
-        <option value="http">HTTP</option>
-      </select>
-    </div>
-    
-    <div>
-      <label for="count">Count:</label>
-      <input id="count" type="number" formControlName="count" required>
-    </div>
-    
-    <div>
-      <label for="timeoutSeconds">Timeout Seconds:</label>
-      <input id="timeoutSeconds" type="number" formControlName="timeoutSeconds" required>
-    </div>
-    
-    <div>
-      <label for="locations">Locations (comma-separated):</label>
-      <input id="locations" formControlName="locations" placeholder="e.g., us-east-1,us-west-2" required>
-    </div>
-    
-    <button type="submit" [disabled]="running">Run Tests</button>
-    <button type="button" (click)="stopTests()" [disabled]="!running">Stop Tests</button>
-  </form>
-  
-  <div *ngIf="running" class="progress-container">
-    <span class="progress-text">Test Completion: </span>
-    <span class="progress-percent">{{ progress | number:'1.0-0' }}%</span>
-    <progress [value]="progress" max="100"></progress>
-    <button type="button" (click)="stopTests()" [disabled]="!running">Stop</button>
-  </div>
-  
-  <div *ngIf="results.length > 0">
-    <h2>Test Results</h2>
-    <table mat-table [dataSource]="results" class="mat-elevation-z8">
-      <ng-container matColumnDef="location">
-        <th mat-header-cell *matHeaderCellDef> Location </th>
-        <td mat-cell *matCellDef="let element"> {{element.location || 'Default'}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef> Status </th>
-        <td mat-cell *matCellDef="let element" [ngClass]="getStatusClass(element.status)"> {{element.status}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="testType">
-        <th mat-header-cell *matHeaderCellDef> Test Type </th>
-        <td mat-cell *matCellDef="let element"> {{element.testType}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="host">
-        <th mat-header-cell *matHeaderCellDef> Host </th>
-        <td mat-cell *matCellDef="let element"> {{element.host}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="timestamp">
-        <th mat-header-cell *matHeaderCellDef> Timestamp </th>
-        <td mat-cell *matCellDef="let element"> {{element.timestamp}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="expand">
-        <th mat-header-cell *matHeaderCellDef aria-label="row actions"></th>
-        <td mat-cell *matCellDef="let element">
-          <button mat-icon-button aria-label="expand row" (click)="expandedElement = expandedElement === element ? null : element">
-            <mat-icon *ngIf="expandedElement === element; else showExpand">keyboard_arrow_up</mat-icon>
-            <ng-template #showExpand>
-              <mat-icon>keyboard_arrow_down</mat-icon>
-            </ng-template>
-          </button>
-        </td>
-      </ng-container>
-
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let element; columns: displayedColumns;" 
-          class="element-row" 
-          [class.expanded-row]="expandedElement === element">
-      </tr>
-
-      <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="detail-row"></tr>
-
-      <ng-container matColumnDef="expandedDetail">
-        <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
-          <div class="element-detail" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
-            <h4>Raw Output</h4>
-            <pre>{{element.rawOutput}}</pre>
-            <h4>Parsed Result (Transformed)</h4>
-            <pre>{{ getTransformedParsedResult(element) | json }}</pre>
-          </div>
-        </td>
-      </ng-container>
-    </table>
-  </div>
-</div>
