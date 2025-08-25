@@ -36,7 +36,6 @@ export class TestVisualizationComponent implements OnInit {
     const nodeIdMap = new Map<string, string>();
     const locationYMap = new Map<string, number>();
     let nodeIdCounter = 0;
-    let yPosition = 0;
 
     // Track unique locations to assign Y-positions
     const uniqueLocations = [...new Set(results.map(r => r.location || 'Default'))];
@@ -58,7 +57,7 @@ export class TestVisualizationComponent implements OnInit {
           id: locationId,
           name: location,
           category: 0,
-          x: 0, // Left side
+          x: 0, // Leftmost side
           y: locationYMap.get(location), // Consistent Y for same location
           symbolSize: 30, // Smaller node size
           label: { show: true }
@@ -66,13 +65,13 @@ export class TestVisualizationComponent implements OnInit {
         nodeIdMap.set(locationId, locationId);
       }
 
-      // Add host node
+      // Add host node (rightmost position)
       if (!nodeIdMap.has(hostId)) {
         nodes.push({
           id: hostId,
           name: host,
           category: 2,
-          x: 800, // Right side
+          x: 1000, // Moved to rightmost position
           y: locationYMap.get(location), // Align with location
           symbolSize: 30, // Smaller node size
           label: { show: true }
@@ -97,7 +96,7 @@ export class TestVisualizationComponent implements OnInit {
             id: hopId,
             name: hopName,
             category: 1,
-            x: (hopIndex + 1) * 150, // Horizontal positioning
+            x: (hopIndex + 1) * 150, // Horizontal positioning between location and host
             y: locationYMap.get(location), // Align with location
             symbolSize: 30, // Smaller node size
             label: { show: true },
