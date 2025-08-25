@@ -32,27 +32,35 @@ export class TestVisualizationComponent implements OnInit {
       { name: 'Host', itemStyle: { color: '#4caf50' } } // Green for host
     ];
 
-    // Map to track unique node IDs
+    // Map to track unique node IDs and location Y-positions
     const nodeIdMap = new Map<string, string>();
+    const locationYMap = new Map<string, number>();
     let nodeIdCounter = 0;
+    let yPosition = 0;
+
+    // Track unique locations to assign Y-positions
+    const uniqueLocations = [...new Set(results.map(r => r.location || 'Default'))];
+    uniqueLocations.forEach((loc, index) => {
+      locationYMap.set(loc, index * 100);
+    });
 
     results.forEach((result, index) => {
       const location = result.location || 'Default';
       const host = result.host;
 
       // Generate unique IDs for location and host
-      const locationId = `location_${index}_${location}`;
+      const locationId = `location_${location}`;
       const hostId = `host_${index}_${host}`;
 
-      // Add location node
+      // Add location node (only once per unique location)
       if (!nodeIdMap.has(locationId)) {
         nodes.push({
           id: locationId,
           name: location,
           category: 0,
           x: 0, // Left side
-          y: index * 100, // Separate paths vertically
-          symbolSize: 50,
+          y: locationYMap.get(location), // Consistent Y for same location
+          symbolSize: 30, // Smaller node size
           label: { show: true }
         });
         nodeIdMap.set(locationId, locationId);
@@ -65,8 +73,8 @@ export class TestVisualizationComponent implements OnInit {
           name: host,
           category: 2,
           x: 800, // Right side
-          y: index * 100,
-          symbolSize: 50,
+          y: locationYMap.get(location), // Align with location
+          symbolSize: 30, // Smaller node size
           label: { show: true }
         });
         nodeIdMap.set(hostId, hostId);
@@ -79,25 +87,19 @@ export class TestVisualizationComponent implements OnInit {
       if (result.parsedResult && result.parsedResult.hops) {
         let prevNodeId = locationId;
         result.parsedResult.hops.forEach((hop: any, hopIndex: number) => {
-          // Create hop name
-          let hopName = `Hop ${hop.hop_number}`;
-          if (hop.host) {
-            hopName += ` (${hop.host})`;
-          } else if (hop.ip) {
-            hopName += ` (${hop.ip})`;
-          } else {
-            hopName += ' (*)';
-          }
+          // Create hop name (without hopNumber)
+          let hopName = hop.host || hop.ip || '*';
 
           // Generate unique hop ID
           const hopId = `hop_${index}_${hop.hop_number}_${nodeIdCounter++}`;
+
           nodes.push({
             id: hopId,
             name: hopName,
             category: 1,
             x: (hopIndex + 1) * 150, // Horizontal positioning
-            y: index * 100,
-            symbolSize: 50,
+            y: locationYMap.get(location), // Align with location
+            symbolSize: 30, // Smaller node size
             label: { show: true },
             rtt1_ms: hop.rtt1_ms, // Store RTT for tooltip
             rtt2_ms: hop.rtt2_ms,
@@ -123,7 +125,7 @@ export class TestVisualizationComponent implements OnInit {
       tooltip: {
         formatter: (params: any) => {
           if (params.data.category === 1) { // Hop
-            return `Hop: ${params.name}<br>RTT1: ${params.data.rtt1_ms || '*'} ms<br>RTT2: ${params.data.rtt2_ms || '*'} ms<br>RTT3: ${params.data.rtt3_ms || '*'} ms`;
+            return `Node: ${params.name}<br>RTT1: ${params.data.rtt1_ms || '*'} ms<br>RTT2: ${params.data.rtt2_ms || '*'} ms<br>RTT3: ${params.data.rtt3_ms || '*'} ms`;
           }
           return params.name;
         }
