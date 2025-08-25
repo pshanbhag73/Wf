@@ -1,4 +1,4 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Subject, forkJoin, BehaviorSubject, Observable, of } from 'rxjs';
@@ -17,39 +17,166 @@ import { animate, state, style, transition, trigger } from '@angular/animations'
     ]),
   ]
 })
-class AppComponent {
-  // ... existing code ...
+export class AppComponent {
+  testForm: FormGroup;
+  running = false;
+  results: any[] = [];
+  expandedElement: any | null = null;
+  displayedColumns: string[] = ['location', 'status', 'testType', 'host', 'timestamp', 'expand'];
+  progressSubject = new BehaviorSubject<number>(0);
+  progress = 0;
+  private stopSubject = new Subject<void>();
+  private totalTests = 0;
+  private completedTests = 0;
+  private apiUrl = 'http://localhost:8080/test';
+
+  constructor(private fb: FormBuilder, private http: HttpClient) {
+    this.testForm = fb.group({
+      host: ['', Validators.required],
+      testType: ['', Validators.required],
+      count: [4, [Validators.required, Validators.min(1), Validators.max(100)]],
+      timeoutSeconds: [2, [Validators.required, Validators.min(1), Validators.max(60)]],
+      locations: ['', Validators.required]
+    });
+
+    this.progressSubject.subscribe(value => this.progress = value);
+  }
+
+  runTests() {
+    if (this.testForm.invalid) return;
+
+    this.running = true;
+    this.results = [];
+    this.completedTests = 0;
+    this.stopSubject = new Subject<void>();
+
+    const formValue = this.testForm.value;
+    const locations = formValue.locations.split(',').map((loc: string) => loc.trim());
+    this.totalTests = locations.length;
+
+    const requests: Observable<any>[] = locations.map(loc => 
+      this.http.post(this.apiUrl, {
+        host: formValue.host,
+        testType: formValue.testType,
+        count: formValue.count,
+        location: loc,
+        timeoutSeconds: formValue.timeoutSeconds
+      }).pipe(
+        takeUntil(this.stopSubject),
+        finalize(() => this.updateProgress()),
+        catchError(err => {
+          console.error(err);
+          return of({ error: err.message, location: loc });
+        })
+      )
+    );
+
+    forkJoin(requests).subscribe(res => {
+      this.results = res;
+      this.running = false;
+    }, err => {
+      console.error(err);
+      this.running = false;
+    });
+  }
+
+  stopTests() {
+    this.stopSubject.next();
+    this.stopSubject.complete();
+    this.running = false;
+  }
+
+  private updateProgress() {
+    this.completedTests++;
+    const progressValue = (this.completedTests / this.totalTests) * 100;
+    this.progressSubject.next(progressValue);
+  }
 
   getTransformedParsedResult(result: any): any {
-    const parsed = result.parsedResult;
-    switch (result.testType.toLowerCase()) {
+    const parsed = result.parsedResult || {};
+    const status = result.status.toLowerCase();
+    const testType = result.testType.toLowerCase();
+
+    // Default transformation for all statuses
+    if (result.error) {
+      return { error: result.error };
+    }
+
+    switch (testType) {
       case 'ping':
-        return {
-          packetLoss: parsed.packet_loss_percent + '%',
-          avgRtt: parsed.avg_rtt_ms + ' ms',
-          packetsSent: parsed.packets_sent,
-          packetsReceived: parsed.packets_received || 'N/A'
-        };
+        if (status === 'success') {
+          return {
+            packetLoss: parsed.packet_loss_percent + '%',
+            avgRtt: parsed.avg_rtt_ms ? parsed.avg_rtt_ms + ' ms' : 'N/A',
+            packetsSent: parsed.packets_sent || 0,
+            packetsReceived: parsed.packets_received || parsed.packet_loss_percent === 100 ? 0 : 'N/A'
+          };
+        } else if (status === 'failure' || status === 'timeout') {
+          return {
+            packetLoss: parsed.packet_loss_percent ? parsed.packet_loss_percent + '%' : 'N/A',
+            avgRtt: parsed.avg_rtt_ms ? parsed.avg_rtt_ms + ' ms' : 'N/A',
+            packetsSent: parsed.packets_sent || 0,
+            packetsReceived: parsed.packets_received || 0,
+            error: parsed.packet_loss_percent === 100 ? 'No packets received' : 'Partial or no data'
+          };
+        }
+        break;
+
       case 'traceroute':
-        return parsed.hops.map((hop: any) => ({
-          hopNumber: hop.hop_number,
-          host: hop.host || hop.ip || '*',
-          rtt: `${hop.rtt1_ms} / ${hop.rtt2_ms} / ${hop.rtt3_ms} ms`
-        }));
+        const hops = parsed.hops || [];
+        if (status === 'success' || status === 'timeout') {
+          return hops.length > 0 ? hops.map((hop: any) => ({
+            hopNumber: hop.hop_number,
+            host: hop.host || hop.ip || '*',
+            rtt: `${hop.rtt1_ms} / ${hop.rtt2_ms} / ${hop.rtt3_ms} ms`
+          })) : { error: 'No hops recorded' };
+        } else if (status === 'failure') {
+          return hops.length > 0 ? hops.map((hop: any) => ({
+            hopNumber: hop.hop_number,
+            host: hop.host || hop.ip || '*',
+            rtt: `${hop.rtt1_ms} / ${hop.rtt2_ms} / ${hop.rtt3_ms} ms`
+          })) : { error: 'Destination unreachable or no hops recorded' };
+        }
+        break;
+
       case 'dns':
-        return {
-          addresses: parsed.addresses.join(', '),
-          cnames: parsed.cnames.join(', ')
-        };
+        if (status === 'success') {
+          return {
+            addresses: parsed.addresses && parsed.addresses.length > 0 ? parsed.addresses.join(', ') : 'None',
+            cnames: parsed.cnames && parsed.cnames.length > 0 ? parsed.cnames.join(', ') : 'None'
+          };
+        } else if (status === 'failure' || status === 'timeout') {
+          return {
+            addresses: parsed.addresses && parsed.addresses.length > 0 ? parsed.addresses.join(', ') : 'None',
+            cnames: parsed.cnames && parsed.cnames.length > 0 ? parsed.cnames.join(', ') : 'None',
+            error: parsed.addresses && parsed.addresses.length > 0 ? 'Partial DNS resolution' : 'No DNS records found'
+          };
+        }
+        break;
+
       case 'http':
-        const avgTime = parsed.responses.reduce((sum: number, res: any) => sum + (res.response_time_ms || 0), 0) / parsed.responses.length;
-        return {
-          averageResponseTime: avgTime.toFixed(2) + ' ms',
-          responses: parsed.responses.map((res: any) => ({
-            statusCode: res.status_code || 'Error',
-            responseTime: res.response_time_ms ? res.response_time_ms + ' ms' : res.error
-          }))
-        };
+        const responses = parsed.responses || [];
+        if (status === 'success') {
+          const avgTime = responses.reduce((sum: number, res: any) => sum + (res.response_time_ms || 0), 0) / responses.length;
+          return {
+            averageResponseTime: avgTime ? avgTime.toFixed(2) + ' ms' : 'N/A',
+            responses: responses.map((res: any) => ({
+              statusCode: res.status_code || 'Error',
+              responseTime: res.response_time_ms ? res.response_time_ms + ' ms' : res.error || 'N/A'
+            }))
+          };
+        } else if (status === 'failure' || status === 'timeout') {
+          return {
+            averageResponseTime: responses.length > 0 ? (responses.reduce((sum: number, res: any) => sum + (res.response_time_ms || 0), 0) / responses.length).toFixed(2) + ' ms' : 'N/A',
+            responses: responses.map((res: any) => ({
+              statusCode: res.status_code || 'Error',
+              responseTime: res.response_time_ms ? res.response_time_ms + ' ms' : res.error || 'Timeout'
+            })),
+            error: responses.length === 0 ? 'No responses received' : 'Partial or failed responses'
+          };
+        }
+        break;
+
       default:
         return parsed;
     }
@@ -67,8 +194,7 @@ class AppComponent {
         return '';
     }
   }
-
-
+}
 
 
 
