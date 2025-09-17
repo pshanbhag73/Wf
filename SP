@@ -1,0 +1,176 @@
+
+Below, I'll provide a Java example using HttpClient (Java 11+) to pull app-to-service relations from Splunk Observability Cloud's APM Service Topology API, along with a Postman request configuration to achieve the same. This assumes you're targeting the /v2/apm/topology endpoint to fetch service relationships filtered by an application tag (e.g., app=web-app), as described previously.
+Java Example
+This Java code uses HttpClient to make a GET request to the Splunk Observability APM Topology API. It extracts services and their relations for a specific application tag, handling the response as JSON. You'll need the org.json library (or another JSON parser like Jackson/Gson) for parsing. Below uses org.json for simplicity.
+Prerequisites
+Java 11 or later.
+Add the org.json dependency to your project (e.g., via Maven):
+<dependency>
+    <groupId>org.json</groupId>
+    <artifactId>json</artifactId>
+    <version>20231013</version>
+</dependency>
+Java Code
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+public class SplunkApmTopology {
+    public static void main(String[] args) {
+        // Configuration
+        String realm = "us0"; // Replace with your realm
+        String token = "your_access_token_here"; // Replace with your token
+        String baseUrl = String.format("https://api.%s.signalfx.com", realm);
+        String appTag = "web-app"; // Replace with your app tag
+        long timeWindowHours = 1; // Data from last N hours
+
+        // Timestamps (Unix seconds)
+        long toTs = System.currentTimeMillis() / 1000;
+        long fromTs = toTs - (timeWindowHours * 3600);
+
+        // Build query parameters
+        String queryParams = String.format(
+            "?from=%d&to=%d&tag_filter=app=%s&max_edges=100&max_hops=3",
+            fromTs, toTs, appTag
+        );
+        String url = baseUrl + "/v2/apm/topology" + queryParams;
+
+        // Create HTTP client
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-Sf-Token", token)
+            .header("Content-Type", "application/json")
+            .GET()
+            .build();
+
+        try {
+            // Send request
+            HttpResponse<String> response = client.send(
+                request, HttpResponse.BodyHandlers.ofString()
+            );
+
+            if (response.statusCode() == 200) {
+                // Parse JSON response
+                JSONObject json = new JSONObject(response.body());
+                System.out.println("App-Service Relations Graph:");
+                
+                // Process nodes (services)
+                System.out.println("Nodes (Services in app '" + appTag + "'):");
+                JSONArray nodes = json.getJSONArray("nodes");
+                for (int i = 0; i < nodes.length(); i++) {
+                    JSONObject node = nodes.getJSONObject(i);
+                    String serviceName = node.getString("service_name");
+                    JSONObject tags = node.getJSONObject("tags");
+                    System.out.printf("  - %s (tags: %s)%n", serviceName, tags);
+                }
+
+                // Process edges (relations)
+                System.out.println("\nEdges (Relations):");
+                JSONArray edges = json.getJSONArray("edges");
+                for (int i = 0; i < edges.length(); i++) {
+                    JSONObject edge = edges.getJSONObject(i);
+                    String from = edge.getString("from");
+                    String to = edge.getString("to");
+                    long latency = edge.getLong("latency");
+                    double errorRate = edge.getDouble("error_rate");
+                    System.out.printf(
+                        "  %s → %s (latency: %dms, errors: %.2f%%)%n",
+                        from, to, latency, errorRate * 100
+                    );
+                }
+            } else {
+                System.out.printf(
+                    "Error: %d - %s%n", response.statusCode(), response.body()
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("Request failed: " + e.getMessage());
+        }
+    }
+}
+Notes
+Dependencies: Ensure org.json is in your classpath. Alternatively, use Jackson or Gson for more robust JSON handling.
+Error Handling: The code includes basic error handling. Enhance it for production (e.g., retry logic, logging).
+Customization: Adjust appTag, realm, token, and timeWindowHours to match your setup. Add more parameters (e.g., environment, service_name) as needed.
+Run: Compile and run with java SplunkApmTopology.java after setting your token and realm.
+Postman Request
+Postman is ideal for testing the API before coding. Here's how to configure a GET request in Postman to fetch the topology data.
+Postman Configuration
+Create a New Request:
+Open Postman and create a new HTTP request.
+Set the method to GET.
+URL:
+Enter the URL with query parameters:
+https://api.us0.signalfx.com/v2/apm/topology?from={{fromTs}}&to={{toTs}}&tag_filter=app=web-app&max_edges=100&max_hops=3
+Replace us0 with your realm.
+Replace web-app with your app tag.
+Headers:
+Add the following headers:
+X-Sf-Token: {{token}}
+Content-Type: application/json
+Store your access token in a Postman variable {{token}} (see below).
+Variables:
+Set up environment or collection variables for dynamic values:
+token: Your Splunk Observability access token (e.g., abc123...).
+fromTs: Start timestamp (Unix seconds, e.g., {{currentTs - 3600}} for 1 hour ago).
+toTs: End timestamp (Unix seconds, e.g., {{currentTs}}).
+currentTs: Current Unix timestamp (use a Pre-request Script to set it).
+Pre-request Script (to set timestamps dynamically):
+const moment = require('moment');
+let currentTs = Math.floor(Date.now() / 1000); // Current Unix timestamp
+pm.environment.set("currentTs", currentTs);
+pm.environment.set("fromTs", currentTs - 3600); // 1 hour ago
+pm.environment.set("toTs", currentTs);
+Test Script (to parse and display results):
+let jsonData = pm.response.json();
+console.log("Nodes (Services):");
+jsonData.nodes.forEach(node => {
+    console.log(`  - ${node.service_name} (tags: ${JSON.stringify(node.tags)})`);
+});
+console.log("\nEdges (Relations):");
+jsonData.edges.forEach(edge => {
+    console.log(`  ${edge.from} → ${edge.to} (latency: ${edge.latency}ms, errors: ${(edge.error_rate * 100).toFixed(2)}%)`);
+});
+Send the Request:
+Click "Send" in Postman. The response will be a JSON object with nodes and edges.
+The Test script will log formatted output to the Postman Console (View > Show Postman Console).
+Example Response (in Postman)
+{
+  "nodes": [
+    {
+      "service_name": "frontend-service",
+      "tags": {"app": "web-app", "team": "frontend"},
+      "throughput": 1000,
+      "error_rate": 0.01
+    },
+    {
+      "service_name": "api-service",
+      "tags": {"app": "web-app", "team": "backend"},
+      "throughput": 800,
+      "error_rate": 0.05
+    }
+  ],
+  "edges": [
+    {
+      "from": "frontend-service",
+      "to": "api-service",
+      "latency": 150,
+      "error_rate": 0.02,
+      "throughput": 800
+    }
+  ]
+}
+Additional Notes
+Authentication: Ensure your token has appropriate permissions (Admin, Power, or Read-Only). Generate it in Splunk Observability UI under Settings > Access Tokens.
+Realm: Find your realm in the Splunk UI (Profile > Organizations) or token details.
+Debugging:
+If no data is returned, verify traces are ingested (APM > Traces) and tags are set correctly.
+Check the Service Map in the Splunk APM UI to confirm expected relations.
+Postman Collection: Save the request as a Postman Collection for reuse. Export it as JSON to share with your team.
+Java Libraries: For production, consider using a library like OkHttp instead of HttpClient for advanced features (e.g., retries, connection pooling).
+API Reference: Full details at Splunk Observability API Docs.
+If you hit issues (e.g., specific errors or different tag structures), share them, and I’ll tailor the solution!
