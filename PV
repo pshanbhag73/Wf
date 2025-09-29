@@ -1,152 +1,226 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy } from '@angular/core';
+import * as d3 from 'd3';
+import { GlobalpingService } from '../globalping.service';
+import { Subscription } from 'rxjs';
 
 @Component({
-  selector: 'app-test-visualization',
-  template: `<div *ngIf="results && results.length > 0">
-    <div *ngFor="let result of results">
-      <div [ngSwitch]="result.testType.toLowerCase()">
-        <div *ngSwitchCase="'traceroute'">
-          <div echarts [options]="chartOption" style="height: 400px; width: 100%;"></div>
-        </div>
-        <div *ngSwitchDefault>
-          <p>No visualization available for {{ result.testType }}.</p>
-        </div>
-      </div>
+  selector: 'app-traceroute-graph',
+  template: `<div>
+    <input type="text" [(ngModel)]="target" placeholder="Target (e.g., google.com)" />
+    <div *ngFor="let loc of locations; let i = index">
+      <input type="text" [(ngModel)]="loc.type" placeholder="Location Type (e.g., country)" />
+      <input type="text" [(ngModel)]="loc.value" placeholder="Value (e.g., US)" />
+      <input type="number" [(ngModel)]="loc.limit" placeholder="Probes per Location" />
     </div>
+    <button (click)="addLocation()">Add Location</button>
+    <button (click)="runTraceroute()">Run Traceroute</button>
+    <div class="graph-container"></div>
   </div>`,
+  styleUrls: ['./traceroute-graph.component.css']
 })
-export class TestVisualizationComponent implements OnInit {
-  @Input() results: any[] = [];
-  chartOption: any = {};
+export class TracerouteGraphComponent implements OnInit, OnDestroy {
+  target: string = 'google.com';
+  locations: { type: string, value: string, limit: number }[] = [{ type: 'country', value: 'US', limit: 2 }];
+  private svg: any;
+  private simulation: any;
+  private width = 800;
+  private height = 800;
+  private nodes: any[] = [];
+  private links: any[] = [];
+  private subscription: Subscription | undefined;
 
-  ngOnInit() {
-    this.chartOption = this.getTracerouteChartOption(this.results);
+  constructor(private elementRef: ElementRef, private globalpingService: GlobalpingService) {}
+
+  ngOnInit(): void {
+    this.initSvg();
   }
 
-  private getTracerouteChartOption(results: any[]) {
-    const nodes: any[] = [];
-    const links: any[] = [];
-    const categories = [
-      { name: 'Location', itemStyle: { color: '#007bff' } }, // Blue for locations
-      { name: 'Hop', itemStyle: { color: '#ff9800' } }, // Orange for hops
-      { name: 'Host', itemStyle: { color: '#4caf50' } } // Green for host
-    ];
+  addLocation() {
+    this.locations.push({ type: '', value: '', limit: 1 });
+  }
 
-    // Map to track unique node IDs and location Y-positions
-    const nodeIdMap = new Map<string, string>();
-    const locationYMap = new Map<string, number>();
-    let nodeIdCounter = 0;
-
-    // Track unique locations to assign Y-positions
-    const uniqueLocations = [...new Set(results.map(r => r.location || 'Default'))];
-    uniqueLocations.forEach((loc, index) => {
-      locationYMap.set(loc, index * 100);
+  runTraceroute() {
+    const apiLocations = this.locations.map(loc => ({ [loc.type]: loc.value, limit: loc.limit }));
+    const body = {
+      type: 'traceroute',
+      target: this.target,
+      locations: apiLocations,
+      measurementOptions: { packets: 3 }
+    };
+    this.globalpingService.createMeasurement(body).subscribe((res: any) => {
+      const measurementId = res.id;
+      this.subscription = this.globalpingService.getResults(measurementId).subscribe((results: any) => {
+        this.updateGraphFromResults(results);
+      });
     });
+  }
 
-    results.forEach((result, index) => {
-      const location = result.location || 'Default';
-      const host = result.host;
+  private initSvg() {
+    this.svg = d3.select(this.elementRef.nativeElement.querySelector('.graph-container'))
+      .append('svg')
+      .attr('width', this.width)
+      .attr('height', this.height)
+      .attr('viewBox', `0 0 ${this.width} ${this.height}`)
+      .style('background', '#f0f0f0');
 
-      // Generate unique IDs for location and host
-      const locationId = `location_${location}`;
-      const hostId = `host_${index}_${host}`;
+    this.simulation = d3.forceSimulation()
+      .force('link', d3.forceLink().id((d: any) => d.id).distance(150))
+      .force('charge', d3.forceManyBody().strength(-600))
+      .force('collide', d3.forceCollide().radius(20).strength(0.5))
+      .force('center', d3.forceCenter(this.width / 2, this.height / 2).strength(0.01)) // Weak center pull
+      .force('x', d3.forceX((d: any) => d.initialX || this.width / 2).strength(0.1))
+      .force('y', d3.forceY((d: any) => d.initialY || this.height / 2).strength(0.1))
+      .on('tick', this.ticked.bind(this));
+  }
 
-      // Add location node (only once per unique location)
-      if (!nodeIdMap.has(locationId)) {
-        nodes.push({
-          id: locationId,
-          name: location,
-          category: 0,
-          x: 0, // Leftmost side
-          y: locationYMap.get(location), // Consistent Y for same location
-          symbolSize: 30, // Smaller node size
-          label: { show: true }
-        });
-        nodeIdMap.set(locationId, locationId);
-      }
+  private updateGraphFromResults(results: any) {
+    if (results.status === 'finished') {
+      this.nodes = [];
+      this.links = [];
+      const numLocations = results.length;
+      const verticalSpacing = this.height / (numLocations + 1);
 
-      // Add host node (rightmost position)
-      if (!nodeIdMap.has(hostId)) {
-        nodes.push({
-          id: hostId,
-          name: host,
-          category: 2,
-          x: 1000, // Moved to rightmost position
-          y: locationYMap.get(location), // Align with location
-          symbolSize: 30, // Smaller node size
-          label: { show: true }
-        });
-        nodeIdMap.set(hostId, hostId);
-      }
+      results.forEach((result: any, locationIndex: number) => {
+        const locationId = `Loc_${locationIndex}_${result.hostname}`;
+        const baseY = (locationIndex + 1) * verticalSpacing;
+        this.nodes.push({ id: locationId, label: result.hostname, type: 'source', locationId, initialX: 100, initialY: baseY });
 
-      // Link location to host (fallback link)
-      links.push({ source: locationId, target: hostId });
+        let prevId = locationId;
+        let hopX = 200;
+        result.hops.forEach((hop: any, hopIndex: number) => {
+          const hopId = `${locationId}_Hop_${hop.hopNumber}`;
+          const uniqueIps = [...new Set(hop.hopDetails.map((detail: any) => detail.ipAddress))];
+          const avgTime = hop.hopDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / hop.hopDetails.length;
 
-      // Process hops
-      if (result.parsedResult && result.parsedResult.hops) {
-        let prevNodeId = locationId;
-        result.parsedResult.hops.forEach((hop: any, hopIndex: number) => {
-          // Create hop name (without hopNumber)
-          let hopName = hop.host || hop.ip || '*';
+          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails, initialX: hopX, initialY: baseY });
+          this.links.push({ source: prevId, target: hopId });
 
-          // Generate unique hop ID
-          const hopId = `hop_${index}_${hop.hop_number}_${nodeIdCounter++}`;
-
-          nodes.push({
-            id: hopId,
-            name: hopName,
-            category: 1,
-            x: (hopIndex + 1) * 150, // Horizontal positioning between location and host
-            y: locationYMap.get(location), // Align with location
-            symbolSize: 30, // Smaller node size
-            label: { show: true },
-            rtt1_ms: hop.rtt1_ms, // Store RTT for tooltip
-            rtt2_ms: hop.rtt2_ms,
-            rtt3_ms: hop.rtt3_ms
+          uniqueIps.forEach((ip, ipIndex) => {
+            const subNodeId = `${hopId}_IP_${ipIndex}`;
+            const subY = baseY + (ipIndex * 30 - (uniqueIps.length * 15)) + (Math.random() * 20 - 10);
+            const subX = hopX + 50 + (Math.random() * 20 - 10);
+            const subDetails = hop.hopDetails.filter((detail: any) => detail.ipAddress === ip);
+            const subAvgTime = subDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / subDetails.length;
+            this.nodes.push({ id: subNodeId, label: `${ip} (${subAvgTime.toFixed(1)}ms)`, type: 'subhop', locationId, parentId: hopId, details: subDetails, initialX: subX, initialY: subY });
+            this.links.push({ source: hopId, target: subNodeId, type: 'sub' });
           });
 
-          // Link to previous node
-          links.push({ source: prevNodeId, target: hopId, lineStyle: { color: '#999' } });
-
-          // Update previous node
-          prevNodeId = hopId;
+          prevId = hopId;
+          hopX += 200;
         });
+      });
 
-        // Link last hop to host
-        if (result.parsedResult.hops.length > 0) {
-          links.push({ source: prevNodeId, target: hostId });
-        }
-      }
+      this.redrawGraph();
+      if (this.subscription) this.subscription.unsubscribe();
+    }
+  }
+
+  private redrawGraph() {
+    // Assign initial positions with fallback random if undefined
+    this.nodes.forEach(node => {
+      node.x = node.initialX || (Math.random() * this.width);
+      node.y = node.initialY || (Math.random() * this.height);
     });
 
-    return {
-      title: { text: 'Traceroute Path Visualization' },
-      tooltip: {
-        formatter: (params: any) => {
-          if (params.data.category === 1) { // Hop
-            return `Node: ${params.name}<br>RTT1: ${params.data.rtt1_ms || '*'} ms<br>RTT2: ${params.data.rtt2_ms || '*'} ms<br>RTT3: ${params.data.rtt3_ms || '*'} ms`;
-          }
-          return params.name;
-        }
-      },
-      legend: [{ data: categories.map(a => a.name) }],
-      series: [{
-        type: 'graph',
-        layout: 'none', // Fixed positions for left-to-right
-        data: nodes,
-        links: links,
-        categories: categories,
-        roam: true, // Enable zoom and drag
-        label: {
-          show: true,
-          position: 'right',
-          formatter: '{b}'
-        },
-        lineStyle: {
-          color: 'source',
-          curveness: 0.3
-        }
-      }]
+    this.simulation.nodes(this.nodes).force('link').links(this.links);
+    this.simulation.alphaMin(0.001); // Allow longer settling
+    this.simulation.alphaTarget(0.3).restart(); // Moderate energy for expansion
+
+    // Warm-up with more ticks for initial spread
+    for (let i = 0; i < 300; i++) {
+      this.simulation.tick();
+    }
+
+    this.svg.selectAll('*').remove();
+
+    const link = this.svg.append('g')
+      .selectAll('.link')
+      .data(this.links)
+      .enter().append('line')
+      .attr('class', (d: any) => `link ${d.type === 'sub' ? 'sub-link' : ''}`)
+      .attr('stroke', (d: any) => d.type === 'sub' ? '#ccc' : '#999')
+      .attr('stroke-width', (d: any) => d.type === 'sub' ? 1 : 2)
+      .attr('x1', (d: any) => d.source.x || 0) // Fallback to prevent 0,0
+      .attr('y1', (d: any) => d.source.y || 0)
+      .attr('x2', (d: any) => d.target.x || 0)
+      .attr('y2', (d: any) => d.target.y || 0);
+
+    const node = this.svg.append('g')
+      .selectAll('.node')
+      .data(this.nodes)
+      .enter().append('circle')
+      .attr('class', 'node')
+      .attr('r', (d: any) => d.type === 'subhop' ? 5 : Math.min(15, d.avgTime || 10))
+      .attr('fill', (d: any) => d.type === 'source' ? 'green' : d.type === 'subhop' ? '#666' : 'steelblue')
+      .attr('cx', (d: any) => d.x || 0) // Initial render with positions
+      .attr('cy', (d: any) => d.y || 0)
+      .call(this.drag(this.simulation));
+
+    const label = this.svg.append('g')
+      .selectAll('.label')
+      .data(this.nodes)
+      .enter().append('text')
+      .attr('class', 'label')
+      .text((d: any) => d.label)
+      .attr('dx', 12)
+      .attr('dy', '.35em')
+      .style('font-size', (d: any) => d.type === 'subhop' ? '10px' : '12px')
+      .attr('x', (d: any) => d.x || 0)
+      .attr('y', (d: any) => d.y || 0);
+
+    const tooltip = d3.select(this.elementRef.nativeElement).append('div')
+      .attr('class', 'tooltip')
+      .style('opacity', 0);
+
+    node.on('mouseover', (event: any, d: any) => {
+      tooltip.transition().duration(200).style('opacity', 0.9);
+      tooltip.html(`<strong>${d.label}</strong><br>Details: ${d.details.map((det: any) => `${det.ipAddress}: ${det.time}ms`).join('<br>')}`)
+        .style('left', (event.pageX + 5) + 'px')
+        .style('top', (event.pageY - 28) + 'px');
+    }).on('mouseout', () => {
+      tooltip.transition().duration(500).style('opacity', 0);
+    });
+
+    // Call ticked to render initial state
+    this.ticked();
+
+    this.ticked = () => {
+      link
+        .attr('x1', (d: any) => d.source.x || 0)
+        .attr('y1', (d: any) => d.source.y || 0)
+        .attr('x2', (d: any) => d.target.x || 0)
+        .attr('y2', (d: any) => d.target.y || 0);
+
+      node
+        .attr('cx', (d: any) => d.x || 0)
+        .attr('cy', (d: any) => d.y || 0);
+
+      label
+        .attr('x', (d: any) => d.x || 0)
+        .attr('y', (d: any) => d.y || 0);
     };
+  }
+
+  private drag(simulation: any): any {
+    return d3.drag()
+      .on('start', (event: any, d: any) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event: any, d: any) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event: any, d: any) => {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      });
+  }
+
+  ngOnDestroy(): void {
+    if (this.simulation) this.simulation.stop();
+    if (this.subscription) this.subscription.unsubscribe();
   }
 }
