@@ -1,226 +1,198 @@
-import { Component, ElementRef, OnInit, OnDestroy } from '@angular/core';
+import { Component, Input, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import * as d3 from 'd3';
-import { GlobalpingService } from '../globalping.service';
-import { Subscription } from 'rxjs';
+import * as dagre from 'dagre';
+
+interface Hop {
+  hopNumber: number;
+  rtt: number;
+  host: string;
+  ip?: string;
+}
+
+interface Trace {
+  source: string;
+  hops: Hop[];
+  destination: string;
+}
 
 @Component({
-  selector: 'app-traceroute-graph',
-  template: `<div>
-    <input type="text" [(ngModel)]="target" placeholder="Target (e.g., google.com)" />
-    <div *ngFor="let loc of locations; let i = index">
-      <input type="text" [(ngModel)]="loc.type" placeholder="Location Type (e.g., country)" />
-      <input type="text" [(ngModel)]="loc.value" placeholder="Value (e.g., US)" />
-      <input type="number" [(ngModel)]="loc.limit" placeholder="Probes per Location" />
-    </div>
-    <button (click)="addLocation()">Add Location</button>
-    <button (click)="runTraceroute()">Run Traceroute</button>
-    <div class="graph-container"></div>
-  </div>`,
-  styleUrls: ['./traceroute-graph.component.css']
+  selector: 'app-traceroute-viz',
+  template: `<svg #svg></svg>`,
+  styles: [`svg { width: 100%; height: 800px; }`]
 })
-export class TracerouteGraphComponent implements OnInit, OnDestroy {
-  target: string = 'google.com';
-  locations: { type: string, value: string, limit: number }[] = [{ type: 'country', value: 'US', limit: 2 }];
-  private svg: any;
-  private simulation: any;
-  private width = 800;
-  private height = 800;
-  private nodes: any[] = [];
-  private links: any[] = [];
-  private subscription: Subscription | undefined;
+export class TracerouteVizComponent implements AfterViewInit {
+  @Input() traces: Trace[] = [];
 
-  constructor(private elementRef: ElementRef, private globalpingService: GlobalpingService) {}
+  @ViewChild('svg') svgElement!: ElementRef;
 
-  ngOnInit(): void {
-    this.initSvg();
-  }
+  ngAfterViewInit() {
+    if (this.traces.length === 0) return;
 
-  addLocation() {
-    this.locations.push({ type: '', value: '', limit: 1 });
-  }
+    const svg = d3.select(this.svgElement.nativeElement);
+    const boundingRect = svg.node()?.getBoundingClientRect();
+    const width = boundingRect?.width || 1200;
+    let height = boundingRect?.height || 800;
 
-  runTraceroute() {
-    const apiLocations = this.locations.map(loc => ({ [loc.type]: loc.value, limit: loc.limit }));
-    const body = {
-      type: 'traceroute',
-      target: this.target,
-      locations: apiLocations,
-      measurementOptions: { packets: 3 }
-    };
-    this.globalpingService.createMeasurement(body).subscribe((res: any) => {
-      const measurementId = res.id;
-      this.subscription = this.globalpingService.getResults(measurementId).subscribe((results: any) => {
-        this.updateGraphFromResults(results);
-      });
-    });
-  }
+    // Color scale for different traces
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
 
-  private initSvg() {
-    this.svg = d3.select(this.elementRef.nativeElement.querySelector('.graph-container'))
-      .append('svg')
-      .attr('width', this.width)
-      .attr('height', this.height)
-      .attr('viewBox', `0 0 ${this.width} ${this.height}`)
-      .style('background', '#f0f0f0');
+    // Build nodes and links
+    const nodeMap = new Map<string, any>();
+    const nodes: any[] = [];
+    const links: any[] = [];
 
-    this.simulation = d3.forceSimulation()
-      .force('link', d3.forceLink().id((d: any) => d.id).distance(150))
-      .force('charge', d3.forceManyBody().strength(-600))
-      .force('collide', d3.forceCollide().radius(20).strength(0.5))
-      .force('center', d3.forceCenter(this.width / 2, this.height / 2).strength(0.01)) // Weak center pull
-      .force('x', d3.forceX((d: any) => d.initialX || this.width / 2).strength(0.1))
-      .force('y', d3.forceY((d: any) => d.initialY || this.height / 2).strength(0.1))
-      .on('tick', this.ticked.bind(this));
-  }
+    // Add destination node (assuming all traces share the same destination)
+    const destination = this.traces[0].destination;
+    const destId = `dest-${destination.replace(/\./g, '-')}`; // Sanitize for ID
+    nodeMap.set(destId, { id: destId, host: destination });
+    nodes.push(nodeMap.get(destId));
 
-  private updateGraphFromResults(results: any) {
-    if (results.status === 'finished') {
-      this.nodes = [];
-      this.links = [];
-      const numLocations = results.length;
-      const verticalSpacing = this.height / (numLocations + 1);
+    this.traces.forEach((trace, index) => {
+      const traceColor = color(index.toString());
 
-      results.forEach((result: any, locationIndex: number) => {
-        const locationId = `Loc_${locationIndex}_${result.hostname}`;
-        const baseY = (locationIndex + 1) * verticalSpacing;
-        this.nodes.push({ id: locationId, label: result.hostname, type: 'source', locationId, initialX: 100, initialY: baseY });
+      // Add source node
+      const sourceId = `source-${trace.source.replace(/\./g, '-')}`;
+      if (!nodeMap.has(sourceId)) {
+        nodeMap.set(sourceId, { id: sourceId, host: trace.source });
+        nodes.push(nodeMap.get(sourceId));
+      }
 
-        let prevId = locationId;
-        let hopX = 200;
-        result.hops.forEach((hop: any, hopIndex: number) => {
-          const hopId = `${locationId}_Hop_${hop.hopNumber}`;
-          const uniqueIps = [...new Set(hop.hopDetails.map((detail: any) => detail.ipAddress))];
-          const avgTime = hop.hopDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / hop.hopDetails.length;
+      let prev = sourceId;
 
-          this.nodes.push({ id: hopId, label: `Hop ${hop.hopNumber} (Avg: ${avgTime.toFixed(1)}ms)`, type: 'hop', locationId, avgTime, details: hop.hopDetails, initialX: hopX, initialY: baseY });
-          this.links.push({ source: prevId, target: hopId });
+      trace.hops.forEach(hop => {
+        const id = hop.ip ? hop.ip : `${trace.source}-hop${hop.hopNumber}-${hop.host || 'unknown'}`.replace(/\./g, '-');
+        if (!nodeMap.has(id)) {
+          nodeMap.set(id, { id, host: hop.host || 'unknown', ip: hop.ip });
+          nodes.push(nodeMap.get(id));
+        }
 
-          uniqueIps.forEach((ip, ipIndex) => {
-            const subNodeId = `${hopId}_IP_${ipIndex}`;
-            const subY = baseY + (ipIndex * 30 - (uniqueIps.length * 15)) + (Math.random() * 20 - 10);
-            const subX = hopX + 50 + (Math.random() * 20 - 10);
-            const subDetails = hop.hopDetails.filter((detail: any) => detail.ipAddress === ip);
-            const subAvgTime = subDetails.reduce((sum: number, detail: any) => sum + detail.time, 0) / subDetails.length;
-            this.nodes.push({ id: subNodeId, label: `${ip} (${subAvgTime.toFixed(1)}ms)`, type: 'subhop', locationId, parentId: hopId, details: subDetails, initialX: subX, initialY: subY });
-            this.links.push({ source: hopId, target: subNodeId, type: 'sub' });
-          });
-
-          prevId = hopId;
-          hopX += 200;
-        });
+        links.push({ source: prev, target: id, rtt: hop.rtt, trace: trace.source, color: traceColor });
+        prev = id;
       });
 
-      this.redrawGraph();
-      if (this.subscription) this.subscription.unsubscribe();
-    }
-  }
-
-  private redrawGraph() {
-    // Assign initial positions with fallback random if undefined
-    this.nodes.forEach(node => {
-      node.x = node.initialX || (Math.random() * this.width);
-      node.y = node.initialY || (Math.random() * this.height);
+      // Link last hop to destination if not already
+      if (prev !== destId) {
+        links.push({ source: prev, target: destId, rtt: 0, trace: trace.source, color: traceColor });
+      }
     });
 
-    this.simulation.nodes(this.nodes).force('link').links(this.links);
-    this.simulation.alphaMin(0.001); // Allow longer settling
-    this.simulation.alphaTarget(0.3).restart(); // Moderate energy for expansion
-
-    // Warm-up with more ticks for initial spread
-    for (let i = 0; i < 300; i++) {
-      this.simulation.tick();
-    }
-
-    this.svg.selectAll('*').remove();
-
-    const link = this.svg.append('g')
-      .selectAll('.link')
-      .data(this.links)
-      .enter().append('line')
-      .attr('class', (d: any) => `link ${d.type === 'sub' ? 'sub-link' : ''}`)
-      .attr('stroke', (d: any) => d.type === 'sub' ? '#ccc' : '#999')
-      .attr('stroke-width', (d: any) => d.type === 'sub' ? 1 : 2)
-      .attr('x1', (d: any) => d.source.x || 0) // Fallback to prevent 0,0
-      .attr('y1', (d: any) => d.source.y || 0)
-      .attr('x2', (d: any) => d.target.x || 0)
-      .attr('y2', (d: any) => d.target.y || 0);
-
-    const node = this.svg.append('g')
-      .selectAll('.node')
-      .data(this.nodes)
-      .enter().append('circle')
-      .attr('class', 'node')
-      .attr('r', (d: any) => d.type === 'subhop' ? 5 : Math.min(15, d.avgTime || 10))
-      .attr('fill', (d: any) => d.type === 'source' ? 'green' : d.type === 'subhop' ? '#666' : 'steelblue')
-      .attr('cx', (d: any) => d.x || 0) // Initial render with positions
-      .attr('cy', (d: any) => d.y || 0)
-      .call(this.drag(this.simulation));
-
-    const label = this.svg.append('g')
-      .selectAll('.label')
-      .data(this.nodes)
-      .enter().append('text')
-      .attr('class', 'label')
-      .text((d: any) => d.label)
-      .attr('dx', 12)
-      .attr('dy', '.35em')
-      .style('font-size', (d: any) => d.type === 'subhop' ? '10px' : '12px')
-      .attr('x', (d: any) => d.x || 0)
-      .attr('y', (d: any) => d.y || 0);
-
-    const tooltip = d3.select(this.elementRef.nativeElement).append('div')
-      .attr('class', 'tooltip')
-      .style('opacity', 0);
-
-    node.on('mouseover', (event: any, d: any) => {
-      tooltip.transition().duration(200).style('opacity', 0.9);
-      tooltip.html(`<strong>${d.label}</strong><br>Details: ${d.details.map((det: any) => `${det.ipAddress}: ${det.time}ms`).join('<br>')}`)
-        .style('left', (event.pageX + 5) + 'px')
-        .style('top', (event.pageY - 28) + 'px');
-    }).on('mouseout', () => {
-      tooltip.transition().duration(500).style('opacity', 0);
+    // Group links for multi-link curving (between same source-target pairs)
+    const multiLinks = new Map<string, any[]>();
+    links.forEach(link => {
+      const min = link.source < link.target ? link.source : link.target;
+      const max = link.source < link.target ? link.target : link.source;
+      const key = `${min},${max}`;
+      if (!multiLinks.has(key)) multiLinks.set(key, []);
+      multiLinks.get(key)!.push(link);
     });
 
-    // Call ticked to render initial state
-    this.ticked();
+    // Use Dagre for layout (DAG layout, left-to-right)
+    const graph = new dagre.graphlib.Graph();
+    graph.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 100, marginx: 20, marginy: 20 });
+    graph.setDefaultEdgeLabel(() => ({}));
 
-    this.ticked = () => {
-      link
-        .attr('x1', (d: any) => d.source.x || 0)
-        .attr('y1', (d: any) => d.source.y || 0)
-        .attr('x2', (d: any) => d.target.x || 0)
-        .attr('y2', (d: any) => d.target.y || 0);
+    nodes.forEach(node => {
+      graph.setNode(node.id, { width: 150, height: 50 });
+    });
 
-      node
-        .attr('cx', (d: any) => d.x || 0)
-        .attr('cy', (d: any) => d.y || 0);
+    links.forEach(link => {
+      graph.setEdge(link.source, link.target);
+    });
 
-      label
-        .attr('x', (d: any) => d.x || 0)
-        .attr('y', (d: any) => d.y || 0);
-    };
-  }
+    dagre.layout(graph);
 
-  private drag(simulation: any): any {
-    return d3.drag()
-      .on('start', (event: any, d: any) => {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+    // Assign positions to nodes
+    nodes.forEach(node => {
+      const gnode = graph.node(node.id);
+      node.x = gnode.x;
+      node.y = gnode.y;
+    });
+
+    // Adjust SVG height dynamically based on layout
+    const maxY = d3.max(nodes, (n: any) => n.y) || 0;
+    const minY = d3.min(nodes, (n: any) => n.y) || 0;
+    height = Math.max(height, maxY - minY + 100);
+    svg.attr('height', height);
+
+    // Add arrow marker
+    svg.append('defs')
+      .append('marker')
+      .attr('id', 'end')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 15)
+      .attr('refY', 0)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', '#999');
+
+    // Draw links (with curving for multiple links between same nodes)
+    svg.append('g')
+      .selectAll('path')
+      .data(links)
+      .enter()
+      .append('path')
+      .attr('d', d => {
+        const source = graph.node(d.source);
+        const target = graph.node(d.target);
+        const key = d.source < d.target ? `${d.source},${d.target}` : `${d.target},${d.source}`;
+        const siblings = multiLinks.get(key) || [];
+        const total = siblings.length;
+        if (total <= 1) {
+          // Straight line
+          return `M${source.x},${source.y} L${target.x},${target.y}`;
+        } else {
+          // Curved quadratic bezier with perpendicular offset
+          const i = siblings.indexOf(d);
+          const offset = 20 * (i - (total - 1) / 2);
+          const dx = target.x - source.x;
+          const dy = target.y - source.y;
+          let nx = -dy;
+          let ny = dx;
+          const len = Math.sqrt(nx * nx + ny * ny) || 1;
+          nx /= len;
+          ny /= len;
+          const controlX = (source.x + target.x) / 2 + offset * nx;
+          const controlY = (source.y + target.y) / 2 + offset * ny;
+          return `M${source.x},${source.y} Q${controlX},${controlY} ${target.x},${target.y}`;
+        }
       })
-      .on('drag', (event: any, d: any) => {
-        d.fx = event.x;
-        d.fy = event.y;
-      })
-      .on('end', (event: any, d: any) => {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-      });
-  }
+      .attr('stroke', d => d.color)
+      .attr('stroke-width', 2)
+      .attr('fill', 'none')
+      .attr('marker-end', 'url(#end)');
 
-  ngOnDestroy(): void {
-    if (this.simulation) this.simulation.stop();
-    if (this.subscription) this.subscription.unsubscribe();
+    // Add RTT labels on links (only if rtt > 0)
+    svg.append('g')
+      .selectAll('text')
+      .data(links.filter(l => l.rtt > 0))
+      .enter()
+      .append('text')
+      .attr('x', d => (graph.node(d.source).x + graph.node(d.target).x) / 2)
+      .attr('y', d => (graph.node(d.source).y + graph.node(d.target).y) / 2 - 5)
+      .attr('font-size', 10)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#333')
+      .text(d => `${d.rtt} ms`);
+
+    // Draw nodes
+    const nodeGroup = svg.append('g')
+      .selectAll('g')
+      .data(nodes)
+      .enter()
+      .append('g')
+      .attr('transform', d => `translate(${d.x}, ${d.y})`);
+
+    nodeGroup.append('circle')
+      .attr('r', 10)
+      .attr('fill', '#69b3a2');
+
+    nodeGroup.append('text')
+      .attr('x', 15)
+      .attr('y', 5)
+      .attr('font-size', 12)
+      .text(d => `${d.host}${d.ip ? ` (${d.ip})` : ''}`);
   }
 }
