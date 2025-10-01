@@ -17,26 +17,50 @@ interface Trace {
 
 @Component({
   selector: 'app-traceroute-viz',
-  template: `<svg #svg></svg>`,
+  template: `
+    <div>
+      <label>
+        <input type="checkbox" [(ngModel)]="showPartial" (change)="updateViz()"> Show first & last 2 hops only
+      </label>
+      <svg #svg></svg>
+    </div>
+  `,
   styles: [`svg { width: 100%; height: 800px; }`]
 })
 export class TracerouteVizComponent implements AfterViewInit {
   @Input() traces: Trace[] = [];
+  @Input() showPartial: boolean = false;
 
   @ViewChild('svg') svgElement!: ElementRef;
 
+  private svg!: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+  private zoomGroup!: d3.Selection<SVGGElement, unknown, null, undefined>;
+
   ngAfterViewInit() {
+    this.svg = d3.select(this.svgElement.nativeElement);
+    this.zoomGroup = this.svg.append('g');
+
+    this.updateViz();
+  }
+
+  updateViz() {
+    this.zoomGroup.selectAll('*').remove();
+
     if (this.traces.length === 0) return;
 
-    const svg = d3.select(this.svgElement.nativeElement);
-    const boundingRect = svg.node()?.getBoundingClientRect();
+    const boundingRect = this.svg.node()?.getBoundingClientRect();
     const width = boundingRect?.width || 1200;
     let height = boundingRect?.height || 800;
 
     // Color scale for different traces
     const color = d3.scaleOrdinal(d3.schemeCategory10);
 
-    // Build nodes and links
+    // Build nodes and links based on showPartial
+    const processedTraces = this.showPartial ? this.traces.map(trace => ({
+      ...trace,
+      hops: [...trace.hops.slice(0, 2), ...trace.hops.slice(-2)]
+    })) : this.traces;
+
     const nodeMap = new Map<string, any>();
     const nodes: any[] = [];
     const links: any[] = [];
@@ -44,16 +68,16 @@ export class TracerouteVizComponent implements AfterViewInit {
     // Add destination node (assuming all traces share the same destination)
     const destination = this.traces[0].destination;
     const destId = `dest-${destination.replace(/\./g, '-')}`; // Sanitize for ID
-    nodeMap.set(destId, { id: destId, host: destination });
+    nodeMap.set(destId, { id: destId, host: destination, type: 'destination' });
     nodes.push(nodeMap.get(destId));
 
-    this.traces.forEach((trace, index) => {
+    processedTraces.forEach((trace, index) => {
       const traceColor = color(index.toString());
 
       // Add source node
       const sourceId = `source-${trace.source.replace(/\./g, '-')}`;
       if (!nodeMap.has(sourceId)) {
-        nodeMap.set(sourceId, { id: sourceId, host: trace.source });
+        nodeMap.set(sourceId, { id: sourceId, host: trace.source, type: 'source' });
         nodes.push(nodeMap.get(sourceId));
       }
 
@@ -62,7 +86,7 @@ export class TracerouteVizComponent implements AfterViewInit {
       trace.hops.forEach(hop => {
         const id = hop.ip ? hop.ip : `${trace.source}-hop${hop.hopNumber}-${hop.host || 'unknown'}`.replace(/\./g, '-');
         if (!nodeMap.has(id)) {
-          nodeMap.set(id, { id, host: hop.host || 'unknown', ip: hop.ip });
+          nodeMap.set(id, { id, host: hop.host || 'unknown', ip: hop.ip, hopNumber: hop.hopNumber, rtt: hop.rtt, type: 'hop' });
           nodes.push(nodeMap.get(id));
         }
 
@@ -86,13 +110,13 @@ export class TracerouteVizComponent implements AfterViewInit {
       multiLinks.get(key)!.push(link);
     });
 
-    // Use Dagre for layout (DAG layout, left-to-right)
+    // Use Dagre for layout (DAG layout, left-to-right: sources left, hops middle, dest right)
     const graph = new dagre.graphlib.Graph();
     graph.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 100, marginx: 20, marginy: 20 });
     graph.setDefaultEdgeLabel(() => ({}));
 
     nodes.forEach(node => {
-      graph.setNode(node.id, { width: 150, height: 50 });
+      graph.setNode(node.id, { width: 150, height: 80 }); // Increased height for bottom labels
     });
 
     links.forEach(link => {
@@ -112,10 +136,10 @@ export class TracerouteVizComponent implements AfterViewInit {
     const maxY = d3.max(nodes, (n: any) => n.y) || 0;
     const minY = d3.min(nodes, (n: any) => n.y) || 0;
     height = Math.max(height, maxY - minY + 100);
-    svg.attr('height', height);
+    this.svg.attr('height', height);
 
     // Add arrow marker
-    svg.append('defs')
+    this.zoomGroup.append('defs')
       .append('marker')
       .attr('id', 'end')
       .attr('viewBox', '0 -5 10 10')
@@ -128,9 +152,9 @@ export class TracerouteVizComponent implements AfterViewInit {
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#999');
 
-    // Draw links (with curving for multiple links between same nodes)
-    svg.append('g')
-      .selectAll('path')
+    // Draw links (always curvy with slight offset for aesthetics, more for multiples)
+    const linkGroup = this.zoomGroup.append('g');
+    linkGroup.selectAll('path')
       .data(links)
       .enter()
       .append('path')
@@ -140,24 +164,19 @@ export class TracerouteVizComponent implements AfterViewInit {
         const key = d.source < d.target ? `${d.source},${d.target}` : `${d.target},${d.source}`;
         const siblings = multiLinks.get(key) || [];
         const total = siblings.length;
-        if (total <= 1) {
-          // Straight line
-          return `M${source.x},${source.y} L${target.x},${target.y}`;
-        } else {
-          // Curved quadratic bezier with perpendicular offset
-          const i = siblings.indexOf(d);
-          const offset = 20 * (i - (total - 1) / 2);
-          const dx = target.x - source.x;
-          const dy = target.y - source.y;
-          let nx = -dy;
-          let ny = dx;
-          const len = Math.sqrt(nx * nx + ny * ny) || 1;
-          nx /= len;
-          ny /= len;
-          const controlX = (source.x + target.x) / 2 + offset * nx;
-          const controlY = (source.y + target.y) / 2 + offset * ny;
-          return `M${source.x},${source.y} Q${controlX},${controlY} ${target.x},${target.y}`;
-        }
+        const i = siblings.indexOf(d);
+        const baseOffset = 10; // Slight curve even for singles
+        const offset = baseOffset * (i - (total - 1) / 2);
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        let nx = -dy;
+        let ny = dx;
+        const len = Math.sqrt(nx * nx + ny * ny) || 1;
+        nx /= len;
+        ny /= len;
+        const controlX = (source.x + target.x) / 2 + offset * nx;
+        const controlY = (source.y + target.y) / 2 + offset * ny;
+        return `M${source.x},${source.y} Q${controlX},${controlY} ${target.x},${target.y}`;
       })
       .attr('stroke', d => d.color)
       .attr('stroke-width', 2)
@@ -165,8 +184,8 @@ export class TracerouteVizComponent implements AfterViewInit {
       .attr('marker-end', 'url(#end)');
 
     // Add RTT labels on links (only if rtt > 0)
-    svg.append('g')
-      .selectAll('text')
+    const labelGroup = this.zoomGroup.append('g');
+    labelGroup.selectAll('text')
       .data(links.filter(l => l.rtt > 0))
       .enter()
       .append('text')
@@ -177,22 +196,52 @@ export class TracerouteVizComponent implements AfterViewInit {
       .attr('fill', '#333')
       .text(d => `${d.rtt} ms`);
 
-    // Draw nodes
-    const nodeGroup = svg.append('g')
+    // Draw nodes with type-based colors and labels on bottom
+    const nodeGroup = this.zoomGroup.append('g')
       .selectAll('g')
       .data(nodes)
       .enter()
       .append('g')
-      .attr('transform', d => `translate(${d.x}, ${d.y})`);
+      .attr('transform', d => `translate(${d.x - 75}, ${d.y - 40})`); // Center node group (width 150, height 80)
 
     nodeGroup.append('circle')
       .attr('r', 10)
-      .attr('fill', '#69b3a2');
+      .attr('cx', 75)
+      .attr('cy', 40)
+      .attr('fill', d => {
+        if (d.type === 'source') return '#1f77b4'; // Blue for sources
+        if (d.type === 'destination') return '#d62728'; // Red for destination
+        return '#69b3a2'; // Green for hops
+      });
 
+    // Host/IP label to the right of circle
     nodeGroup.append('text')
-      .attr('x', 15)
-      .attr('y', 5)
-      .attr('font-size', 12)
+      .attr('x', 90)
+      .attr('y', 40)
+      .attr('dy', '0.35em')
+      .attr('font-size', 11)
+      .attr('text-anchor', 'start')
+      .attr('fill', '#333')
       .text(d => `${d.host}${d.ip ? ` (${d.ip})` : ''}`);
+
+    // Hop-specific info on bottom (hopNumber and rtt for hops only)
+    nodeGroup.filter(d => d.type === 'hop')
+      .append('text')
+      .attr('x', 75)
+      .attr('y', 60)
+      .attr('dy', '0.35em')
+      .attr('font-size', 9)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#666')
+      .text(d => `Hop ${d.hopNumber} | ${d.rtt} ms`);
+
+    // Add zoom behavior
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        this.zoomGroup.attr('transform', event.transform);
+      });
+
+    this.svg.call(zoom);
   }
 }
