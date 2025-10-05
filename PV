@@ -1,8 +1,302 @@
-nodeGroup.append('text')
+import { Component, Input, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import * as d3 from 'd3';
+import * as dagre from 'dagre';
+
+interface Hop {
+  hopNumber: number;
+  rtt: number;
+  host: string;
+  ip?: string;
+  location?: string;
+}
+
+interface Trace {
+  source: string;
+  hops: Hop[];
+  destination: string;
+}
+
+@Component({
+  selector: 'app-traceroute-viz',
+  template: `
+    <div>
+      <label>
+        <input type="checkbox" [(ngModel)]="showPartial" (change)="updateViz()"> Show first & last 2 hops only
+      </label>
+      <svg #svg></svg>
+      <div #tooltip class="tooltip" style="position: absolute; opacity: 0; background: #fff; border: 1px solid #ccc; padding: 5px; pointer-events: none; font-size: 12px;"></div>
+    </div>
+  `,
+  styles: [`
+    svg { width: 100%; height: 800px; }
+    .tooltip { z-index: 10; white-space: pre; }
+  `]
+})
+export class TracerouteVizComponent implements AfterViewInit {
+  @Input() traces: Trace[] = [];
+  @Input() showPartial: boolean = false;
+
+  @ViewChild('svg') svgElement!: ElementRef;
+  @ViewChild('tooltip') tooltipElement!: ElementRef;
+
+  private svg!: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+  private zoomGroup!: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private tooltip!: d3.Selection<HTMLDivElement, unknown, null, undefined>;
+
+  ngAfterViewInit() {
+    this.svg = d3.select(this.svgElement.nativeElement);
+    this.zoomGroup = this.svg.append('g');
+    this.tooltip = d3.select(this.tooltipElement.nativeElement);
+
+    this.updateViz();
+  }
+
+  private updateTooltipPosition(event: MouseEvent) {
+    this.tooltip
+      .style('left', (event.pageX + 10) + 'px')
+      .style('top', (event.pageY - 10) + 'px');
+  }
+
+  updateViz() {
+    this.zoomGroup.selectAll('*').remove();
+
+    if (this.traces.length === 0) return;
+
+    const boundingRect = this.svg.node()?.getBoundingClientRect();
+    const width = boundingRect?.width || 1200;
+    let height = boundingRect?.height || 800;
+
+    // Color scale for different traces
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    // Build nodes and links based on showPartial
+    const processedTraces = this.showPartial ? this.traces.map(trace => ({
+      ...trace,
+      hops: [...trace.hops.slice(0, 2), ...trace.hops.slice(-2)]
+    })) : this.traces;
+
+    const nodeMap = new Map<string, any>();
+    const nodes: any[] = [];
+    const links: any[] = [];
+
+    // Add destination node (assuming all traces share the same destination)
+    const destination = this.traces[0].destination;
+    const destId = `dest-${destination.replace(/\./g, '-')}`; // Sanitize for ID
+    nodeMap.set(destId, { id: destId, host: destination, type: 'destination', location: '' });
+    nodes.push(nodeMap.get(destId));
+
+    processedTraces.forEach((trace, index) => {
+      const traceColor = color(index.toString());
+
+      // Add source node
+      const sourceId = `source-${trace.source.replace(/\./g, '-')}`;
+      if (!nodeMap.has(sourceId)) {
+        nodeMap.set(sourceId, { id: sourceId, host: trace.source, type: 'source', location: '' });
+        nodes.push(nodeMap.get(sourceId));
+      }
+
+      let prev = sourceId;
+
+      trace.hops.forEach(hop => {
+        const id = hop.ip ? hop.ip : `${trace.source}-hop${hop.hopNumber}-${hop.host || 'unknown'}`.replace(/\./g, '-');
+        if (!nodeMap.has(id)) {
+          nodeMap.set(id, { id, host: hop.host || 'unknown', ip: hop.ip, hopNumber: hop.hopNumber, rtt: hop.rtt, type: 'hop', location: hop.location });
+          nodes.push(nodeMap.get(id));
+        }
+
+        links.push({ source: prev, target: id, rtt: hop.rtt, trace: trace.source, color: traceColor });
+        prev = id;
+      });
+
+      // Link last hop to destination if not already
+      if (prev !== destId) {
+        links.push({ source: prev, target: destId, rtt: 0, trace: trace.source, color: traceColor });
+      }
+    });
+
+    // Group links for multi-link curving and averaging
+    const multiLinks = new Map<string, any[]>();
+    links.forEach(link => {
+      const min = link.source < link.target ? link.source : link.target;
+      const max = link.source < link.target ? link.target : link.source;
+      const key = `${min},${max}`;
+      if (!multiLinks.has(key)) multiLinks.set(key, []);
+      multiLinks.get(key)!.push(link);
+    });
+
+    // Use Dagre for layout (DAG layout, left-to-right: sources left, hops middle, dest right)
+    const graph = new dagre.graphlib.Graph();
+    graph.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 100, marginx: 20, marginy: 20 });
+    graph.setDefaultEdgeLabel(() => ({}));
+
+    nodes.forEach(node => {
+      graph.setNode(node.id, { width: 200, height: 100 }); // Increased height to prevent overlap
+    });
+
+    links.forEach(link => {
+      graph.setEdge(link.source, link.target);
+    });
+
+    dagre.layout(graph);
+
+    // Assign positions to nodes
+    nodes.forEach(node => {
+      const gnode = graph.node(node.id);
+      node.x = gnode.x;
+      node.y = gnode.y;
+    });
+
+    // Adjust SVG height dynamically based on layout
+    const maxY = d3.max(nodes, (n: any) => n.y) || 0;
+    const minY = d3.min(nodes, (n: any) => n.y) || 0;
+    height = Math.max(height, maxY - minY + 120);
+    this.svg.attr('height', height);
+
+    // Add arrow marker
+    this.zoomGroup.append('defs')
+      .append('marker')
+      .attr('id', 'end')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 15)
+      .attr('refY', 0)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', '#999');
+
+    // Draw links (always curvy with slight offset for aesthetics, more for multiples)
+    const linkGroup = this.zoomGroup.append('g');
+    const paths = linkGroup.selectAll('path')
+      .data(links)
+      .enter()
+      .append('path')
+      .attr('d', d => {
+        const source = graph.node(d.source);
+        const target = graph.node(d.target);
+        const key = d.source < d.target ? `${d.source},${d.target}` : `${d.target},${d.source}`;
+        const siblings = multiLinks.get(key) || [];
+        const total = siblings.length;
+        const i = siblings.indexOf(d);
+        const baseOffset = 10; // Slight curve even for singles
+        const offset = baseOffset * (i - (total - 1) / 2);
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        let nx = -dy;
+        let ny = dx;
+        const len = Math.sqrt(nx * nx + ny * ny) || 1;
+        nx /= len;
+        ny /= len;
+        const controlX = (source.x + target.x) / 2 + offset * nx;
+        const controlY = (source.y + target.y) / 2 + offset * ny;
+        return `M${source.x},${source.y} Q${controlX},${controlY} ${target.x},${target.y}`;
+      })
+      .attr('stroke', d => d.color)
+      .attr('stroke-width', 2)
+      .attr('fill', 'none')
+      .attr('marker-end', 'url(#end)');
+
+    // Add hover for detailed RTT tooltip
+    paths.on('mouseover', (event, d) => {
+      const key = d.source < d.target ? `${d.source},${d.target}` : `${d.target},${d.source}`;
+      const siblings = multiLinks.get(key) || [];
+      const details = siblings
+        .filter(s => s.rtt > 0)
+        .map(s => `${s.trace}: ${s.rtt} ms`)
+        .join('\n');
+      if (details) {
+        this.tooltip.text(details)
+          .style('opacity', 1);
+        this.updateTooltipPosition(event);
+      }
+    }).on('mousemove', (event) => {
+      if (this.tooltip.style('opacity') === '1') {
+        this.updateTooltipPosition(event);
+      }
+    }).on('mouseout', () => {
+      this.tooltip.style('opacity', 0);
+    });
+
+    // Add average RTT labels for unique edges (to avoid overlap)
+    const edgeData = Array.from(multiLinks.values())
+      .filter(group => group.some(l => l.rtt > 0))
+      .map(group => {
+        const avgRtt = d3.mean(group, g => g.rtt)!;
+        const first = group[0];
+        const source = graph.node(first.source);
+        const target = graph.node(first.target);
+        return { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 - 5, avgRtt };
+      });
+
+    const labelGroup = this.zoomGroup.append('g');
+    labelGroup.selectAll('text')
+      .data(edgeData)
+      .enter()
+      .append('text')
+      .attr('x', d => d.x)
+      .attr('y', d => d.y)
+      .attr('font-size', 10)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#333')
+      .text(d => `${Math.round(d.avgRtt)} ms (avg)`);
+
+    // Draw nodes with type-based colors and labels on bottom
+    const nodeGroup = this.zoomGroup.append('g')
+      .selectAll('g')
+      .data(nodes)
+      .enter()
+      .append('g')
+      .attr('transform', d => `translate(${d.x - 100}, ${d.y - 50})`); // Center node group (width 200, height 100)
+
+    nodeGroup.append('circle')
+      .attr('r', 10)
+      .attr('cx', 100)
+      .attr('cy', 40)
+      .attr('fill', d => {
+        if (d.type === 'source') return '#1f77b4'; // Blue for sources
+        if (d.type === 'destination') return '#d62728'; // Red for destination
+        return '#69b3a2'; // Green for hops
+      });
+
+    // Location label to the left of circle (if available), positioned higher
+    nodeGroup.append('text')
       .attr('x', 20)
-      .attr('y', 40)
+      .attr('y', 30)
       .attr('dy', '0.35em')
       .attr('font-size', 10)
       .attr('text-anchor', 'start')
       .attr('fill', '#666')
       .text(d => d.location || '');
+
+    // Host/IP label to the right of circle, positioned at center height
+    nodeGroup.append('text')
+      .attr('x', 115)
+      .attr('y', 40)
+      .attr('dy', '0.35em')
+      .attr('font-size', 11)
+      .attr('text-anchor', 'start')
+      .attr('fill', '#333')
+      .text(d => `${d.host}${d.ip ? ` (${d.ip})` : ''}`);
+
+    // Hop-specific info on bottom (hopNumber and rtt for hops only), positioned lower
+    nodeGroup.filter(d => d.type === 'hop')
+      .append('text')
+      .attr('x', 100)
+      .attr('y', 70)
+      .attr('dy', '0.35em')
+      .attr('font-size', 9)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#666')
+      .text(d => `Hop ${d.hopNumber} | ${d.rtt} ms`);
+
+    // Add zoom behavior
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        this.zoomGroup.attr('transform', event.transform);
+      });
+
+    this.svg.call(zoom);
+  }
+}
