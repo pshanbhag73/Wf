@@ -69,7 +69,7 @@ export class TracerouteVizComponent implements AfterViewInit {
     // Color scale for different traces
     const color = d3.scaleOrdinal(d3.schemeCategory10);
 
-    // Build nodes and links based on showPartial
+    // Build nodes and individual trace links for highlighting
     const processedTraces = this.showPartial ? this.traces.map(trace => ({
       ...trace,
       hops: [...trace.hops.slice(0, 2), ...trace.hops.slice(-2)]
@@ -77,11 +77,11 @@ export class TracerouteVizComponent implements AfterViewInit {
 
     const nodeMap = new Map<string, any>();
     const nodes: any[] = [];
-    const links: any[] = [];
+    const traceLinks: any[] = []; // Individual links per trace for highlighting
 
-    // Add destination node (assuming all traces share the same destination)
+    // Add destination node
     const destination = this.traces[0].destination;
-    const destId = `dest-${destination.replace(/\./g, '-')}`; // Sanitize for ID
+    const destId = `dest-${destination.replace(/\./g, '-')}`;
     nodeMap.set(destId, { id: destId, host: destination, type: 'destination', location: '' });
     nodes.push(nodeMap.get(destId));
 
@@ -104,19 +104,19 @@ export class TracerouteVizComponent implements AfterViewInit {
           nodes.push(nodeMap.get(id));
         }
 
-        links.push({ source: prev, target: id, rtt: hop.rtt, trace: trace.source, color: traceColor });
+        traceLinks.push({ source: prev, target: id, rtt: hop.rtt, trace: trace.source, color: traceColor, traceIndex: index });
         prev = id;
       });
 
-      // Link last hop to destination if not already
+      // Link last hop to destination
       if (prev !== destId) {
-        links.push({ source: prev, target: destId, rtt: 0, trace: trace.source, color: traceColor });
+        traceLinks.push({ source: prev, target: destId, rtt: 0, trace: trace.source, color: traceColor, traceIndex: index });
       }
     });
 
-    // Group links for multi-link curving and averaging
+    // Group into unique edges for drawing single paths
     const multiLinks = new Map<string, any[]>();
-    links.forEach(link => {
+    traceLinks.forEach(link => {
       const min = link.source < link.target ? link.source : link.target;
       const max = link.source < link.target ? link.target : link.source;
       const key = `${min},${max}`;
@@ -124,16 +124,31 @@ export class TracerouteVizComponent implements AfterViewInit {
       multiLinks.get(key)!.push(link);
     });
 
-    // Use Dagre for layout (DAG layout, left-to-right: sources left, hops middle, dest right)
+    const uniqueEdges: any[] = Array.from(multiLinks.values()).map(group => {
+      const firstLink = group[0];
+      const avgRtt = d3.mean(group, g => g.rtt)! || 0;
+      const traces = [...new Set(group.map(g => g.trace))];
+      const traceIndices = [...new Set(group.map(g => g.traceIndex))];
+      return {
+        source: firstLink.source,
+        target: firstLink.target,
+        rtt: avgRtt,
+        traces,
+        traceIndices,
+        color: firstLink.color // Use first trace's color for the merged line
+      };
+    });
+
+    // Use Dagre for layout
     const graph = new dagre.graphlib.Graph();
     graph.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 100, marginx: 20, marginy: 20 });
     graph.setDefaultEdgeLabel(() => ({}));
 
     nodes.forEach(node => {
-      graph.setNode(node.id, { width: 200, height: 100 }); // Increased height to prevent overlap
+      graph.setNode(node.id, { width: 200, height: 100 });
     });
 
-    links.forEach(link => {
+    traceLinks.forEach(link => { // Use traceLinks for edges to ensure all paths are laid out
       graph.setEdge(link.source, link.target);
     });
 
@@ -146,7 +161,7 @@ export class TracerouteVizComponent implements AfterViewInit {
       node.y = gnode.y;
     });
 
-    // Adjust SVG height dynamically based on layout
+    // Adjust SVG height
     const maxY = d3.max(nodes, (n: any) => n.y) || 0;
     const minY = d3.min(nodes, (n: any) => n.y) || 0;
     height = Math.max(height, maxY - minY + 120);
@@ -166,100 +181,92 @@ export class TracerouteVizComponent implements AfterViewInit {
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#999');
 
-    // Draw links (always curvy with slight offset for aesthetics, more for multiples)
+    // Draw single path per unique edge
     const linkGroup = this.zoomGroup.append('g');
-    const paths = linkGroup.selectAll('path')
-      .data(links)
+    const edgePaths = linkGroup.selectAll('path')
+      .data(uniqueEdges)
       .enter()
       .append('path')
+      .attr('class', d => `edge-path-${d.traceIndices.join('-')}`) // Class for highlighting groups
       .attr('d', d => {
         const source = graph.node(d.source);
         const target = graph.node(d.target);
-        const key = d.source < d.target ? `${d.source},${d.target}` : `${d.target},${d.source}`;
-        const siblings = multiLinks.get(key) || [];
-        const total = siblings.length;
-        const i = siblings.indexOf(d);
-        const baseOffset = 10; // Slight curve even for singles
-        const offset = baseOffset * (i - (total - 1) / 2);
-        const dx = target.x - source.x;
-        const dy = target.y - source.y;
-        let nx = -dy;
-        let ny = dx;
-        const len = Math.sqrt(nx * nx + ny * ny) || 1;
-        nx /= len;
-        ny /= len;
-        const controlX = (source.x + target.x) / 2 + offset * nx;
-        const controlY = (source.y + target.y) / 2 + offset * ny;
-        return `M${source.x},${source.y} Q${controlX},${controlY} ${target.x},${target.y}`;
+        // Straight line for merged (or slight curve if desired; here straight for "one line")
+        return `M${source.x},${source.y} L${target.x},${target.y}`;
       })
       .attr('stroke', d => d.color)
       .attr('stroke-width', 2)
       .attr('fill', 'none')
       .attr('marker-end', 'url(#end)');
 
-    // Add hover for detailed RTT tooltip
-    paths.on('mouseover', (event, d) => {
-      const key = d.source < d.target ? `${d.source},${d.target}` : `${d.target},${d.source}`;
-      const siblings = multiLinks.get(key) || [];
-      const details = siblings
-        .filter(s => s.rtt > 0)
-        .map(s => `${s.trace}: ${s.rtt} ms`)
+    // Hover on edge path: highlight all paths (edges) taken by its traces
+    edgePaths.on('mouseover', (event, d) => {
+      const highlightClasses = d.traceIndices.map(i => `trace-${i}`);
+      traceLinks.filter(l => d.traceIndices.includes(l.traceIndex)).forEach(l => {
+        linkGroup.selectAll(`.edge-path-${l.traceIndices?.join('-') || ''}`).attr('stroke-width', 4);
+      });
+      // Or globally: d3.selectAll('.edge-path').attr('opacity', 0.3); then reset for highlights
+      d3.selectAll('.edge-path').attr('opacity', 0.3);
+      d.traceIndices.forEach(i => d3.selectAll(`.edge-path-${i}`).attr('opacity', 1).attr('stroke-width', 4));
+      // Tooltip with details
+      const details = d.traces
+        .map(t => `${t}: ${d3.mean(traceLinks.filter(l => l.trace === t && l.source === d.source && l.target === d.target), g => g.rtt) || 0} ms`)
         .join('\n');
-      if (details) {
-        this.tooltip.text(details)
-          .style('opacity', 1);
-        this.updateTooltipPosition(event);
-      }
-    }).on('mousemove', (event) => {
-      if (this.tooltip.style('opacity') === '1') {
-        this.updateTooltipPosition(event);
-      }
-    }).on('mouseout', () => {
+      this.tooltip.text(details).style('opacity', 1);
+      this.updateTooltipPosition(event);
+    }).on('mouseout', (event) => {
+      d3.selectAll('.edge-path').attr('opacity', 1).attr('stroke-width', 2);
       this.tooltip.style('opacity', 0);
     });
 
-    // Add average RTT labels for unique edges (to avoid overlap)
-    const edgeData = Array.from(multiLinks.values())
-      .filter(group => group.some(l => l.rtt > 0))
-      .map(group => {
-        const avgRtt = d3.mean(group, g => g.rtt)!;
-        const first = group[0];
-        const source = graph.node(first.source);
-        const target = graph.node(first.target);
-        return { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 - 5, avgRtt };
-      });
-
+    // Average RTT labels
+    const edgeData = uniqueEdges.filter(e => e.rtt > 0);
     const labelGroup = this.zoomGroup.append('g');
     labelGroup.selectAll('text')
       .data(edgeData)
       .enter()
       .append('text')
-      .attr('x', d => d.x)
-      .attr('y', d => d.y)
+      .attr('x', d => {
+        const source = graph.node(d.source);
+        const target = graph.node(d.target);
+        return (source.x + target.x) / 2;
+      })
+      .attr('y', d => {
+        const source = graph.node(d.source);
+        const target = graph.node(d.target);
+        return (source.y + target.y) / 2 - 5;
+      })
       .attr('font-size', 10)
       .attr('text-anchor', 'middle')
       .attr('fill', '#333')
-      .text(d => `${Math.round(d.avgRtt)} ms (avg)`);
+      .text(d => `${Math.round(d.rtt)} ms (avg)`);
 
-    // Draw nodes with type-based colors and labels on bottom
+    // Draw nodes
     const nodeGroup = this.zoomGroup.append('g')
       .selectAll('g')
       .data(nodes)
       .enter()
       .append('g')
-      .attr('transform', d => `translate(${d.x - 100}, ${d.y - 50})`); // Center node group (width 200, height 100)
+      .attr('transform', d => `translate(${d.x - 100}, ${d.y - 50})`);
 
-    nodeGroup.append('circle')
+    const circles = nodeGroup.append('circle')
       .attr('r', 10)
       .attr('cx', 100)
       .attr('cy', 40)
       .attr('fill', d => {
-        if (d.type === 'source') return '#1f77b4'; // Blue for sources
-        if (d.type === 'destination') return '#d62728'; // Red for destination
-        return '#69b3a2'; // Green for hops
+        if (d.type === 'source') return '#1f77b4';
+        if (d.type === 'destination') return '#d62728';
+        return '#69b3a2';
+      })
+      .on('mouseover', (event, d) => {
+        const info = `Host: ${d.host}\nIP: ${d.ip || 'N/A'}\nLocation: ${d.location || 'N/A'}${d.type === 'hop' ? `\nHop: ${d.hopNumber}\nRTT: ${d.rtt} ms` : ''}`;
+        this.tooltip.text(info).style('opacity', 1);
+        this.updateTooltipPosition(event);
+      }).on('mouseout', () => {
+        this.tooltip.style('opacity', 0);
       });
 
-    // Location label to the left of circle (if available), positioned higher
+    // Location label left
     nodeGroup.append('text')
       .attr('x', 20)
       .attr('y', 30)
@@ -269,7 +276,7 @@ export class TracerouteVizComponent implements AfterViewInit {
       .attr('fill', '#666')
       .text(d => d.location || '');
 
-    // Host/IP label to the right of circle, positioned at center height
+    // Host/IP right
     nodeGroup.append('text')
       .attr('x', 115)
       .attr('y', 40)
@@ -279,7 +286,7 @@ export class TracerouteVizComponent implements AfterViewInit {
       .attr('fill', '#333')
       .text(d => `${d.host}${d.ip ? ` (${d.ip})` : ''}`);
 
-    // Hop-specific info on bottom (hopNumber and rtt for hops only), positioned lower
+    // Hop info bottom
     nodeGroup.filter(d => d.type === 'hop')
       .append('text')
       .attr('x', 100)
@@ -290,7 +297,7 @@ export class TracerouteVizComponent implements AfterViewInit {
       .attr('fill', '#666')
       .text(d => `Hop ${d.hopNumber} | ${d.rtt} ms`);
 
-    // Add zoom behavior
+    // Add zoom
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
       .on('zoom', (event) => {
