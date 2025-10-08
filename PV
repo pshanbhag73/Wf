@@ -1,21 +1,19 @@
-// In the edgePaths .attr('d'), enhance the conditional for straighter initial segments then smooth S-curve drop on vertical change:
+// In the edgePaths .attr('d'), update for pronounced S-curve on vertical change:
 .attr('d', d => {
   const source = graph.node(d.source);
   const target = graph.node(d.target);
   const dx = target.x - source.x;
   const dy = target.y - source.y;
-  const threshold = 15; // Lower threshold for earlier curve trigger on small changes
+  const threshold = 15;
   if (Math.abs(dy) < threshold) {
-    // Straight line if minimal vertical change
     return `M${source.x},${source.y} L${target.x},${target.y}`;
   } else {
-    // Improved S-curve: straighter start/mid, then drop (cubic Bezier with adjusted controls for "drop" effect)
     const sign = Math.sign(dy);
-    const absDy = Math.abs(dy);
-    const cp1x = source.x + dx * 0.2; // Start close to source for straight feel
-    const cp1y = source.y + (absDy * 0.1 * sign); // Minimal initial offset
-    const cp2x = target.x - dx * 0.2; // End close to target
-    const cp2y = target.y - (absDy * 0.3 * sign); // Stronger pull toward target for drop
+    const sOffset = 30; // Height of S-curve bulge
+    const cp1x = source.x + dx / 3;
+    const cp1y = source.y - sOffset * sign; // Curve opposite first for S start
+    const cp2x = target.x - dx / 3;
+    const cp2y = target.y + sOffset * sign; // Then overcompensate for S end
     return `M${source.x},${source.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${target.x},${target.y}`;
   }
 })
