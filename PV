@@ -1,16 +1,22 @@
-// In the edgePaths .attr('d'), replace the straight line with curvy quadratic Bezier for water-like flow:
+// In the edgePaths .attr('d'), conditional straight or S-curve based on vertical change:
 .attr('d', d => {
   const source = graph.node(d.source);
   const target = graph.node(d.target);
   const dx = target.x - source.x;
   const dy = target.y - source.y;
-  let nx = -dy;
-  let ny = dx;
-  const len = Math.sqrt(nx * nx + ny * ny) || 1;
-  nx /= len;
-  ny /= len;
-  const offset = 15; // Gentle curve for flow
-  const controlX = (source.x + target.x) / 2 + offset * nx;
-  const controlY = (source.y + target.y) / 2 + offset * ny;
-  return `M${source.x},${source.y} Q${controlX},${controlY} ${target.x},${target.y}`;
+  const threshold = 20; // Threshold for vertical change
+  if (Math.abs(dy) < threshold) {
+    // Straight line if minimal vertical change
+    return `M${source.x},${source.y} L${target.x},${target.y}`;
+  } else {
+    // Smooth S-curve (cubic Bezier) for vertical divergence
+    const midX = (source.x + target.x) / 2;
+    const offset = Math.abs(dy) / 3; // Scale offset with dy for smoothness
+    const sign = dy > 0 ? 1 : -1;
+    const cp1x = source.x + dx / 3;
+    const cp1y = source.y + (dy / 2) + (offset * sign);
+    const cp2x = target.x - dx / 3;
+    const cp2y = target.y - (dy / 2) + (offset * sign);
+    return `M${source.x},${source.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${target.x},${target.y}`;
+  }
 })
