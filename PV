@@ -1,25 +1,30 @@
-// In the edgePaths .attr('d'), update to have horizontal start and end segments for symmetry:
+// In the edgePaths .attr('d'), update for horizontal end segment and adjusted start:
 .attr('d', d => {
   const source = graph.node(d.source);
   const target = graph.node(d.target);
   const dx = target.x - source.x;
   const dy = target.y - source.y;
-  const arrowLength = 10;
-  const horizontalOffset = 40; // Distance for horizontal start/end
-  const startX = source.x + horizontalOffset;
+  const radius = 10;
+  const horizEnd = 20; // Length of horizontal end segment for arrow alignment
+  const threshold = 15;
+  const startX = source.x + radius;
   const startY = source.y;
-  const endX = target.x - arrowLength;
+  const endX = target.x - radius;
   const endY = target.y;
-  if (Math.abs(dy) < 1) { // Nearly horizontal: straight with horiz segments
-    return `M${source.x},${source.y} L${startX},${startY} L${endX},${endY}`;
+  const preEndX = endX - horizEnd;
+  const preEndY = endY;
+  const dxCurve = preEndX - startX;
+  const dyCurve = preEndY - startY;
+  if (Math.abs(dy) < threshold) {
+    // Straight line with start from edge and end at preEnd then horiz to end
+    return `M${startX},${startY} L${endX},${endY}`;
   } else {
-    // Curve between horiz start and horiz end
     const sign = Math.sign(dy);
-    const sOffset = Math.min(30, Math.abs(dy) / 2);
-    const cp1x = startX + (dx - 2 * horizontalOffset) / 3;
+    const sOffset = 30;
+    const cp1x = startX + dxCurve / 3;
     const cp1y = startY - sOffset * sign;
-    const cp2x = endX - (dx - 2 * horizontalOffset) / 3;
-    const cp2y = endY + sOffset * sign;
-    return `M${source.x},${source.y} L${startX},${startY} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endX},${endY} L${target.x - arrowLength},${target.y}`;
+    const cp2x = preEndX - dxCurve / 3;
+    const cp2y = preEndY + sOffset * sign;
+    return `M${startX},${startY} C${cp1x},${cp1y} ${cp2x},${cp2y} ${preEndX},${preEndY} L${endX},${endY}`;
   }
 })
