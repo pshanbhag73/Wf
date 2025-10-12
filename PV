@@ -1,26 +1,26 @@
-// In the edgePaths .attr('d'), update to start from right edge of source and end at left edge of target for single point connect:
-.attr('d', d => {
-  const source = graph.node(d.source);
-  const target = graph.node(d.target);
-  const dx = target.x - source.x;
-  const dy = target.y - source.y;
-  const nodeRadius = 10; // Circle radius
-  const startX = source.x + nodeRadius;
-  const startY = source.y;
-  const endX = target.x - nodeRadius;
-  const endY = target.y;
-  const threshold = 15;
-  if (Math.abs(dy) < threshold) {
-    return `M${startX},${startY} L${endX},${endY}`;
-  } else {
-    const sign = Math.sign(dy);
-    const sOffset = 15;
-    const curveDx = endX - startX;
-    const curveDy = endY - startY;
-    const cp1x = startX + curveDx * 0.4;
-    const cp1y = startY - sOffset * sign;
-    const cp2x = endX - curveDx * 0.4;
-    const cp2y = endY + sOffset * sign;
-    return `M${startX},${startY} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endX},${endY}`;
-  }
-})
+// Update the edgePaths class to include base and trace-specific for better selection:
+.attr('class', d => `edge-path edge-trace-${d.traceIndices.join('-')}`)
+
+// Update the mouseover handler to highlight all edges used by any trace in the hovered edge:
+edgePaths.on('mouseover', (event, d) => {
+  const hoveredTraceIndices = d.traceIndices;
+  // Find all unique edges that share any trace with hovered
+  const edgesToHighlight = uniqueEdges.filter(e => 
+    e.traceIndices.some(idx => hoveredTraceIndices.includes(idx))
+  );
+  // Dim all
+  d3.selectAll('.edge-path').attr('opacity', 0.3).attr('stroke-width', 1);
+  // Highlight relevant edges
+  edgesToHighlight.forEach(e => {
+    d3.selectAll(`.edge-trace-${e.traceIndices.join('-')}`).attr('opacity', 1).attr('stroke-width', 3);
+  });
+  // Tooltip with details for this edge
+  const details = d.traces
+    .map(t => `${t}: ${d3.mean(traceLinks.filter(l => l.trace === t && l.source === d.source && l.target === d.target), g => g.rtt) || 0} ms`)
+    .join('\n');
+  this.tooltip.text(details).style('opacity', 1);
+  this.updateTooltipPosition(event);
+}).on('mouseout', () => {
+  d3.selectAll('.edge-path').attr('opacity', 0.7).attr('stroke-width', 1);
+  this.tooltip.style('opacity', 0);
+});
