@@ -1,23 +1,25 @@
-// In the edgePaths .attr('d'), update to always have horizontal end for merging incoming:
+// In the edgePaths .attr('d'), update to have horizontal start and end segments for symmetry:
 .attr('d', d => {
   const source = graph.node(d.source);
   const target = graph.node(d.target);
   const dx = target.x - source.x;
   const dy = target.y - source.y;
   const arrowLength = 10;
-  const endX = target.x - arrowLength; // Horizontal from left
+  const horizontalOffset = 40; // Distance for horizontal start/end
+  const startX = source.x + horizontalOffset;
+  const startY = source.y;
+  const endX = target.x - arrowLength;
   const endY = target.y;
-  if (Math.abs(dy) < 1) { // Nearly horizontal: straight
-    return `M${source.x},${source.y} L${endX},${endY}`;
+  if (Math.abs(dy) < 1) { // Nearly horizontal: straight with horiz segments
+    return `M${source.x},${source.y} L${startX},${startY} L${endX},${endY}`;
   } else {
-    // Curve with horizontal end segment
-    const horizontalOffset = 40; // Distance for horizontal end
-    const cp2x = target.x - horizontalOffset;
-    const cp2y = target.y;
+    // Curve between horiz start and horiz end
     const sign = Math.sign(dy);
-    const sOffset = Math.min(30, Math.abs(dy) / 2); // Scale with dy
-    const cp1x = source.x + dx / 3;
-    const cp1y = source.y - sOffset * sign; // Initial bulge for S
-    return `M${source.x},${source.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endX},${endY}`;
+    const sOffset = Math.min(30, Math.abs(dy) / 2);
+    const cp1x = startX + (dx - 2 * horizontalOffset) / 3;
+    const cp1y = startY - sOffset * sign;
+    const cp2x = endX - (dx - 2 * horizontalOffset) / 3;
+    const cp2y = endY + sOffset * sign;
+    return `M${source.x},${source.y} L${startX},${startY} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endX},${endY} L${target.x - arrowLength},${target.y}`;
   }
 })
