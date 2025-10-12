@@ -1,43 +1,23 @@
-// Update the marker definition: change refX from 15 to 10 to place tip at path end
-this.zoomGroup.append('defs')
-  .append('marker')
-  .attr('id', 'end')
-  .attr('viewBox', '0 -5 10 10')
-  .attr('refX', 10)
-  .attr('refY', 0)
-  .attr('markerWidth', 6)
-  .attr('markerHeight', 6)
-  .attr('orient', 'auto')
-  .append('path')
-  .attr('d', 'M0,-5L10,0L0,5')
-  .attr('fill', '#999');
-
-// In the edgePaths .attr('d'), shorten path ends for arrow alignment:
+// In the edgePaths .attr('d'), update to always have horizontal end for merging incoming:
 .attr('d', d => {
   const source = graph.node(d.source);
   const target = graph.node(d.target);
   const dx = target.x - source.x;
   const dy = target.y - source.y;
-  const threshold = 15;
   const arrowLength = 10;
-  if (Math.abs(dy) < threshold) {
-    const angle = Math.atan2(dy, dx);
-    const endX = target.x - arrowLength * Math.cos(angle);
-    const endY = target.y - arrowLength * Math.sin(angle);
+  const endX = target.x - arrowLength; // Horizontal from left
+  const endY = target.y;
+  if (Math.abs(dy) < 1) { // Nearly horizontal: straight
     return `M${source.x},${source.y} L${endX},${endY}`;
   } else {
+    // Curve with horizontal end segment
+    const horizontalOffset = 40; // Distance for horizontal end
+    const cp2x = target.x - horizontalOffset;
+    const cp2y = target.y;
     const sign = Math.sign(dy);
-    const sOffset = 30;
+    const sOffset = Math.min(30, Math.abs(dy) / 2); // Scale with dy
     const cp1x = source.x + dx / 3;
-    const cp1y = source.y - sOffset * sign;
-    const cp2x = target.x - dx / 3;
-    const cp2y = target.y + sOffset * sign;
-    // Approximate angle from last segment for shortening
-    const lastDx = target.x - cp2x;
-    const lastDy = target.y - cp2y;
-    const angle = Math.atan2(lastDy, lastDx);
-    const endX = target.x - arrowLength * Math.cos(angle);
-    const endY = target.y - arrowLength * Math.sin(angle);
+    const cp1y = source.y - sOffset * sign; // Initial bulge for S
     return `M${source.x},${source.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endX},${endY}`;
   }
 })
