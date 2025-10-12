@@ -1,26 +1,65 @@
-// Update the edgePaths class to include base and trace-specific for better selection:
-.attr('class', d => `edge-path edge-trace-${d.traceIndices.join('-')}`)
+// Add location to Trace interface
+interface Trace {
+  source: string;
+  location: string; // New: location for the trace (e.g., source location)
+  hops: Hop[];
+  destination: string;
+}
 
-// Update the mouseover handler to highlight all edges used by any trace in the hovered edge:
-edgePaths.on('mouseover', (event, d) => {
-  const hoveredTraceIndices = d.traceIndices;
-  // Find all unique edges that share any trace with hovered
-  const edgesToHighlight = uniqueEdges.filter(e => 
-    e.traceIndices.some(idx => hoveredTraceIndices.includes(idx))
-  );
-  // Dim all
-  d3.selectAll('.edge-path').attr('opacity', 0.3).attr('stroke-width', 1);
-  // Highlight relevant edges
-  edgesToHighlight.forEach(e => {
-    d3.selectAll(`.edge-trace-${e.traceIndices.join('-')}`).attr('opacity', 1).attr('stroke-width', 3);
-  });
-  // Tooltip with details for this edge
-  const details = d.traces
-    .map(t => `${t}: ${d3.mean(traceLinks.filter(l => l.trace === t && l.source === d.source && l.target === d.target), g => g.rtt) || 0} ms`)
-    .join('\n');
-  this.tooltip.text(details).style('opacity', 1);
-  this.updateTooltipPosition(event);
-}).on('mouseout', () => {
-  d3.selectAll('.edge-path').attr('opacity', 0.7).attr('stroke-width', 1);
-  this.tooltip.style('opacity', 0);
+// In processedTraces.forEach, add trace.location to the traceLinks push:
+traceLinks.push({ 
+  ... , 
+  location: trace.location 
 });
+
+// Update uniqueEdges creation to collect unique locations per edge:
+const uniqueEdges: any[] = Array.from(multiLinks.values()).map(group => {
+  const firstLink = group[0];
+  const avgRtt = d3.mean(group, g => g.rtt)! || 0;
+  const traces = [...new Set(group.map(g => g.trace))];
+  const traceIndices = [...new Set(group.map(g => g.traceIndex))];
+  const locations = [...new Set(group.map(g => g.location))]; // Collect unique locations
+  let edgeColor;
+  if (locations.length === 1) {
+    edgeColor = locationColor(locations[0]); // Use single location color
+  } else {
+    const locKey = locations.sort().join('-'); // Unique key for multi-location
+    edgeColor = multiLocationColor(locKey); // Or use locationColor(locKey) if extending scale
+  }
+  return {
+    source: firstLink.source,
+    target: firstLink.target,
+    rtt: avgRtt,
+    traces,
+    traceIndices,
+    locations,
+    color: edgeColor
+  };
+});
+
+// Add color scales before building nodes/links:
+// Location color scale
+const locationColor = d3.scaleOrdinal<string>()
+  .domain(processedTraces.map(t => t.location)) // Unique locations from traces
+  .range(d3.schemeCategory10); // Or more colors if needed
+
+// For multi-location unique colors, extend domain or use a separate scale
+const multiLocationColor = d3.scaleOrdinal<string>()
+  .domain([]) // Dynamically add keys
+  .range(d3.schemeCategory20); // Different palette for multi
+
+// After collecting uniqueEdges, update multiLocationColor domain:
+const multiLocKeys = uniqueEdges
+  .filter(e => e.locations.length > 1)
+  .map(e => e.locations.sort().join('-'));
+if (multiLocKeys.length > 0) {
+  multiLocationColor.domain(multiLocKeys);
+}
+
+// In edgePaths .attr('stroke'), use d.color (now location-based)
+.attr('stroke', d => d.color)
+
+// In mouseover tooltip, include locations if desired:
+const details = d.traces
+  .map(t => `${t} (${processedTraces.find(tr => tr.source === t)?.location || ''}): ${...} ms`)
+  .join('\n');
