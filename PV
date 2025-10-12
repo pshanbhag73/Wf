@@ -1,30 +1,19 @@
-// In the edgePaths .attr('d'), update for horizontal end segment and adjusted start:
+// In the edgePaths .attr('d'), soften the S-curve by reducing offset and stretching control points for smoother transitions:
 .attr('d', d => {
   const source = graph.node(d.source);
   const target = graph.node(d.target);
   const dx = target.x - source.x;
   const dy = target.y - source.y;
-  const radius = 10;
-  const horizEnd = 20; // Length of horizontal end segment for arrow alignment
   const threshold = 15;
-  const startX = source.x + radius;
-  const startY = source.y;
-  const endX = target.x - radius;
-  const endY = target.y;
-  const preEndX = endX - horizEnd;
-  const preEndY = endY;
-  const dxCurve = preEndX - startX;
-  const dyCurve = preEndY - startY;
   if (Math.abs(dy) < threshold) {
-    // Straight line with start from edge and end at preEnd then horiz to end
-    return `M${startX},${startY} L${endX},${endY}`;
+    return `M${source.x},${source.y} L${target.x},${target.y}`;
   } else {
     const sign = Math.sign(dy);
-    const sOffset = 30;
-    const cp1x = startX + dxCurve / 3;
-    const cp1y = startY - sOffset * sign;
-    const cp2x = preEndX - dxCurve / 3;
-    const cp2y = preEndY + sOffset * sign;
-    return `M${startX},${startY} C${cp1x},${cp1y} ${cp2x},${cp2y} ${preEndX},${preEndY} L${endX},${endY}`;
+    const sOffset = 15; // Reduced offset for gentler bulge
+    const cp1x = source.x + dx * 0.4; // Stretched farther for smoother start
+    const cp1y = source.y - sOffset * sign;
+    const cp2x = target.x - dx * 0.4; // Stretched for smoother end
+    const cp2y = target.y + sOffset * sign;
+    return `M${source.x},${source.y} C${cp1x},${cp1y} ${cp2x},${cp2y} ${target.x},${target.y}`;
   }
 })
