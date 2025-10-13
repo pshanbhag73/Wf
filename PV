@@ -37,16 +37,6 @@ interface IpInfo {
       <label>
         <input type="checkbox" [(ngModel)]="showPartial" (change)="updateViz()"> Show first & last 2 hops only
       </label>
-      <div *ngIf="uniqueDatacenters.length > 0">
-        <h4>Datacenters (Click to highlight)</h4>
-        <ul>
-          <li *ngFor="let dc of uniqueDatacenters" 
-              [class.highlighted]="selectedDatacenter === dc"
-              (click)="selectDatacenter(dc)">
-            {{dc}}
-          </li>
-        </ul>
-      </div>
       <svg #svg></svg>
       <div #tooltip class="tooltip" style="position: absolute; opacity: 0; background: #fff; border: 1px solid #ccc; padding: 5px; pointer-events: none; font-size: 12px;"></div>
     </div>
@@ -54,9 +44,6 @@ interface IpInfo {
   styles: [`
     svg { width: 100%; height: 800px; }
     .tooltip { z-index: 10; white-space: pre; }
-    ul { list-style: none; padding: 0; }
-    li { cursor: pointer; padding: 5px; margin: 2px 0; background: #f0f0f0; border-radius: 3px; }
-    li.highlighted { background: #ddd; font-weight: bold; }
   `]
 })
 export class TracerouteVizComponent implements AfterViewInit, OnInit {
@@ -271,7 +258,7 @@ export class TracerouteVizComponent implements AfterViewInit, OnInit {
     // Adjust SVG height
     const maxY = d3.max(nodes, (n: any) => n.y) || 0;
     const minY = d3.min(nodes, (n: any) => n.y) || 0;
-    height = Math.max(height, maxY - minY + 120);
+    height = Math.max(height, maxY - minY + 120 + (this.uniqueDatacenters.length * 25)); // Extra for datacenter list
     this.svg.attr('height', height);
 
     // Add arrow marker
@@ -425,6 +412,46 @@ export class TracerouteVizComponent implements AfterViewInit, OnInit {
       .attr('text-anchor', 'middle')
       .attr('fill', '#666')
       .text(d => `Hop ${d.hopNumber} | ${d.rtt} ms`);
+
+    // Add datacenter buttons in SVG (top-right area, outside zoomGroup for fixed position)
+    const dcGroup = this.svg.append('g')
+      .attr('transform', `translate(${width - 200}, 20)`); // Fixed position top-right
+
+    dcGroup.append('text')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('font-size', 12)
+      .attr('font-weight', 'bold')
+      .attr('fill', '#333')
+      .text('Datacenters (Click to highlight)');
+
+    const dcButtons = dcGroup.selectAll('g')
+      .data(this.uniqueDatacenters)
+      .enter()
+      .append('g')
+      .attr('transform', (d, i) => `translate(0, ${20 + i * 25})`)
+      .on('click', (event, dc) => {
+        event.stopPropagation(); // Prevent zoom trigger
+        this.selectDatacenter(dc);
+      })
+      .on('mouseover', () => d3.select(event.currentTarget).style('cursor', 'pointer'))
+      .on('mouseout', () => d3.select(event.currentTarget).style('cursor', 'default'));
+
+    dcButtons.append('rect')
+      .attr('width', 180)
+      .attr('height', 20)
+      .attr('rx', 3)
+      .attr('fill', d => d === this.selectedDatacenter ? '#ddd' : '#f0f0f0')
+      .attr('stroke', '#ccc')
+      .attr('stroke-width', 1);
+
+    dcButtons.append('text')
+      .attr('x', 5)
+      .attr('y', 15)
+      .attr('dy', '0.35em')
+      .attr('font-size', 11)
+      .attr('fill', '#333')
+      .text(d => d);
 
     // Add zoom
     const zoom = d3.zoom<SVGSVGElement, unknown>()
