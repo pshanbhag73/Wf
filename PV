@@ -60,6 +60,8 @@ export class TracerouteVizComponent implements AfterViewInit, OnInit {
 
   uniqueDatacenters: string[] = [];
   selectedDatacenter: string | null = null;
+  private persistentTooltip: boolean = false; // Flag for persistent tooltip
+  private currentTooltipNode: any = null; // Track current persistent node
 
   constructor(private httpClient: HttpClient) {
     this.http = httpClient;
@@ -112,6 +114,22 @@ export class TracerouteVizComponent implements AfterViewInit, OnInit {
   selectDatacenter(dc: string) {
     this.selectedDatacenter = this.selectedDatacenter === dc ? null : dc;
     this.updateViz(); // Re-render to apply highlight
+  }
+
+  private showTooltip(info: string, event: MouseEvent, node: any) {
+    this.tooltip.text(info).style('opacity', 1);
+    this.updateTooltipPosition(event);
+    if (!this.persistentTooltip) {
+      this.currentTooltipNode = null;
+    } else {
+      this.currentTooltipNode = node;
+    }
+  }
+
+  private hideTooltip() {
+    this.tooltip.style('opacity', 0);
+    this.persistentTooltip = false;
+    this.currentTooltipNode = null;
   }
 
   private updateTooltipPosition(event: MouseEvent) {
@@ -330,7 +348,9 @@ export class TracerouteVizComponent implements AfterViewInit, OnInit {
       this.updateTooltipPosition(event);
     }).on('mouseout', () => {
       d3.selectAll('.edge-path').attr('opacity', 0.7).attr('stroke-width', 1);
-      this.tooltip.style('opacity', 0);
+      if (!this.persistentTooltip) {
+        this.tooltip.style('opacity', 0);
+      }
     });
 
     // Average RTT labels
@@ -376,10 +396,46 @@ export class TracerouteVizComponent implements AfterViewInit, OnInit {
       .attr('stroke-width', d => d.datacenter === this.selectedDatacenter ? 3 : 0)
       .on('mouseover', (event, d) => {
         const info = `Host: ${d.host}\nIP: ${d.ip || 'N/A'}\nDatacenter: ${d.datacenter}\nLocation: ${d.location || 'N/A'}${d.type === 'hop' ? `\nHop: ${d.hopNumber}\nRTT: ${d.rtt} ms` : ''}`;
-        this.tooltip.text(info).style('opacity', 1);
-        this.updateTooltipPosition(event);
-      }).on('mouseout', () => {
-        this.tooltip.style('opacity', 0);
+        this.showTooltip(info, event, d);
+      })
+      .on('mouseout', (event, d) => {
+        if (!this.persistentTooltip || this.currentTooltipNode !== d) {
+          this.hideTooltip();
+        }
+      })
+      .on('click', (event, d) => {
+        event.stopPropagation(); // Prevent zoom trigger
+        this.persistentTooltip = !this.persistentTooltip;
+        if (this.persistentTooltip) {
+          const info = `Host: ${d.host}\nIP: ${d.ip || 'N/A'}\nDatacenter: ${d.datacenter}\nLocation: ${d.location || 'N/A'}${d.type === 'hop' ? `\nHop: ${d.hopNumber}\nRTT: ${d.rtt} ms` : ''}`;
+          this.showTooltip(info, event, d);
+        } else {
+          this.hideTooltip();
+        }
+      })
+      .on('dblclick', (event, d) => {
+        event.stopPropagation(); // Prevent zoom trigger
+        if (d.ip) {
+          // Open device info in new tab (adjust URL as needed)
+          window.open(`https://your-device-info-page.com/device/${d.ip}`, '_blank');
+        }
+      })
+      .on('contextmenu', (event, d) => {
+        event.preventDefault(); // Prevent default context menu
+        event.stopPropagation(); // Prevent zoom trigger
+        const textToCopy = `${d.host}${d.ip ? ` (${d.ip})` : ''} | ${d.datacenter}${d.type === 'hop' ? ` | Hop ${d.hopNumber}: ${d.rtt} ms` : ''}`;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          // Brief feedback
+          this.tooltip.text(`Copied: ${textToCopy}`).style('opacity', 1);
+          this.updateTooltipPosition(event);
+          setTimeout(() => {
+            if (!this.persistentTooltip) {
+              this.tooltip.style('opacity', 0);
+            }
+          }, 1000);
+        }).catch(err => {
+          console.error('Copy failed:', err);
+        });
       });
 
     // Location label left
