@@ -1,65 +1,444 @@
-// Add location to Trace interface
+import { Component, Input, ViewChild, ElementRef, AfterViewInit, OnInit } from '@angular/core';
+import * as d3 from 'd3';
+import * as dagre from 'dagre';
+import { HttpClient } from '@angular/common/http';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+interface Hop {
+  hopNumber: number;
+  rtt: number;
+  host: string;
+  ip?: string;
+  location?: string;
+}
+
 interface Trace {
   source: string;
-  location: string; // New: location for the trace (e.g., source location)
+  location?: string; // Optional source location
   hops: Hop[];
   destination: string;
 }
 
-// In processedTraces.forEach, add trace.location to the traceLinks push:
-traceLinks.push({ 
-  ... , 
-  location: trace.location 
-});
-
-// Update uniqueEdges creation to collect unique locations per edge:
-const uniqueEdges: any[] = Array.from(multiLinks.values()).map(group => {
-  const firstLink = group[0];
-  const avgRtt = d3.mean(group, g => g.rtt)! || 0;
-  const traces = [...new Set(group.map(g => g.trace))];
-  const traceIndices = [...new Set(group.map(g => g.traceIndex))];
-  const locations = [...new Set(group.map(g => g.location))]; // Collect unique locations
-  let edgeColor;
-  if (locations.length === 1) {
-    edgeColor = locationColor(locations[0]); // Use single location color
-  } else {
-    const locKey = locations.sort().join('-'); // Unique key for multi-location
-    edgeColor = multiLocationColor(locKey); // Or use locationColor(locKey) if extending scale
-  }
-  return {
-    source: firstLink.source,
-    target: firstLink.target,
-    rtt: avgRtt,
-    traces,
-    traceIndices,
-    locations,
-    color: edgeColor
-  };
-});
-
-// Add color scales before building nodes/links:
-// Location color scale
-const locationColor = d3.scaleOrdinal<string>()
-  .domain(processedTraces.map(t => t.location)) // Unique locations from traces
-  .range(d3.schemeCategory10); // Or more colors if needed
-
-// For multi-location unique colors, extend domain or use a separate scale
-const multiLocationColor = d3.scaleOrdinal<string>()
-  .domain([]) // Dynamically add keys
-  .range(d3.schemeCategory20); // Different palette for multi
-
-// After collecting uniqueEdges, update multiLocationColor domain:
-const multiLocKeys = uniqueEdges
-  .filter(e => e.locations.length > 1)
-  .map(e => e.locations.sort().join('-'));
-if (multiLocKeys.length > 0) {
-  multiLocationColor.domain(multiLocKeys);
+interface IpInfo {
+  city?: string;
+  region?: string;
+  country?: string;
+  org?: string; // For hosting/datacenter
+  // Assume API returns these; adjust based on actual response
 }
 
-// In edgePaths .attr('stroke'), use d.color (now location-based)
-.attr('stroke', d => d.color)
+@Component({
+  selector: 'app-traceroute-viz',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
+    <div>
+      <label>
+        <input type="checkbox" [(ngModel)]="showPartial" (change)="updateViz()"> Show first & last 2 hops only
+      </label>
+      <div *ngIf="uniqueDatacenters.length > 0">
+        <h4>Datacenters (Click to highlight)</h4>
+        <ul>
+          <li *ngFor="let dc of uniqueDatacenters" 
+              [class.highlighted]="selectedDatacenter === dc"
+              (click)="selectDatacenter(dc)">
+            {{dc}}
+          </li>
+        </ul>
+      </div>
+      <svg #svg></svg>
+      <div #tooltip class="tooltip" style="position: absolute; opacity: 0; background: #fff; border: 1px solid #ccc; padding: 5px; pointer-events: none; font-size: 12px;"></div>
+    </div>
+  `,
+  styles: [`
+    svg { width: 100%; height: 800px; }
+    .tooltip { z-index: 10; white-space: pre; }
+    ul { list-style: none; padding: 0; }
+    li { cursor: pointer; padding: 5px; margin: 2px 0; background: #f0f0f0; border-radius: 3px; }
+    li.highlighted { background: #ddd; font-weight: bold; }
+  `]
+})
+export class TracerouteVizComponent implements AfterViewInit, OnInit {
+  @Input() traces: Trace[] = [];
+  @Input() showPartial: boolean = false;
 
-// In mouseover tooltip, include locations if desired:
-const details = d.traces
-  .map(t => `${t} (${processedTraces.find(tr => tr.source === t)?.location || ''}): ${...} ms`)
-  .join('\n');
+  @ViewChild('svg') svgElement!: ElementRef;
+  @ViewChild('tooltip') tooltipElement!: ElementRef;
+
+  private svg!: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+  private zoomGroup!: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private tooltip!: d3.Selection<HTMLDivElement, unknown, null, undefined>;
+  private http!: HttpClient;
+
+  uniqueDatacenters: string[] = [];
+  selectedDatacenter: string | null = null;
+
+  constructor(private httpClient: HttpClient) {
+    this.http = httpClient;
+  }
+
+  ngOnInit() {
+    // Fetch locations on init if traces provided
+    if (this.traces.length > 0) {
+      this.fetchIpLocations();
+    }
+  }
+
+  async fetchIpLocations() {
+    // Collect unique IPs from traces (sources, dest, hops)
+    const uniqueIps = new Set<string>();
+    this.traces.forEach(trace => {
+      uniqueIps.add(trace.source);
+      uniqueIps.add(trace.destination);
+      trace.hops.forEach(hop => hop.ip && uniqueIps.add(hop.ip));
+    });
+
+    // Fetch info for each IP
+    const ipPromises = Array.from(uniqueIps).map(ip => 
+      this.http.get<IpInfo>(`https://api.ipapi.is?q=${ip}`).toPromise()
+        .then(info => ({ ip, info }))
+        .catch(err => ({ ip, info: { city: 'Unknown' } as IpInfo }))
+    );
+
+    const results = await Promise.all(ipPromises);
+    const ipMap = new Map<string, IpInfo>();
+    results.forEach(({ ip, info }) => ipMap.set(ip, info));
+
+    // Store in traces for later use in nodes
+    this.traces.forEach(trace => {
+      trace.location = ipMap.get(trace.source)?.city || 'Unknown';
+      trace.hops.forEach(hop => {
+        if (hop.ip) {
+          const info = ipMap.get(hop.ip);
+          hop.location = info?.city || 'Unknown';
+        }
+      });
+      // Destination location
+      const destInfo = ipMap.get(trace.destination);
+      trace.destination += ` (${destInfo?.city || 'Unknown'})`; // Append to host
+    });
+
+    this.updateViz();
+  }
+
+  selectDatacenter(dc: string) {
+    this.selectedDatacenter = this.selectedDatacenter === dc ? null : dc;
+    this.updateViz(); // Re-render to apply highlight
+  }
+
+  private updateTooltipPosition(event: MouseEvent) {
+    this.tooltip
+      .style('left', (event.pageX + 10) + 'px')
+      .style('top', (event.pageY - 10) + 'px');
+  }
+
+  updateViz() {
+    this.zoomGroup.selectAll('*').remove();
+
+    if (this.traces.length === 0) return;
+
+    const boundingRect = this.svg.node()?.getBoundingClientRect();
+    const width = boundingRect?.width || 1200;
+    let height = boundingRect?.height || 800;
+
+    // Color scale for different traces
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    // Build nodes and individual trace links for highlighting
+    const processedTraces = this.showPartial ? this.traces.map(trace => ({
+      ...trace,
+      hops: [...trace.hops.slice(0, 2), ...trace.hops.slice(-2)]
+    })) : this.traces;
+
+    const nodeMap = new Map<string, any>();
+    const nodes: any[] = [];
+    const traceLinks: any[] = []; // Individual links per trace for highlighting
+
+    // Add destination node
+    const destination = this.traces[0].destination;
+    const destId = `dest-${destination.replace(/\./g, '-')}`;
+    const destIp = this.traces[0].destination.split(' (')[0]; // Extract IP if appended
+    nodeMap.set(destId, { id: destId, host: destination, type: 'destination', ip: destIp, datacenter: destIp ? processedTraces[0].hops.find(h => h.ip === destIp)?.location || 'Unknown' : 'Unknown' });
+    nodes.push(nodeMap.get(destId));
+
+    processedTraces.forEach((trace, index) => {
+      const traceColor = color(index.toString());
+
+      // Add source node
+      const sourceId = `source-${trace.source.replace(/\./g, '-')}`;
+      if (!nodeMap.has(sourceId)) {
+        nodeMap.set(sourceId, { id: sourceId, host: trace.source, type: 'source', ip: trace.source, datacenter: trace.location || 'Unknown' });
+        nodes.push(nodeMap.get(sourceId));
+      }
+
+      let prev = sourceId;
+
+      trace.hops.forEach(hop => {
+        const id = hop.ip ? hop.ip : `${trace.source}-hop${hop.hopNumber}-${hop.host || 'unknown'}`.replace(/\./g, '-');
+        if (!nodeMap.has(id)) {
+          nodeMap.set(id, { id, host: hop.host || 'unknown', ip: hop.ip, hopNumber: hop.hopNumber, rtt: hop.rtt, type: 'hop', datacenter: hop.location || 'Unknown' });
+          nodes.push(nodeMap.get(id));
+        }
+
+        traceLinks.push({ source: prev, target: id, rtt: hop.rtt, trace: trace.source, color: traceColor, traceIndex: index, location: trace.location });
+        prev = id;
+      });
+
+      // Link last hop to destination
+      if (prev !== destId) {
+        traceLinks.push({ source: prev, target: destId, rtt: 0, trace: trace.source, color: traceColor, traceIndex: index, location: trace.location });
+      }
+    });
+
+    // Collect unique datacenters for list
+    this.uniqueDatacenters = [...new Set(nodes.map(n => n.datacenter).filter(Boolean))];
+
+    // Group into unique edges for drawing single paths
+    const multiLinks = new Map<string, any[]>();
+    traceLinks.forEach(link => {
+      const min = link.source < link.target ? link.source : link.target;
+      const max = link.source < link.target ? link.target : link.source;
+      const key = `${min},${max}`;
+      if (!multiLinks.has(key)) multiLinks.set(key, []);
+      multiLinks.get(key)!.push(link);
+    });
+
+    const uniqueEdges: any[] = Array.from(multiLinks.values()).map(group => {
+      const firstLink = group[0];
+      const avgRtt = d3.mean(group, g => g.rtt)! || 0;
+      const traces = [...new Set(group.map(g => g.trace))];
+      const traceIndices = [...new Set(group.map(g => g.traceIndex))];
+      const locations = [...new Set(group.map(g => g.location))];
+      let edgeColor;
+      if (locations.length === 1) {
+        edgeColor = locationColor(locations[0]);
+      } else {
+        const locKey = locations.sort().join('-');
+        edgeColor = multiLocationColor(locKey);
+      }
+      return {
+        source: firstLink.source,
+        target: firstLink.target,
+        rtt: avgRtt,
+        traces,
+        traceIndices,
+        locations,
+        color: edgeColor
+      };
+    });
+
+    // Location color scales
+    const locationColor = d3.scaleOrdinal<string>()
+      .domain(processedTraces.map(t => t.location || 'Unknown'))
+      .range(d3.schemeCategory10);
+
+    const multiLocKeys = uniqueEdges
+      .filter(e => e.locations.length > 1)
+      .map(e => e.locations.sort().join('-'));
+    const custom20 = [
+      '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+      '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+      '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
+      '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5'
+    ];
+    const multiLocationColor = d3.scaleOrdinal<string>()
+      .domain(multiLocKeys)
+      .range(custom20);
+
+    // Use Dagre for layout
+    const graph = new dagre.graphlib.Graph();
+    graph.setGraph({ rankdir: 'LR', nodesep: 50, ranksep: 60, marginx: 150, marginy: 20 });
+    graph.setDefaultEdgeLabel(() => ({}));
+
+    nodes.forEach(node => {
+      graph.setNode(node.id, { width: 200, height: 100 });
+    });
+
+    traceLinks.forEach(link => {
+      graph.setEdge(link.source, link.target);
+    });
+
+    dagre.layout(graph);
+
+    // Assign positions to nodes
+    nodes.forEach(node => {
+      const gnode = graph.node(node.id);
+      node.x = gnode.x;
+      node.y = gnode.y;
+    });
+
+    // Adjust SVG height
+    const maxY = d3.max(nodes, (n: any) => n.y) || 0;
+    const minY = d3.min(nodes, (n: any) => n.y) || 0;
+    height = Math.max(height, maxY - minY + 120);
+    this.svg.attr('height', height);
+
+    // Add arrow marker
+    this.zoomGroup.append('defs')
+      .append('marker')
+      .attr('id', 'end')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 10)
+      .attr('refY', 0)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', '#999');
+
+    // Draw single path per unique edge
+    const linkGroup = this.zoomGroup.append('g');
+    const edgePaths = linkGroup.selectAll('path')
+      .data(uniqueEdges)
+      .enter()
+      .append('path')
+      .attr('class', d => `edge-path edge-trace-${d.traceIndices.join('-')}`)
+      .attr('d', d => {
+        const source = graph.node(d.source);
+        const target = graph.node(d.target);
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const threshold = 15;
+        const nodeRadius = 10;
+        const startX = source.x + nodeRadius;
+        const startY = source.y;
+        const endX = target.x - nodeRadius;
+        const endY = target.y;
+        if (Math.abs(dy) < threshold) {
+          return `M${startX},${startY} L${endX},${endY}`;
+        } else {
+          const sign = Math.sign(dy);
+          const sOffset = 15;
+          const curveDx = endX - startX;
+          const curveDy = endY - startY;
+          const cp1x = startX + curveDx * 0.4;
+          const cp1y = startY - sOffset * sign;
+          const cp2x = endX - curveDx * 0.4;
+          const cp2y = endY + sOffset * sign;
+          return `M${startX},${startY} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endX},${endY}`;
+        }
+      })
+      .attr('stroke', d => d.color)
+      .attr('stroke-width', 1)
+      .attr('opacity', 0.7)
+      .attr('fill', 'none')
+      .attr('marker-end', 'url(#end)');
+
+    // Hover on edge path: highlight all paths (edges) taken by its traces
+    edgePaths.on('mouseover', (event, d) => {
+      const hoveredTraceIndices = d.traceIndices;
+      const edgesToHighlight = uniqueEdges.filter(e => 
+        e.traceIndices.some(idx => hoveredTraceIndices.includes(idx))
+      );
+      d3.selectAll('.edge-path').attr('opacity', 0.3).attr('stroke-width', 1);
+      edgesToHighlight.forEach(e => {
+        d3.selectAll(`.edge-trace-${e.traceIndices.join('-')}`).attr('opacity', 1).attr('stroke-width', 3);
+      });
+      const details = d.traces
+        .map(t => `${t}: ${d3.mean(traceLinks.filter(l => l.trace === t && l.source === d.source && l.target === d.target), g => g.rtt) || 0} ms`)
+        .join('\n');
+      this.tooltip.text(details).style('opacity', 1);
+      this.updateTooltipPosition(event);
+    }).on('mouseout', () => {
+      d3.selectAll('.edge-path').attr('opacity', 0.7).attr('stroke-width', 1);
+      this.tooltip.style('opacity', 0);
+    });
+
+    // Average RTT labels
+    const edgeData = uniqueEdges.filter(e => e.rtt > 0);
+    const labelGroup = this.zoomGroup.append('g');
+    labelGroup.selectAll('text')
+      .data(edgeData)
+      .enter()
+      .append('text')
+      .attr('x', d => {
+        const source = graph.node(d.source);
+        const target = graph.node(d.target);
+        return (source.x + target.x) / 2;
+      })
+      .attr('y', d => {
+        const source = graph.node(d.source);
+        const target = graph.node(d.target);
+        return (source.y + target.y) / 2 - 5;
+      })
+      .attr('font-size', 10)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#333')
+      .text(d => `${Math.round(d.rtt)} ms (avg)`);
+
+    // Draw nodes
+    const nodeGroup = this.zoomGroup.append('g')
+      .selectAll('g')
+      .data(nodes)
+      .enter()
+      .append('g')
+      .attr('transform', d => `translate(${d.x - 100}, ${d.y - 50})`);
+
+    const circles = nodeGroup.append('circle')
+      .attr('r', 10)
+      .attr('cx', 100)
+      .attr('cy', 40)
+      .attr('fill', d => {
+        if (d.type === 'source') return '#1f77b4';
+        if (d.type === 'destination') return '#d62728';
+        return '#69b3a2';
+      })
+      .attr('stroke', d => d.datacenter === this.selectedDatacenter ? 'red' : 'none')
+      .attr('stroke-width', d => d.datacenter === this.selectedDatacenter ? 3 : 0)
+      .on('mouseover', (event, d) => {
+        const info = `Host: ${d.host}\nIP: ${d.ip || 'N/A'}\nDatacenter: ${d.datacenter}\nLocation: ${d.location || 'N/A'}${d.type === 'hop' ? `\nHop: ${d.hopNumber}\nRTT: ${d.rtt} ms` : ''}`;
+        this.tooltip.text(info).style('opacity', 1);
+        this.updateTooltipPosition(event);
+      }).on('mouseout', () => {
+        this.tooltip.style('opacity', 0);
+      });
+
+    // Location label left
+    nodeGroup.append('text')
+      .attr('x', 20)
+      .attr('y', 30)
+      .attr('dy', '0.35em')
+      .attr('font-size', 10)
+      .attr('text-anchor', 'start')
+      .attr('fill', '#666')
+      .text(d => d.datacenter || ''); // Use datacenter for left label
+
+    // Host/IP right
+    nodeGroup.append('text')
+      .attr('x', 115)
+      .attr('y', 40)
+      .attr('dy', '0.35em')
+      .attr('font-size', 11)
+      .attr('text-anchor', 'start')
+      .attr('fill', '#333')
+      .text(d => `${d.host}${d.ip ? ` (${d.ip})` : ''}`);
+
+    // Hop info bottom
+    nodeGroup.filter(d => d.type === 'hop')
+      .append('text')
+      .attr('x', 100)
+      .attr('y', 70)
+      .attr('dy', '0.35em')
+      .attr('font-size', 9)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#666')
+      .text(d => `Hop ${d.hopNumber} | ${d.rtt} ms`);
+
+    // Add zoom
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        this.zoomGroup.attr('transform', event.transform);
+      });
+
+    this.svg.call(zoom);
+  }
+
+  ngAfterViewInit() {
+    this.svg = d3.select(this.svgElement.nativeElement);
+    this.zoomGroup = this.svg.append('g');
+    this.tooltip = d3.select(this.tooltipElement.nativeElement);
+  }
+}
