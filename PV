@@ -1,3 +1,18 @@
+// In updateViz(), after the // Add zoom block (this.svg.call(zoom);), add:
+if (this.selectedDatacenter) {
+  const selectedNodes = nodes.filter(n => n.datacenter === this.selectedDatacenter);
+  if (selectedNodes.length > 0) {
+    const avgX = d3.mean(selectedNodes, (n: any) => n.x) || 0;
+    const avgY = d3.mean(selectedNodes, (n: any) => n.y) || 0;
+    const tx = width / 2 - avgX;
+    const ty = height / 2 - avgY;
+    const newTransform = d3.zoomIdentity.translate(tx, ty);
+    this.svg.transition().duration(750).call(zoom.transform, newTransform);
+  }
+}
+
+
+
 import { Component, Input, ViewChild, ElementRef, AfterViewInit, OnInit } from '@angular/core';
 import * as d3 from 'd3';
 import * as dagre from 'dagre';
