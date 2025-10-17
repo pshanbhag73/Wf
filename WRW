@@ -1,0 +1,47 @@
+I'll assume we're using a NoSQL database like MongoDB for these collections, as they handle time-series data well for metrics and service mappings. Each collection is designed to be queryable by timestamp and datacenter (DC) for efficient lookups in the "What's Running Where" feature. I've included sample schema fields, indexes, and rationale.
+1. Metrics Collection: device_metrics
+This collection stores CPU and memory metrics from devices, tagged with the associated DC. It supports time-series aggregation for trend analysis.
+Schema (JSON-like document structure):
+{
+  "_id": ObjectId,  // Auto-generated unique ID
+  "timestamp": ISODate("2025-10-17T12:00:00Z"),  // UTC timestamp for the metric snapshot
+  "device_id": "device-123",  // Unique device identifier
+  "dc_name": "us-west-1",  // Datacenter name (e.g., AWS region or custom DC label)
+  "cpu_usage_percent": 45.5,  // CPU utilization as percentage (0-100)
+  "memory_usage_percent": 67.2,  // Memory utilization as percentage (0-100)
+  "metadata": {  // Optional: Additional context
+    "hostname": "server-abc",
+    "app_instance_id": "app-v1-instance-1"  // Link to application instance if available
+  }
+}
+Recommended Indexes:
+Compound index on { "timestamp": -1, "dc_name": 1 } for fast time-range queries per DC.
+Index on { "device_id": 1 } for device-specific lookups.
+Rationale: Time-series optimized for querying recent metrics (e.g., last 5-15 minutes) to detect activity. Store at 1-5 minute intervals to balance granularity and storage.
+2. Service Collection: service_dc_mappings
+This collection stores service-to-DC mappings from APM tools (e.g., New Relic, Datadog), capturing where services were deployed/running at a given time.
+Schema (JSON-like document structure):
+{
+  "_id": ObjectId,  // Auto-generated unique ID
+  "timestamp": ISODate("2025-10-17T12:00:00Z"),  // UTC timestamp for the mapping snapshot
+  "service_id": "auth-service-v2",  // Unique service identifier from APM
+  "dc_name": "us-west-1",  // Datacenter where the service is running
+  "app_name": "user-auth-app",  // Application name for higher-level grouping
+  "status": "active",  // Enum: "active", "inactive", "scaling"
+  "apm_source": "newrelic",  // Tool that reported this (for auditing)
+  "metadata": {  // Optional: APM-specific details
+    "instance_count": 3,
+    "health_score": 95  // APM health metric (0-100)
+  }
+}
+Recommended Indexes:
+Compound index on { "timestamp": -1, "service_id": 1 } for time-based service history.
+Index on { "dc_name": 1, "app_name": 1 } for DC-to-app lookups.
+Rationale: Captures deployment snapshots from APM polls (e.g., every 1-2 minutes). Enables joining with metrics via DC and timestamp for the feature.
+Algorithm: Detect Application Activity from Metrics Trends
+This algorithm determines if an application (or service instance) is "active" at a given query time T by analyzing CPU/memory trends from the device_metrics collection. It compares the recent trend (last 15 minutes) against a historical baseline (last 1 hour) to detect spikes indicative of activity, reducing false positives from idle baselines.
+Inputs:
+Query time T (ISODate).
+Device ID or app instance ID (to filter metrics).
+Thresholds: activity_threshold (e.g., 20% above baseline), window_recent (e.g., 15 minutes), window_historical (e.g., 60 minutes).
+Min samples: At least 3 data points per window
