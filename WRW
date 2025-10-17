@@ -1,47 +1,48 @@
-I'll assume we're using a NoSQL database like MongoDB for these collections, as they handle time-series data well for metrics and service mappings. Each collection is designed to be queryable by timestamp and datacenter (DC) for efficient lookups in the "What's Running Where" feature. I've included sample schema fields, indexes, and rationale.
-1. Metrics Collection: device_metrics
-This collection stores CPU and memory metrics from devices, tagged with the associated DC. It supports time-series aggregation for trend analysis.
-Schema (JSON-like document structure):
-{
-  "_id": ObjectId,  // Auto-generated unique ID
-  "timestamp": ISODate("2025-10-17T12:00:00Z"),  // UTC timestamp for the metric snapshot
-  "device_id": "device-123",  // Unique device identifier
-  "dc_name": "us-west-1",  // Datacenter name (e.g., AWS region or custom DC label)
-  "cpu_usage_percent": 45.5,  // CPU utilization as percentage (0-100)
-  "memory_usage_percent": 67.2,  // Memory utilization as percentage (0-100)
-  "metadata": {  // Optional: Additional context
-    "hostname": "server-abc",
-    "app_instance_id": "app-v1-instance-1"  // Link to application instance if available
-  }
-}
-Recommended Indexes:
-Compound index on { "timestamp": -1, "dc_name": 1 } for fast time-range queries per DC.
-Index on { "device_id": 1 } for device-specific lookups.
-Rationale: Time-series optimized for querying recent metrics (e.g., last 5-15 minutes) to detect activity. Store at 1-5 minute intervals to balance granularity and storage.
-2. Service Collection: service_dc_mappings
-This collection stores service-to-DC mappings from APM tools (e.g., New Relic, Datadog), capturing where services were deployed/running at a given time.
-Schema (JSON-like document structure):
-{
-  "_id": ObjectId,  // Auto-generated unique ID
-  "timestamp": ISODate("2025-10-17T12:00:00Z"),  // UTC timestamp for the mapping snapshot
-  "service_id": "auth-service-v2",  // Unique service identifier from APM
-  "dc_name": "us-west-1",  // Datacenter where the service is running
-  "app_name": "user-auth-app",  // Application name for higher-level grouping
-  "status": "active",  // Enum: "active", "inactive", "scaling"
-  "apm_source": "newrelic",  // Tool that reported this (for auditing)
-  "metadata": {  // Optional: APM-specific details
-    "instance_count": 3,
-    "health_score": 95  // APM health metric (0-100)
-  }
-}
-Recommended Indexes:
-Compound index on { "timestamp": -1, "service_id": 1 } for time-based service history.
-Index on { "dc_name": 1, "app_name": 1 } for DC-to-app lookups.
-Rationale: Captures deployment snapshots from APM polls (e.g., every 1-2 minutes). Enables joining with metrics via DC and timestamp for the feature.
 Algorithm: Detect Application Activity from Metrics Trends
 This algorithm determines if an application (or service instance) is "active" at a given query time T by analyzing CPU/memory trends from the device_metrics collection. It compares the recent trend (last 15 minutes) against a historical baseline (last 1 hour) to detect spikes indicative of activity, reducing false positives from idle baselines.
 Inputs:
 Query time T (ISODate).
 Device ID or app instance ID (to filter metrics).
 Thresholds: activity_threshold (e.g., 20% above baseline), window_recent (e.g., 15 minutes), window_historical (e.g., 60 minutes).
-Min samples: At least 3 data points per window
+Min samples: At least 3 data points per window.
+Pseudocode (Python-like for clarity):
+function is_active(T, device_id, activity_threshold=20, window_recent=15, window_historical=60):
+    # Step 1: Fetch recent metrics (T - window_recent to T)
+    recent_metrics = query_device_metrics(device_id, T - window_recent mins, T)
+    if len(recent_metrics) < 3:
+        return False  # Insufficient data
+    
+    # Step 2: Compute recent trend (simple linear regression slope for CPU + memory avg)
+    recent_cpu_avg = average([m.cpu_usage_percent for m in recent_metrics])
+    recent_mem_avg = average([m.memory_usage_percent for m in recent_metrics])
+    recent_combined = (recent_cpu_avg + recent_mem_avg) / 2  # Normalize to 0-100
+    
+    # Step 3: Fetch historical baseline (T - window_historical to T - window_recent)
+    historical_metrics = query_device_metrics(device_id, T - window_historical mins, T - window_recent mins)
+    if len(historical_metrics) < 3:
+        baseline = 5  # Fallback low baseline for idle
+    else:
+        historical_cpu_avg = average([m.cpu_usage_percent for m in historical_metrics])
+        historical_mem_avg = average([m.memory_usage_percent for m in historical_metrics])
+        baseline = (historical_cpu_avg + historical_mem_avg) / 2
+    
+    # Step 4: Detect activity via trend comparison
+    trend_delta = recent_combined - baseline
+    if trend_delta > activity_threshold:
+        # Optional: Confirm with slope (positive trend in recent window)
+        recent_slope = linear_regression_slope([m.timestamp for m in recent_metrics], 
+                                              [m.cpu_usage_percent for m in recent_metrics])  # Or use combined
+        if recent_slope > 0:  # Rising trend
+            return True, f"Active: {trend_delta:.1f}% above baseline"
+    
+    return False, f"Inactive: {trend_delta:.1f}% delta from baseline"
+Explanation of Steps:
+Fetch Recent Data: Query the last window_recent minutes to capture current state.
+Compute Recent Trend: Average CPU/memory for a snapshot; use slope for directionality if needed (e.g., via NumPy's polyfit for regression).
+Compute Baseline: Average from the prior window_historical to establish "normal" idle/load.
+Compare & Decide: If recent avg exceeds baseline by threshold and shows a positive trend, mark as active. This handles varying workloads (e.g., bursty apps).
+Edge Cases Handled:
+Low data: Fall back to inactive or low baseline.
+No trend: Relies on absolute delta.
+Integrate with service collection: Cross-check DC match and APM status for confirmation.
+This setup allows querying at time T: Join collections on DC/timestamp, apply the algorithm to metrics, and overlay APM data for a full view. If implementing in code, use libraries like Pandas for averages/slopes
