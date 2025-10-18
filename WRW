@@ -45,4 +45,4 @@ Edge Cases Handled:
 Low data: Fall back to inactive or low baseline.
 No trend: Relies on absolute delta.
 Integrate with service collection: Cross-check DC match and APM status for confirmation.
-This setup allows querying at time T: Join collections on DC/timestamp, apply the algorithm to metrics, and overlay APM data for a full view. If implementing in code, use libraries like Pandas for averages/slopes
+This setup allows querying at time T: Join collections on DC/timestamp, apply the algorithm to metrics, and overlay APM data for a full view. If implementing in code, use libraries like Pandas for averages/sl
