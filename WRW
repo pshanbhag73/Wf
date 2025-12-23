@@ -1,113 +1,107 @@
-Data Collections
-The data collections remain as previously defined: device_metrics for CPU/memory metrics from devices (tagged by DC) and service_dc_mappings for service-to-DC mappings from APM tools. No changes needed here.
-Algorithm: Detect Application Activity from Metrics Trends (Real-Time Version)
-This updated algorithm determines if an application (or service instance) is "active" at the current time (using Instant.now()) by analyzing CPU/memory trends from the device_metrics collection. It no longer requires a query time T as input—instead, it always evaluates activity for the present moment. This makes it suitable for continuous monitoring, dashboards, or scheduled jobs that run periodically (e.g., every minute).
-The logic compares the recent trend (last 15 minutes) against a historical baseline (last 1 hour prior to the recent window) to detect spikes indicative of activity, reducing false positives from idle baselines.
-Inputs:
-Device ID or app instance ID (to filter metrics).
-Thresholds: activityThreshold (e.g., 20% above baseline), windowRecent (e.g., 15 minutes), windowHistorical (e.g., 60 minutes).
-Min samples: At least 3 data points per window.
-Pseudocode (Java-like for clarity):
 import java.time.Instant;
 import java.time.Duration;
 import java.util.List;
-import java.util.OptionalDouble;
 
-// Assume a MetricRecord class with fields: Instant timestamp, double cpuUsagePercent, double memoryUsagePercent
-// Assume a DataQueryService with method: List<MetricRecord> queryDeviceMetrics(String deviceId, Instant start, Instant end)
+public class SmartActivityDetector {
 
-public class ActivityDetector {
-    
-    public static class ActivityResult {
-        private final boolean active;
-        private final String reason;
-        private final Instant evaluationTime;  // The current time when evaluated
-        
-        public ActivityResult(boolean active, String reason, Instant evaluationTime) {
-            this.active = active;
-            this.reason = reason;
-            this.evaluationTime = evaluationTime;
-        }
-        
-        // Getters...
+    public record ActivityResult(
+            boolean active,
+            String reason,
+            double currentLoad,
+            double baselineLoad,
+            Instant evaluatedAt
+    ) {}
+
+    private final DataQueryService queryService;
+
+    // Tunable thresholds (adjust per environment)
+    private static final double ABSOLUTE_ACTIVE_THRESHOLD = 15.0;   // 15% combined CPU+Mem above baseline → active
+    private static final double IDLE_THRESHOLD = 10.0;             // < 10% combined → definitely idle
+    private static final long RECENT_WINDOW_MINUTES = 12;          // Look at last 12 min
+    private static final long BASELINE_WINDOW_MINUTES = 90;        // Baseline from 90–102 min ago (avoids recent spikes)
+
+    public SmartActivityDetector(DataQueryService queryService) {
+        this.queryService = queryService;
     }
-    
-    public ActivityResult getCurrentActivity(String deviceId, double activityThreshold, long windowRecentMinutes, long windowHistoricalMinutes) {
-        // Always use current time for real-time evaluation
-        Instant now = Instant.now();  // Or use a clock for testing: Clock.systemUTC().instant()
-        
-        // Step 1: Fetch recent metrics (now - windowRecent to now)
-        Instant recentStart = now.minus(Duration.ofMinutes(windowRecentMinutes));
-        List<MetricRecord> recentMetrics = dataQueryService.queryDeviceMetrics(deviceId, recentStart, now);
-        if (recentMetrics.size() < 3) {
-            return new ActivityResult(false, "Insufficient recent data", now);
+
+    public ActivityResult detectCurrentActivity(String deviceId) {
+        Instant now = Instant.now();
+        Instant recentStart = now.minus(Duration.ofMinutes(RECENT_WINDOW_MINUTES));
+
+        // 1. Get recent metrics (last ~12 min)
+        List<MetricRecord> recent = queryService.queryDeviceMetrics(
+                deviceId, recentStart, now);
+
+        if (recent.isEmpty()) {
+            return new ActivityResult(false, "No recent metrics", 0, 0, now);
         }
-        
-        // Step 2: Compute recent trend (simple average for CPU + memory)
-        OptionalDouble recentCpuAvg = recentMetrics.stream()
-            .mapToDouble(m -> m.getCpuUsagePercent())
-            .average();
-        OptionalDouble recentMemAvg = recentMetrics.stream()
-            .mapToDouble(m -> m.getMemoryUsagePercent())
-            .average();
-        double recentCpu = recentCpuAvg.orElse(0.0);
-        double recentMem = recentMemAvg.orElse(0.0);
-        double recentCombined = (recentCpu + recentMem) / 2.0;  // Normalize to 0-100
-        
-        // Step 3: Fetch historical baseline (now - windowHistorical to now - windowRecent)
-        Instant historicalStart = now.minus(Duration.ofMinutes(windowHistoricalMinutes));
-        Instant historicalEnd = recentStart;
-        List<MetricRecord> historicalMetrics = dataQueryService.queryDeviceMetrics(deviceId, historicalStart, historicalEnd);
-        
-        double baseline;
-        if (historicalMetrics.size() < 3) {
-            baseline = 5.0;  // Fallback low baseline for idle
-        } else {
-            OptionalDouble historicalCpuAvg = historicalMetrics.stream()
-                .mapToDouble(m -> m.getCpuUsagePercent())
-                .average();
-            OptionalDouble historicalMemAvg = historicalMetrics.stream()
-                .mapToDouble(m -> m.getMemoryUsagePercent())
-                .average();
-            double historicalCpu = historicalCpuAvg.orElse(0.0);
-            double historicalMem = historicalMemAvg.orElse(0.0);
-            baseline = (historicalCpu + historicalMem) / 2.0;
+
+        // 2. Compute current combined load (avg CPU + avg Mem)/2
+        double avgCpu = recent.stream().mapToDouble(MetricRecord::cpuUsagePercent).average().orElse(0.0);
+        double avgMem = recent.stream().mapToDouble(MetricRecord::memoryUsagePercent).average().orElse(0.0);
+        double currentLoad = (avgCpu + avgMem) / 2.0;
+
+        // 3. Compute true idle baseline (90–102 min ago → avoids contamination from recent activity)
+        Instant baselineStart = now.minus(Duration.ofMinutes(BASELINE_WINDOW_MINUTES + RECENT_WINDOW_MINUTES));
+        Instant baselineEnd   = now.minus(Duration.ofMinutes(BASELINE_WINDOW_MINUTES));
+
+        List<MetricRecord> baselineMetrics = queryService.queryDeviceMetrics(deviceId, baselineStart, baselineEnd);
+
+        double baselineLoad = 5.0; // safe default for brand-new devices
+        if (!baselineMetrics.isEmpty()) {
+            double bCpu = baselineMetrics.stream().mapToDouble(MetricRecord::cpuUsagePercent).average().orElse(5.0);
+            double bMem = baselineMetrics.stream().mapToDouble(MetricRecord::memoryUsagePercent).average().orElse(5.0);
+            baselineLoad = (bCpu + bMem) / 2.0;
         }
-        
-        // Step 4: Detect activity via trend comparison
-        double trendDelta = recentCombined - baseline;
-        if (trendDelta > activityThreshold) {
-            // Optional: Confirm with slope (positive trend in recent window)
-            // Note: For simplicity, implement linear regression slope using a library like Apache Commons Math
-            // double recentSlope = computeLinearSlope(recentMetrics);  // Pseudo-method
-            // if (recentSlope > 0) {  // Rising trend
-                return new ActivityResult(true, String.format("Active at %s: %.1f%% above baseline", now, trendDelta), now);
-            // }
+
+        // 4. Decision logic — uptrend NOT required
+        boolean active;
+        String reason;
+
+        if (currentLoad >= baselineLoad + ABSOLUTE_ACTIVE_THRESHOLD) {
+            active = true;
+            reason = String.format("High load (%.1f%% vs baseline %.1f%%)", currentLoad, baselineLoad);
         }
-        
-        return new ActivityResult(false, String.format("Inactive at %s: %.1f%% delta from baseline", now, trendDelta), now);
+        else if (currentLoad <= IDLE_THRESHOLD) {
+            active = false;
+            reason = String.format("Idle level (%.1f%% ≤ %.0f%%)", currentLoad, IDLE_THRESHOLD);
+        }
+        else {
+            // In the "gray zone": not clearly idle, not clearly spiked
+            // → treat as active (better to over-report than under-report running services)
+            active = true;
+            reason = String.format("Moderate sustained load (%.1f%% > idle)", currentLoad);
+        }
+
+        return new ActivityResult(active, reason, round(currentLoad), round(baselineLoad), now);
     }
-    
-    // Helper method for linear regression slope (pseudo, use external lib in real impl)
-    private double computeLinearSlope(List<MetricRecord> metrics) {
-        // Implement simple linear regression: slope = (n*sum(xy) - sum(x)*sum(y)) / (n*sum(x2) - sum(x)^2)
-        // Convert timestamps to minutes from start for x-values
-        // Use CPU or combined for y
-        // Return slope value
-        return 0.0;  // Placeholder
+
+    private double round(double val) {
+        return Math.round(val * 10.0) / 10.0;
     }
-}
-Explanation of Changes and Steps:
-Real-Time Evaluation: Removed Instant T parameter; now uses Instant.now() (or injectable Clock for testability) to always assess activity for the current moment.
-Fetch Recent Data: Queries up to now for the last windowRecentMinutes.
-Compute Recent Trend: Unchanged—uses Java Streams for averaging.
-Compute Baseline: Adjusted windows relative to now.
-Compare & Decide: Outputs include the evaluation timestamp for logging/auditing. Activity is marked true if delta exceeds threshold (optionally with positive slope).
-Usage Example:
-Call detector.getCurrentActivity("device-123", 20.0, 15, 60) in a cron job or event listener to poll periodically.
-For the "What's Running Where" feature, run this per device/DC and join with service_dc_mappings for the latest snapshot.
-Edge Cases Handled:
-Low data: Returns inactive with reason, timestamped to now.
-Clock skew: Use a shared Clock instance in distributed systems.
-Integrate with service collection: Query latest APM status up to now for confirmation.
-This version keeps the algorithm lightweight for real-time use while enabling historical queries if needed via a separate method.
+
+
+
+
+
+Goal: Detect if a device/service is currently active, regardless of whether usage is going up, down, or stable — as long as it's meaningfully above idle.
+New Rules (more accurate):
+Compute baseline from the last 1–2 hours (idle/reference period).
+Compute current average from the last 10–15 minutes.
+If current average ≥ baseline + absolute_threshold → ACTIVE
+(absolute_threshold = e.g. 15% combined CPU+Mem)
+Optional softener: even if slightly below, if recent max was high → still active (handles cooldown)
+Only mark inactive if current load is very close to historical idle (e.g. < 8–10%)
+
+
+
+// Conservative (fewer false positives)
+ABSOLUTE_ACTIVE_THRESHOLD = 20.0
+IDLE_THRESHOLD = 8.0
+
+// Aggressive (never miss a running service)
+ABSOLUTE_ACTIVE_THRESHOLD = 12.0
+IDLE_THRESHOLD = 12.0
+
+
+
