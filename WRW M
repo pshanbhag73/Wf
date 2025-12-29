@@ -1,42 +1,40 @@
+let appId = "my-app-123";  // Replace with your app ID
 
-{ $round: ["$cpu_usage_percent", 1] }  // Shows 45.6 instead of 45.599999999
-
-
-{ $merge: {
-  into: "app_current_status",
-  on: ["device_id"],
-  whenMatched: "replace",
-  whenNotMatched: "insert"
-}}
-
-
-// Parameter: Replace "my-app-123" with the actual appId
-let appId = "my-app-123";
-
-// Dynamic time calculations (use in MongoDB shell, Atlas, or via driver with $currentDate)
 let now = new Date();
-let recentStart = new Date(now.getTime() - 12 * 60 * 1000);        // now - 12 minutes
-let baselineEnd = new Date(now.getTime() - 90 * 60 * 1000);        // now - 90 minutes
-let baselineStart = new Date(now.getTime() - 102 * 60 * 1000);     // now - 102 minutes
+let recentStart = new Date(now.getTime() - 12 * 60 * 1000);           // Last 12 minutes
+let baselineEnd = new Date(now.getTime() - 90 * 60 * 1000);          // 90 min ago
+let baselineStart = new Date(now.getTime() - 102 * 60 * 1000);       // 102 min ago
 
 db.device_metrics.aggregate([
-  // Step 1: Filter only metrics for devices running the given appId
+  // Step 1: Filter by app_id and recent time range (~2 hours)
   {
     $match: {
-      "metadata.app_id": appId,                          // <-- Key filter: all devices for this app
-      timestamp: { $gte: baselineStart }                 // Limit to last ~2 hours (optimization)
+      "metadata.app_id": appId,
+      timestamp: { $gte: baselineStart }
     }
   },
 
-  // Step 2: Group by device to compute recent and baseline averages
+  // Step 2: Group by service_name (if exists) AND device_id
   {
     $group: {
-      _id: "$metadata.device_id",                        // One group per device
+      _id: {
+        service_name: { 
+          $cond: [
+            { $ifNull: ["$metadata.service_name", false] },
+            "$metadata.service_name",
+            null  // null means no service_name
+          ]
+        },
+        device_id: "$metadata.device_id"
+      },
 
-      dc_name: { $first: "$metadata.dc_name" },          // Preserve DC for "What's Running Where"
-      hostname: { $first: "$metadata.hostname" },        // Optional context
+      // Preserve useful metadata (take first seen)
+      dc_name: { $first: "$metadata.dc_name" },
+      device_type: { $first: "$metadata.device_type" },      // ← NEW
+      hostname: { $first: "$metadata.hostname" },
+      environment: { $first: "$metadata.environment" },      // optional extra
 
-      // Recent window: last 12 minutes
+      // Recent window averages (last 12 min)
       recent_cpu: {
         $avg: {
           $cond: [{ $gte: ["$timestamp", recentStart] }, "$cpu_usage_percent", null]
@@ -51,66 +49,62 @@ db.device_metrics.aggregate([
         $sum: { $cond: [{ $gte: ["$timestamp", recentStart] }, 1, 0] }
       },
 
-      // Baseline window: 90–102 minutes ago
+      // Baseline window averages (90–102 min ago)
       baseline_cpu: {
         $avg: {
           $cond: [
-            { $and: [
-              { $gte: ["$timestamp", baselineStart] },
-              { $lt: ["$timestamp", baselineEnd] }
-            ]},
-            "$cpu_usage_percent",
-            null
+            { $and: [{ $gte: ["$timestamp", baselineStart] }, { $lt: ["$timestamp", baselineEnd] }] },
+            "$cpu_usage_percent", null
           ]
         }
       },
       baseline_mem: {
         $avg: {
           $cond: [
-            { $and: [
-              { $gte: ["$timestamp", baselineStart] },
-              { $lt: ["$timestamp", baselineEnd] }
-            ]},
-            "$memory_usage_percent",
-            null
+            { $and: [{ $gte: ["$timestamp", baselineStart] }, { $lt: ["$timestamp", baselineEnd] }] },
+            "$memory_usage_percent", null
           ]
         }
       },
       baseline_count: {
         $sum: {
           $cond: [
-            { $and: [
-              { $gte: ["$timestamp", baselineStart] },
-              { $lt: ["$timestamp", baselineEnd] }
-            ]},
-            1,
-            0
+            { $and: [{ $gte: ["$timestamp", baselineStart] }, { $lt: ["$timestamp", baselineEnd] }] },
+            1, 0
           ]
         }
       }
     }
   },
 
-  // Step 3: Compute combined loads and determine activity
+  // Step 3: Reshape and compute loads
   {
     $project: {
-      device_id: "$_id",
+      service_name: "$_id.service_name",
+      device_id: "$_id.device_id",
       dc_name: 1,
+      device_type: 1,           // ← NEW in output
       hostname: 1,
+      environment: 1,
 
       current_load: {
-        $divide: [
-          { $add: ["$recent_cpu", "$recent_mem"] },
-          2
+        $round: [
+          { $divide: [{ $add: ["$recent_cpu", "$recent_mem"] }, 2] },
+          1
         ]
       },
       recent_samples: "$recent_count",
 
       baseline_load: {
-        $cond: [
-          { $lt: ["$baseline_count", 3] },
-          5.0,  // Default idle if not enough historical data
-          { $divide: [{ $add: ["$baseline_cpu", "$baseline_mem"] }, 2] }
+        $round: [
+          {
+            $cond: [
+              { $lt: ["$baseline_count", 3] },
+              5.0,
+              { $divide: [{ $add: ["$baseline_cpu", "$baseline_mem"] }, 2] }
+            ]
+          },
+          1
         ]
       },
 
@@ -129,72 +123,49 @@ db.device_metrics.aggregate([
     }
   },
 
-  // Step 4: Final activity decision (no uptrend required)
+  // Step 4: Determine activity status
   {
     $project: {
+      service_name: 1,
       device_id: 1,
       dc_name: 1,
+      device_type: 1,
       hostname: 1,
-      current_load: { $round: ["$current_load", 1] },
-      baseline_load: { $round: ["$baseline_load", 1] },
+      environment: 1,
+      current_load: 1,
+      baseline_load: 1,
+
       active: {
         $cond: [
-          { $lte: ["$current_load", 10] },                   // Clearly idle
+          { $lte: ["$current_load", 10] },
           false,
-          { $gte: ["$current_load", { $add: ["$baseline_load", 15] }] },  // High spike
+          { $gte: ["$current_load", { $add: ["$baseline_load", 15] }] },
           true,
-          true                                               // Default: moderate load = active
+          true  // moderate load = active
         ]
       },
+
       reason: {
         $switch: {
           branches: [
-            {
-              case: { $gte: ["$load_delta", 15] },
-              then: "High load (spike above baseline)"
-            },
-            {
-              case: { $lte: ["$current_load", 10] },
-              then: "Idle (low utilization)"
-            }
+            { case: { $gte: ["$load_delta", 15] }, then: "High load (spike)" },
+            { case: { $lte: ["$current_load", 10] }, then: "Idle" }
           ],
-          default: "Active (moderate/sustained load)"
+          default: "Active (moderate/sustained)"
         }
       },
+
       evaluated_at: now
     }
   },
 
-  // Optional: Sort by activity or DC
-  { $sort: { dc_name: 1, active: -1, current_load: -1 } }
+  // Step 5: Sort for better readability – services first, then devices
+  {
+    $sort: {
+      service_name: 1,       // nulls (no service) come first in MongoDB
+      dc_name: 1,
+      active: -1,
+      current_load: -1
+    }
+  }
 ])
-
-
-
-
-
-Computes current load (last ~12 minutes) and baseline load (90–102 minutes ago)
-Determines if each device is active (high/moderate load) or inactive (idle)
-Returns one document per device with clear status and reasoning
-
-
-
-// 1. Primary recommended index (best for this exact query pattern)
-db.device_metrics.createIndex(
-  { "metadata.app_id": 1, "timestamp": 1 }
-)
-
-// 2. Additional index for fast grouping by device_id within an app
-db.device_metrics.createIndex(
-  { "metadata.app_id": 1, "metadata.device_id": 1, "timestamp": 1 }
-)
-
-// 3. Useful if you often query by dc_name as well (e.g., "What's Running Where" by region)
-db.device_metrics.createIndex(
-  { "metadata.app_id": 1, "metadata.dc_name": 1, "timestamp": 1 }
-)
-
-// 4. Optional: For direct device-level lookups (if you sometimes query single device)
-db.device_metrics.createIndex(
-  { "metadata.device_id": 1, "timestamp": -1 }
-)
