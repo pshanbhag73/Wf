@@ -1,3 +1,15 @@
+
+{ $round: ["$cpu_usage_percent", 1] }  // Shows 45.6 instead of 45.599999999
+
+
+{ $merge: {
+  into: "app_current_status",
+  on: ["device_id"],
+  whenMatched: "replace",
+  whenNotMatched: "insert"
+}}
+
+
 // Parameter: Replace "my-app-123" with the actual appId
 let appId = "my-app-123";
 
