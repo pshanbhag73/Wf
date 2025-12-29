@@ -1,0 +1,108 @@
+// After computing current_load and baseline_load...
+
+{
+  $group: { /* existing group */ 
+    // Add recent std dev
+    recent_std_dev: {
+      $stdDevSamp: {
+        $cond: [{ $gte: ["$timestamp", recentStart] },
+          { $divide: [{ $add: ["$cpu_usage_percent", "$memory_usage_percent"] }, 2] },
+          null
+        ]
+      }
+    }
+  }
+},
+{
+  $project: {
+    // ... existing fields
+    anomaly_score: {
+      $divide: [{ $subtract: ["$current_load", "$baseline_load"] }, "$recent_std_dev"]
+    },
+    is_anomaly: {
+      $or: [
+        { $gt: [{ $subtract: ["$current_load", "$baseline_load"] }, { $multiply: ["$recent_std_dev", 3] }] },  // Spike
+        { $lt: ["$current_load", { $subtract: ["$baseline_load", { $multiply: ["$recent_std_dev", 3] }] }] }   // Unusual drop
+      ]
+    },
+    anomaly_reason: {
+      $cond: [
+        "$is_anomaly",
+        "Significant deviation from baseline (possible overload/leak)",
+        "Normal"
+      ]
+    }
+  }
+}
+
+
+Device health anomaly detection identifies unusual patterns in server or device metrics (like CPU and memory utilization) that may indicate issues such as performance bottlenecks, leaks, overheating, malware, or impending failures. It goes beyond simple thresholds (e.g., CPU > 90%) by learning "normal" behavior over time, accounting for seasonality (e.g., daily/weekly peaks), trends, and correlations between metrics.
+This is crucial for proactive monitoring in large-scale environments (e.g., 200k devices), reducing downtime and alert fatigue.
+Key Metrics for Device Health
+Focus on these core ones from your device_metrics collection:
+CPU usage percent — Spikes or sustained high levels indicate overload.
+Memory usage percent — Gradual increases suggest leaks; sudden drops/rises can signal issues.
+Combined load — (CPU + Memory)/2, as used in previous pipelines.
+Additional (if available): Disk I/O, network throughput, temperature (for hardware health).
+Common Anomaly Types in CPU/Memory
+Type
+Description
+Example in CPU/Memory
+Detection Approach
+Point anomaly
+Single extreme value
+Sudden CPU spike to 100%
+Z-score or Isolation Forest
+Contextual
+Normal in one context, abnormal in another
+High memory at night (usually low)
+Seasonal decomposition
+Collective
+Sequence of points abnormal together
+Gradual memory creep over days
+Trend analysis or autoencoders
+Correlation
+Unusual relationship between metrics
+High CPU but low memory (or vice versa)
+Multivariate models (e.g., ratios)
+Best Practices
+Establish Baselines: Use historical data (e.g., last 1-7 days) to learn normal patterns, including daily/weekly seasonality.
+Handle Seasonality: Metrics often peak during business hours—avoid false positives.
+Multivariate Analysis: CPU and memory are correlated; anomalies in one without the other can be suspicious.
+Unsupervised Methods: Ideal since labeled anomalies are rare—assume most data is normal.
+Reduce False Positives: Use dynamic thresholds (e.g., 3σ from baseline) + confirmation over multiple points.
+Real-Time vs Batch: For dashboards, run periodically; for alerts, near real-time.
+Scale: With 100M+ records/day, push computation to MongoDB where possible.
+Recommended Techniques (Simple to Advanced)
+Technique
+Pros
+Cons
+Suitable For Your Scale?
+Z-Score / MAD (Median Absolute Deviation)
+Simple, fast, no ML needed
+Assumes normal distribution
+Yes (in MongoDB agg)
+Seasonal Decomposition (e.g., STL) + Threshold
+Handles trends/seasonality
+Needs tuning
+Yes
+Isolation Forest
+Good for multivariate, unsupervised
+Requires pulling data to app/ML
+Medium (batch)
+Prophet / ARIMA Forecasting
+Excellent for seasonality
+Slower for many series
+Batch per device/service
+Autoencoders (Deep Learning)
+Captures complex patterns
+Needs training data & compute
+Offline/advanced
+MongoDB-Centric Implementation (Building on Your Pipeline)
+Extend your existing aggregation pipeline for basic anomaly detection directly in MongoDB (fast & scalable):
+Add Anomaly Score: Compute deviation from baseline + recent std dev.
+Flag Anomalies: If current_load > baseline + 3 * recent_std_dev → anomaly.
+
+
+Start with the enhanced MongoDB pipeline for immediate wins on your existing setup. This will flag true health issues (e.g., memory leaks as gradual rises) while ignoring normal fluctuations.
+
