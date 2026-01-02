@@ -74,3 +74,95 @@ Use Git hooks (Husky for Angular, pre-commit for Java) to enforce checks.
 Ignore AI suggestions (Copilot/GitHub Copilot) blindly — always review for unused code.
 Self-review PRs: Search for // TODO, commented code, unused vars.
 Share this as a team guideline document (e.g., in repo README or Confluence) so everyone follows the same standards. This will drastically cut down on repetitive review comments!
+
+
+
+
+
+
+CI/CD Best Practices for Angular + Spring Boot Projects
+To reduce PR review fatigue and ensure reliable, secure deployments, enforce these basic CI/CD standards. Use GitHub Actions (free and integrated) or similar (Jenkins, GitLab CI) for automation. Aim for pipelines that trigger on PRs (for checks) and pushes to main/develop (for builds/deploys).
+General Pipeline Principles
+Fail Fast: Pipeline should fail early on any lint/test/security issue — no merging broken code.
+Branch Strategy:
+Run full checks on PRs to main/develop.
+Auto-deploy to dev/staging on merge to develop.
+Manual approval or tag-based deploy to production on main.
+Caching: Cache dependencies (npm for Angular, Maven/Gradle for Spring Boot) to speed up runs (e.g., cache ~/.m2 and node_modules).
+Parallel Jobs: Run frontend and backend jobs in parallel where possible.
+No Hardcoded Secrets: Never commit secrets — use repository secrets (GitHub Secrets) or vault tools.
+Common Pipeline Stages
+A typical GitHub Actions workflow (.github/workflows/ci-cd.yml) includes:
+Checkout Code
+Setup Environments (Node.js for Angular, JDK for Spring Boot)
+Install Dependencies (npm install / mvn install)
+Lint & Format Check (Enforce code standards automatically)
+Run Tests (Unit + Integration; aim for >80% coverage)
+Static Analysis / Security Scans (Catch vulnerabilities early)
+Build Artifacts (ng build --prod for Angular; mvn package for JAR/WAR)
+Docker Build & Push (Optional but recommended for consistency)
+Deploy (To dev/staging/prod environments)
+Specific for Angular (Frontend)
+Use Node.js 20+.
+Commands:
+npm ci (clean install for reproducibility).
+ng lint (fail on errors).
+ng test --watch=false --browsers=ChromeHeadless (headless tests).
+ng build --configuration production (optimized build).
+Enforce no unused code: Integrate ESLint rules that fail on unused vars/imports.
+Specific for Spring Boot (Backend)
+Use JDK 21+.
+Commands (Maven example; adapt for Gradle):
+mvn clean verify (runs tests + package).
+Include SonarQube or SpotBugs for code quality.
+Test thoroughly: Unit (JUnit/Mockito) + Integration (@SpringBootTest).
+Security Best Practices (Critical in 2025+)
+Secrets Management: Store DB creds, API keys in GitHub Secrets; inject as env vars.
+Dependency Scanning: Use tools like npm audit, OWASP Dependency-Check, or GitHub Dependabot — fail on high/critical vulnerabilities.
+SAST/SCA: Integrate Trivy, Snyk, or GitHub CodeQL for static scans.
+Least Privilege: Runners use minimal permissions; no admin access.
+Signed Artifacts: Use cosign or similar for Docker image signing if containerized.
+Branch Protection: Require passing status checks + approvals before merge.
+Example Minimal GitHub Actions Workflow Structure
+Separate workflows for frontend/backend or one with matrix/jobs.
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  angular-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npx ng lint  # Fail on lint errors
+      - run: npx ng test --watch=false
+      - run: npx ng build --prod
+
+  springboot-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: 21, distribution: temurin }
+      - run: mvn -B clean verify  # Tests + package
+
+  security-scan:  # Optional combined job
+    needs: [angular-build-test, springboot-build-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+Tips to Enforce & Reduce Review Comments
+Require Status Checks: In repo settings > Branches > Require status checks to pass before merging (add your workflow jobs).
+Auto-Fix Where Possible: Use pre-commit hooks or actions for formatting/lint fixes.
+Notifications: Slack/Email on failures.
+Monitor Pipeline Health: Keep runs <10-15 mins; optimize caching.
+Add this to your team docs/repo README. These basics will catch lint issues, unused code, test failures, and basic security problems automatically — freeing reviews for architecture/logic discussions! If using Docker/K8s for deployment, extend with build/push steps.
