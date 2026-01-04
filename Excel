@@ -1,3 +1,0 @@
-=IF(SUMPRODUCT(--(LEFT(Sheet1!A1, LEN(Sheet2!A1:Z1000))=Sheet2!A1:Z1000))>0, "Found a Match", "No Match")
-
-=IF(LEFT(Sheet2!A1, LEN(Sheet1!A1))=Sheet1!A1, "Starts With", "Does Not Start With")
