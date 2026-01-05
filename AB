@@ -1,0 +1,5 @@
+Ab Initio stores metadata (data about your data and applications) in the EME, a centralized repository that tracks graphs, versions, components, transformations, and more. The Metadata Hub builds on this by providing advanced features like data lineage (tracing data origins and transformations), dependencies (how applications, jobs, and datasets interconnect), and governance. It categorizes metadata into:
+Business metadata: Ownership, definitions, change management.
+Technical metadata: Database/table details, data types, keys.
+Operational metadata: Data history, transformations, performance stats.
+The Metadata Hub integrates with EME to automatically derive lineage and dependencies, often without manual intervention. It supports self-service views for analysts, including UI-based browsing of datasets, jobs, and flows. For
