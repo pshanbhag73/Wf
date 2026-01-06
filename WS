@@ -1,0 +1,59 @@
+// Replace with your values
+const realm = 'us1';  // Your realm, e.g., 'us0', 'eu0'
+const token = 'YOUR_ORG_ACCESS_TOKEN_HERE';  // Paste your org token
+
+const wsUrl = `wss://stream.\( {realm}.signalfx.com/v2/signalflow/authenticate/ \){token}`;
+
+const ws = new WebSocket(wsUrl);
+
+ws.onopen = () => {
+  console.log('WebSocket connected and authenticated!');
+
+  // Example SignalFlow program with tag/dimension filters
+  // Filters on dimensions (tags): e.g., only production environment and specific host
+  const program = `
+    data('cpu.utilization', filter('environment' == 'production' AND 'host' == 'web-server-01'))
+      .mean(by=['host'])
+      .publish();
+  `;
+
+  const executeMsg = {
+    type: 'execute',
+    program: program.trim(),
+    // Optional: resolution, maxDelay, etc. for control
+  };
+
+  ws.send(JSON.stringify(executeMsg));
+  console.log('Sent execute request with filtered program');
+};
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  console.log('Received message:', msg);
+
+  if (msg.type === 'data') {
+    // Data messages contain tsId (time series ID) and datapoints
+    msg.data.forEach((series) => {
+      console.log('Time series data:', series);
+    });
+  } else if (msg.type === 'metadata') {
+    // Metadata: dimensions (tags), etc.
+    console.log('Metadata (tags/dimensions):', msg.properties);
+  } else if (msg.type === 'message') {
+    console.log('Info:', msg.message);
+  } else if (msg.type === 'error') {
+    console.error('Error:', msg.error);
+  }
+};
+
+ws.onerror = (err) => {
+  console.error('WebSocket error:', err);
+};
+
+ws.onclose = (event) => {
+  console.log('WebSocket closed:', event.code, event.reason);
+};
+
+// To stop the stream later:
+// ws.send(JSON.stringify({ type: 'stop', channel: 'YOUR_CHANNEL_FROM_RESPONSE' }));
+// Or just ws.close();
