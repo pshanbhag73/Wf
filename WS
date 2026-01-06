@@ -1,50 +1,48 @@
 // Replace with your values
-const realm = 'us1';  // e.g., 'us0', 'eu0'
-const token = 'YOUR_ORG_ACCESS_TOKEN_HERE';  // Your org token
+const realm = 'us1';  // Your realm, e.g., 'us0', 'eu0'
+const token = 'YOUR_ORG_ACCESS_TOKEN_HERE';  // Org token
 
 const wsUrl = `wss://stream.\( {realm}.signalfx.com/v2/signalflow/authenticate/ \){token}`;
 
 const ws = new WebSocket(wsUrl);
 
-// Calculate timestamps for the last hour (in ms since epoch)
+// Time window: last hour (adjust as needed)
 const now = Date.now();
-const oneHourAgo = now - 3600000;  // 1 hour in ms
+const oneHourAgo = now - 3600000;  // 1 hour ago in ms
 
-// Object to store unique app-DC pairs for recording
-const activeAppsByDC = new Map();  // Key: a.dc, Value: Set of a.appid
+// Store unique active app-DC pairs
+const activeAppsByDC = new Map();  // dc -> Set of appids
 
 ws.onopen = () => {
   console.log('WebSocket connected and authenticated!');
 
-  // SignalFlow program: Query all metrics with a.dc and a.appid, count per group
-  // This identifies active combos (any count > 0 means running in the window)
-  // Use '*' for all metrics; replace with 'cpu.*' or specific if too broad
+  // SignalFlow program: Fetch ANY metric that has both a.dc and a.appid
+  // This returns all unique time series (with their dimensions) active in the window
+  // No need for '*' — use a placeholder like 'cpu.utilization' or known metric if possible
+  // To broaden: remove metric name and use extrapolation=false to avoid extras
   const program = `
-    data('*', filter=filter('a.dc', '*') and filter('a.appid', '*'))
-      .count(by=['a.dc', 'a.appid'])
-      .publish();
+    data('*', filter=filter('a.dc', '*') and filter('a.appid', '*'), extrapolation='null', maxExtrapolations=0)
+    .publish();
   `;
 
   const executeMsg = {
     type: 'execute',
     program: program.trim(),
-    start: oneHourAgo,  // Start of 1-hour window
-    stop: now,          // End of window (now)
-    resolution: 60000,  // 1-min resolution (adjust as needed, e.g., 300000 for 5-min)
-    maxDelay: 300000,   // Allow up to 5 min delay for data ingestion
-    immediate: true     // Run historical computation immediately
+    start: oneHourAgo,
+    stop: now,
+    resolution: 60000,     // 1-minute buckets
+    maxDelay: 300000,      // Up to 5 min ingestion delay
+    immediate: false       // Process historical data normally
   };
 
   ws.send(JSON.stringify(executeMsg));
-  console.log('Sent execute request for last hour with grouping');
+  console.log('Executing historical query for active a.dc + a.appid combinations...');
 };
 
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  console.log('Received message:', msg);
 
   if (msg.type === 'metadata') {
-    // Metadata has dimensions (properties) for each tsId
     const properties = msg.properties || {};
     const dc = properties['a.dc'];
     const appid = properties['a.appid'];
@@ -54,35 +52,30 @@ ws.onmessage = (event) => {
         activeAppsByDC.set(dc, new Set());
       }
       activeAppsByDC.get(dc).add(appid);
-      console.log(`Recorded active app/component: ${appid} in DC ${dc}`);
+      console.log(`Active: App/Component "\( {appid}" in Data Center " \){dc}"`);
     }
-  } else if (msg.type === 'data') {
-    // Optional: Data points show counts per group over time
-    // If count > 0 at any point, it's active (but we use metadata for uniqueness)
-    console.log('Data point:', msg);
-  } else if (msg.type === 'job-start' || msg.type === 'job-progress') {
-    console.log('Job status:', msg);
+  } else if (msg.type === 'message' || msg.type === 'job-start' || msg.type === 'job-progress') {
+    console.log('Status:', msg.message || msg);
   } else if (msg.type === 'end-of-channel' || msg.type === 'detach') {
-    // When computation ends, output the recorded data
-    console.log('Computation complete. Recorded active apps/components by DC:');
+    console.log('\n=== Computation Complete ===');
+    console.log('Unique active applications/components by data center:');
     activeAppsByDC.forEach((apps, dc) => {
-      console.log(`Data Center: ${dc}`);
-      apps.forEach(app => console.log(`  - App/Component: ${app}`));
+      console.log(`\nData Center: ${dc}`);
+      apps.forEach(app => console.log(`  - ${app}`));
     });
-    // Optional: To save as JSON, copy this:
-    console.log('JSON output:', JSON.stringify(Array.from(activeAppsByDC.entries()).map(([dc, apps]) => ({ dc, apps: Array.from(apps) }))));
+    console.log('\nTotal data centers:', activeAppsByDC.size);
+    let totalApps = 0;
+    activeAppsByDC.forEach(apps => totalApps += apps.size);
+    console.log('Total unique app/component instances:', totalApps);
+
+    // For easy copy: JSON format
+    const jsonOutput = Array.from(activeAppsByDC.entries())
+      .map(([dc, apps]) => ({ data_center: dc, applications: Array.from(apps) }));
+    console.log('\nJSON for recording:', JSON.stringify(jsonOutput, null, 2));
   } else if (msg.type === 'error') {
-    console.error('Error:', msg.error);
+    console.error('SignalFlow Error:', msg.error || msg);
   }
 };
 
-ws.onerror = (err) => {
-  console.error('WebSocket error:', err);
-};
-
-ws.onclose = (event) => {
-  console.log('WebSocket closed:', event.code, event.reason);
-};
-
-// To stop early: ws.close();
-// Or send { type: 'detach', channel: 'CHANNEL_FROM_JOB-START' }
+ws.onerror = (err) => console.error('WebSocket error:', err);
+ws.onclose = (event) => console.log('WebSocket closed:', event.code, event.reason);
