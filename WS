@@ -1,46 +1,76 @@
 // Replace with your values
-const realm = 'us1';  // Your realm, e.g., 'us0', 'eu0'
-const token = 'YOUR_ORG_ACCESS_TOKEN_HERE';  // Paste your org token
+const realm = 'us1';  // e.g., 'us0', 'eu0'
+const token = 'YOUR_ORG_ACCESS_TOKEN_HERE';  // Your org token
 
 const wsUrl = `wss://stream.\( {realm}.signalfx.com/v2/signalflow/authenticate/ \){token}`;
 
 const ws = new WebSocket(wsUrl);
 
+// Calculate timestamps for the last hour (in ms since epoch)
+const now = Date.now();
+const oneHourAgo = now - 3600000;  // 1 hour in ms
+
+// Object to store unique app-DC pairs for recording
+const activeAppsByDC = new Map();  // Key: a.dc, Value: Set of a.appid
+
 ws.onopen = () => {
   console.log('WebSocket connected and authenticated!');
 
-  // Example SignalFlow program with tag/dimension filters
-  // Filters on dimensions (tags): e.g., only production environment and specific host
+  // SignalFlow program: Query all metrics with a.dc and a.appid, count per group
+  // This identifies active combos (any count > 0 means running in the window)
+  // Use '*' for all metrics; replace with 'cpu.*' or specific if too broad
   const program = `
-    data('cpu.utilization', filter('environment' == 'production' AND 'host' == 'web-server-01'))
-      .mean(by=['host'])
+    data('*', filter=filter('a.dc', '*') and filter('a.appid', '*'))
+      .count(by=['a.dc', 'a.appid'])
       .publish();
   `;
 
   const executeMsg = {
     type: 'execute',
     program: program.trim(),
-    // Optional: resolution, maxDelay, etc. for control
+    start: oneHourAgo,  // Start of 1-hour window
+    stop: now,          // End of window (now)
+    resolution: 60000,  // 1-min resolution (adjust as needed, e.g., 300000 for 5-min)
+    maxDelay: 300000,   // Allow up to 5 min delay for data ingestion
+    immediate: true     // Run historical computation immediately
   };
 
   ws.send(JSON.stringify(executeMsg));
-  console.log('Sent execute request with filtered program');
+  console.log('Sent execute request for last hour with grouping');
 };
 
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
   console.log('Received message:', msg);
 
-  if (msg.type === 'data') {
-    // Data messages contain tsId (time series ID) and datapoints
-    msg.data.forEach((series) => {
-      console.log('Time series data:', series);
+  if (msg.type === 'metadata') {
+    // Metadata has dimensions (properties) for each tsId
+    const properties = msg.properties || {};
+    const dc = properties['a.dc'];
+    const appid = properties['a.appid'];
+
+    if (dc && appid) {
+      if (!activeAppsByDC.has(dc)) {
+        activeAppsByDC.set(dc, new Set());
+      }
+      activeAppsByDC.get(dc).add(appid);
+      console.log(`Recorded active app/component: ${appid} in DC ${dc}`);
+    }
+  } else if (msg.type === 'data') {
+    // Optional: Data points show counts per group over time
+    // If count > 0 at any point, it's active (but we use metadata for uniqueness)
+    console.log('Data point:', msg);
+  } else if (msg.type === 'job-start' || msg.type === 'job-progress') {
+    console.log('Job status:', msg);
+  } else if (msg.type === 'end-of-channel' || msg.type === 'detach') {
+    // When computation ends, output the recorded data
+    console.log('Computation complete. Recorded active apps/components by DC:');
+    activeAppsByDC.forEach((apps, dc) => {
+      console.log(`Data Center: ${dc}`);
+      apps.forEach(app => console.log(`  - App/Component: ${app}`));
     });
-  } else if (msg.type === 'metadata') {
-    // Metadata: dimensions (tags), etc.
-    console.log('Metadata (tags/dimensions):', msg.properties);
-  } else if (msg.type === 'message') {
-    console.log('Info:', msg.message);
+    // Optional: To save as JSON, copy this:
+    console.log('JSON output:', JSON.stringify(Array.from(activeAppsByDC.entries()).map(([dc, apps]) => ({ dc, apps: Array.from(apps) }))));
   } else if (msg.type === 'error') {
     console.error('Error:', msg.error);
   }
@@ -54,6 +84,5 @@ ws.onclose = (event) => {
   console.log('WebSocket closed:', event.code, event.reason);
 };
 
-// To stop the stream later:
-// ws.send(JSON.stringify({ type: 'stop', channel: 'YOUR_CHANNEL_FROM_RESPONSE' }));
-// Or just ws.close();
+// To stop early: ws.close();
+// Or send { type: 'detach', channel: 'CHANNEL_FROM_JOB-START' }
