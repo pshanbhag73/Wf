@@ -1,5 +1,82 @@
-Ab Initio stores metadata (data about your data and applications) in the EME, a centralized repository that tracks graphs, versions, components, transformations, and more. The Metadata Hub builds on this by providing advanced features like data lineage (tracing data origins and transformations), dependencies (how applications, jobs, and datasets interconnect), and governance. It categorizes metadata into:
-Business metadata: Ownership, definitions, change management.
-Technical metadata: Database/table details, data types, keys.
-Operational metadata: Data history, transformations, performance stats.
-The Metadata Hub integrates with EME to automatically derive lineage and dependencies, often without manual intervention. It supports self-service views for analysts, including UI-based browsing of datasets, jobs, and flows. For
+You're correct that tying the "Clearly Idle" threshold to a fixed 10% can limit adaptability in diverse environments. While 10% works well as a conservative default for many systems (where true idle often hovers near single digits due to OS overhead), it risks false negatives for devices with inherently higher baselines—e.g., always-on services running background tasks at 15-20%.
+Making this threshold dynamic and deviation-based aligns better with the algorithm's philosophy of per-device personalization. It reduces misclassifications by anchoring "idle" to observed historical norms rather than a universal constant. This is especially valuable in your large-scale setup (200k devices), where workload patterns vary by app, service, or DC.
+Updated Threshold Recommendation
+Instead of a fixed 10%, redefine "Clearly Idle" as:
+Current Load ≤ Baseline Load + Idle Deviation Threshold
+Where Idle Deviation Threshold = a small positive offset, e.g., 5% (tunable).
+This allows for minor noise above baseline while still catching true idleness.
+If baseline is unreliable (e.g., <3 samples), fallback to a safe fixed low like 10%.
+To catch unusual drops (potential anomalies like crashes), add a symmetric check:
+If Current Load < Baseline Load - Anomaly Drop Threshold (e.g., 15%), flag as possible anomaly (e.g., "Unexpected Drop – Service Down?").
+This keeps the three-zone model but makes it fully adaptive.
+Why Deviation-Based is Better (with Examples)
+Handles Variable Baselines: Baselines aren't always low. Deviation ensures "idle" is relative.
+Reduces Errors: Fixed thresholds ignore context; deviation incorporates it.
+Proactive for Anomalies: Catches not just highs (overloads) but lows (failures).
+Zone (Updated)
+New Rule
+Interpretation
+Example Scenario
+Decision
+Improvement Over Fixed 10%
+Clearly Idle
+Current Load ≤ Baseline + 5%
+Device is at or near its normal resting state
+Baseline 18% (background tasks), Current 20% → Within +5%
+Inactive
+Adapts to high-baseline devices; fixed 10% would wrongly call this "active"
+High Spike (Clear Anomaly)
+Current Load ≥ Baseline + 15%
+Significant unexpected increase
+Baseline 12%, Current 65% → +53% delta
+Active + Anomaly Flagged
+Unchanged – focuses on positive deviations
+Unexpected Drop (New Anomaly Zone)
+Current Load < Baseline - 15%
+Unusual decrease (possible failure)
+Baseline 40%, Current 10% → -30% delta
+Inactive + Anomaly Flagged
+Catches crashes; fixed thresholds miss this
+Moderate / Sustained
+Everything else
+Normal operation
+Baseline 25%, Current 35% → +10%
+Active (Healthy)
+Unchanged – safe default
+Tuning Notes:
+Idle Deviation (5%): Low to avoid over-classifying noise as active; test with historical data (e.g., via MongoDB queries on low-activity periods).
+Anomaly Drop (15%): Matches spike threshold for symmetry; higher than idle to avoid flagging minor dips.
+Fallbacks: If baseline < 5%, use fixed 10% to prevent over-sensitivity.
+Integration into MongoDB Pipeline
+Update the $project stage for activity/anomaly:
+{
+  $project: {
+    // ... existing fields
+    active: {
+      $cond: [
+        { $lte: ["$current_load", { $add: ["$baseline_load", 5] }] },  // Dynamic idle
+        false,
+        { $gte: ["$current_load", { $add: ["$baseline_load", 15] }] },
+        true,
+        true  // Moderate = active
+      ]
+    },
+    is_anomaly: {
+      $or: [
+        { $gte: ["$load_delta", 15] },  // Spike
+        { $lte: ["$load_delta", -15] }  // Drop
+      ]
+    },
+    reason: {
+      $switch: {
+        branches: [
+          { case: { $gte: ["$load_delta", 15] }, then: "High load (spike anomaly)" },
+          { case: { $lte: ["$load_delta", -15] }, then: "Unexpected drop (possible failure)" },
+          { case: { $lte: ["$current_load", { $add: ["$baseline_load", 5] }] }, then: "Idle" }
+        ],
+        default: "Active (moderate/sustained)"
+      }
+    }
+  }
+}
+This change makes the system more robust without added complexity—still runs fast at scale. If we observe edge cases (e.g., via logs), we can refine deviations further. Great catch!
