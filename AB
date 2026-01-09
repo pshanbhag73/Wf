@@ -14,7 +14,7 @@ db.device_metrics.aggregate([
     }
   },
 
-  // Step 2: Group by service_name (if exists) AND device_id
+  // Step 2: Group by service_name (if exists), device_id, and dc_name to compute per-DC baselines
   {
     $group: {
       _id: {
@@ -22,19 +22,19 @@ db.device_metrics.aggregate([
           $cond: [
             { $ifNull: ["$metadata.service_name", false] },
             "$metadata.service_name",
-            null  // null means no service_name
+            null
           ]
         },
-        device_id: "$metadata.device_id"
+        device_id: "$metadata.device_id",
+        dc_name: "$metadata.dc_name"  // Now grouping includes DC for cross-comparison
       },
 
       // Preserve useful metadata (take first seen)
-      dc_name: { $first: "$metadata.dc_name" },
       device_type: { $first: "$metadata.device_type" },
       hostname: { $first: "$metadata.hostname" },
       environment: { $first: "$metadata.environment" },
 
-      // Recent window averages (last 12 min) – keep mean for current (less historical bias)
+      // Recent window averages (last 12 min) – per device/DC
       recent_cpu: {
         $avg: {
           $cond: [{ $gte: ["$timestamp", recentStart] }, "$cpu_usage_percent", null]
@@ -49,7 +49,7 @@ db.device_metrics.aggregate([
         $sum: { $cond: [{ $gte: ["$timestamp", recentStart] }, 1, 0] }
       },
 
-      // Baseline window: Collect arrays for percentile calc (90–102 min ago)
+      // Baseline window: Collect arrays for percentile calc (90–102 min ago) – per device/DC
       baseline_combined: {
         $push: {
           $cond: [
@@ -70,25 +70,16 @@ db.device_metrics.aggregate([
     }
   },
 
-  // Step 3: Compute loads + relative delta (use median for baseline)
+  // Step 3: Compute per-device/DC loads (own baseline)
   {
-    $project: {
-      service_name: "$_id.service_name",
-      device_id: "$_id.device_id",
-      dc_name: 1,
-      device_type: 1,
-      hostname: 1,
-      environment: 1,
-
+    $addFields: {
       current_load: {
         $round: [
           { $divide: [{ $add: ["$recent_cpu", "$recent_mem"] }, 2] },
           1
         ]
       },
-      recent_samples: "$recent_count",
-
-      baseline_load: {
+      own_baseline_load: {
         $round: [
           {
             $cond: [
@@ -99,31 +90,86 @@ db.device_metrics.aggregate([
           },
           1
         ]
-      },
+      }
+    }
+  },
 
-      absolute_delta: {
-        $subtract: [
-          { $divide: [{ $add: ["$recent_cpu", "$recent_mem"] }, 2] },
+  // Step 4: Group by service_name and device_id to compute cross-DC peer baseline (median across other DCs)
+  {
+    $group: {
+      _id: {
+        service_name: "$_id.service_name",
+        device_id: "$_id.device_id"
+      },
+      devices: {
+        $push: {
+          dc_name: "$_id.dc_name",
+          device_type: "$device_type",
+          hostname: "$hostname",
+          environment: "$environment",
+          current_load: "$current_load",
+          recent_samples: "$recent_count",
+          own_baseline_load: "$own_baseline_load",
+          own_absolute_delta: { $subtract: ["$current_load", "$own_baseline_load"] }
+        }
+      },
+      all_dc_baselines: { $push: "$own_baseline_load" }  // Collect baselines from all DCs for this device/service
+    }
+  },
+
+  // Step 5: For each device/service, compute peer baseline (median of other DCs' baselines) and blend/compare
+  {
+    $unwind: "$devices"  // Flatten back to per-device/DC
+  },
+  {
+    $addFields: {
+      // Peer baseline: Median of baselines from OTHER DCs (exclude own DC's baseline)
+      peer_baseline_load: {
+        $round: [
           {
             $cond: [
-              { $lt: ["$baseline_count", 3] },
-              5.0,
-              { $percentile: { input: "$baseline_combined", p: [0.5], method: "approximate" } }[0]
+              { $eq: [{ $size: "$all_dc_baselines" }, 1] },  // Only one DC? Fallback to own
+              "$devices.own_baseline_load",
+              { $percentile: {
+                  input: {
+                    $filter: {
+                      input: "$all_dc_baselines",
+                      as: "bl",
+                      cond: { $ne: [" \]bl", "$devices.own_baseline_load"] }  // Exclude own
+                    }
+                  },
+                  p: [0.5],
+                  method: "approximate"
+                } }[0]
             ]
-          }
+          },
+          1
         ]
+      }
+    }
+  },
+  {
+    $addFields: {
+      // Blended baseline: Max(own, peer) to avoid flat/low own baselines under-reporting activity
+      blended_baseline_load: {
+        $max: ["$devices.own_baseline_load", "$peer_baseline_load"]
       },
-
+      // Use blended for delta (avoids flat baselines marking as active incorrectly)
+      absolute_delta: { $subtract: ["$devices.current_load", "$blended_baseline_load"] }
+    }
+  },
+  {
+    $addFields: {
       relative_delta: {
         $let: {
           vars: {
             safe_baseline: {
-              $cond: [{ $gt: ["$baseline_load", 1] }, "$baseline_load", 5]  // Fallback for low/zero baseline
+              $cond: [{ $gt: ["$blended_baseline_load", 1] }, "$blended_baseline_load", 5]  // Fallback for low/zero
             }
           },
           in: {
             $round: [
-              { $multiply: [{ $divide: [" \]absolute_delta", "$$safe_baseline"] }, 100] },
+              { $multiply: [{ $divide: ["$absolute_delta", "$$safe_baseline"] }, 100] },
               1
             ]
           }
@@ -132,24 +178,26 @@ db.device_metrics.aggregate([
     }
   },
 
-  // Step 4: Determine activity status (using relative with tolerance for small negatives)
+  // Step 6: Determine activity status (using relative with tolerance for small negatives)
   {
     $project: {
-      service_name: 1,
-      device_id: 1,
-      dc_name: 1,
-      device_type: 1,
-      hostname: 1,
-      environment: 1,
-      current_load: 1,
-      baseline_load: 1,
+      service_name: "$_id.service_name",
+      device_id: "$_id.device_id",
+      dc_name: "$devices.dc_name",
+      device_type: "$devices.device_type",
+      hostname: "$devices.hostname",
+      environment: "$devices.environment",
+      current_load: "$devices.current_load",
+      own_baseline_load: "$devices.own_baseline_load",
+      peer_baseline_load: 1,
+      blended_baseline_load: 1,
       relative_delta: 1,
 
       active: {
         $cond: {
           if: { $lte: ["$relative_delta", -10] },  // Significant drop → idle/inactive
           then: false,
-          else: true  // All else (including small negatives, moderates, highs) → active
+          else: true  // All else → active
         }
       },
 
@@ -175,10 +223,10 @@ db.device_metrics.aggregate([
     }
   },
 
-  // Step 5: Sort for better readability – services first, then devices
+  // Step 7: Sort for better readability – services first, then devices
   {
     $sort: {
-      service_name: 1,       // nulls (no service) come first in MongoDB
+      service_name: 1,
       dc_name: 1,
       active: -1,
       current_load: -1
