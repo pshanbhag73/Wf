@@ -124,22 +124,24 @@ db.device_metrics.aggregate([
       relative_delta: {
         $let: {
           vars: {
-            safe_baseline: {
-              $cond: [{ $gt: ["$baseline_load", 1] }, "$baseline_load", 5]  // Fallback for low/zero baseline
+            vars: {
+              safe_baseline: {
+                $cond: [{ $gt: ["$baseline_load", 1] }, "$baseline_load", 5]  // Fallback for low/zero baseline
+              }
+            },
+            in: {
+              $round: [
+                { $multiply: [{ $divide: ["\[ absolute_delta", " \]safe_baseline"] }, 100] },
+                1
+              ]
             }
-          },
-          in: {
-            $round: [
-              { $multiply: [{ $divide: ["\[ absolute_delta", " \]safe_baseline"] }, 100] },
-              1
-            ]
           }
         }
       }
     }
   },
 
-  // Step 4: Determine activity status (using relative)
+  // Step 4: Determine activity status (using relative with tolerance for small negatives)
   {
     $project: {
       service_name: 1,
@@ -153,19 +155,23 @@ db.device_metrics.aggregate([
       relative_delta: 1,
 
       active: {
-        $cond: [
-          { $lte: ["$relative_delta", 10] },  // Dynamic idle (≤10% relative)
-          false,
-          { $gte: ["$relative_delta", 50] },  // High spike (≥50% relative)
-          true,
-          true  // Moderate = active
-        ]
+        $cond: {
+          if: { $lte: ["$relative_delta", -10] },  // Significant drop → idle/inactive
+          then: false,
+          else: {
+            $cond: {
+              if: { $gte: ["$relative_delta", 50] },  // High spike → active
+              then: true,
+              else: true  // Moderate (including small negatives/positives) → active
+            }
+          }
+        }
       },
 
       is_anomaly: {
         $or: [
           { $gte: ["$relative_delta", 50] },  // Relative spike
-          { $lte: ["$relative_delta", -50] }  // Relative drop (possible failure)
+          { $lte: ["$relative_delta", -50] }  // Large relative drop (possible failure)
         ]
       },
 
@@ -174,9 +180,9 @@ db.device_metrics.aggregate([
           branches: [
             { case: { $gte: ["$relative_delta", 50] }, then: "High load (spike anomaly)" },
             { case: { $lte: ["$relative_delta", -50] }, then: "Unexpected drop (possible failure)" },
-            { case: { $lte: ["$relative_delta", 10] }, then: "Idle" }
+            { case: { $lte: ["$relative_delta", -10] }, then: "Idle (significant drop)" }
           ],
-          default: "Active (moderate/sustained)"
+          default: "Active (moderate/sustained, including minor fluctuations)"
         }
       },
 
