@@ -1,235 +1,108 @@
-let appId = "my-app-123";  // Replace with your app ID
-
-let now = new Date();
-let recentStart = new Date(now.getTime() - 12 * 60 * 1000);           // Last 12 minutes
-let baselineEnd = new Date(now.getTime() - 90 * 60 * 1000);          // 90 min ago
-let baselineStart = new Date(now.getTime() - 102 * 60 * 1000);       // 102 min ago
-
-db.device_metrics.aggregate([
-  // Step 1: Filter by app_id and recent time range (~2 hours)
-  {
-    $match: {
-      "metadata.app_id": appId,
-      timestamp: { $gte: baselineStart }
-    }
-  },
-
-  // Step 2: Group by service_name (if exists), device_id, and dc_name to compute per-DC baselines
-  {
-    $group: {
-      _id: {
-        service_name: { 
-          $cond: [
-            { $ifNull: ["$metadata.service_name", false] },
-            "$metadata.service_name",
-            null
-          ]
-        },
-        device_id: "$metadata.device_id",
-        dc_name: "$metadata.dc_name"  // Now grouping includes DC for cross-comparison
-      },
-
-      // Preserve useful metadata (take first seen)
-      device_type: { $first: "$metadata.device_type" },
-      hostname: { $first: "$metadata.hostname" },
-      environment: { $first: "$metadata.environment" },
-
-      // Recent window averages (last 12 min) – per device/DC
-      recent_cpu: {
-        $avg: {
-          $cond: [{ $gte: ["$timestamp", recentStart] }, "$cpu_usage_percent", null]
-        }
-      },
-      recent_mem: {
-        $avg: {
-          $cond: [{ $gte: ["$timestamp", recentStart] }, "$memory_usage_percent", null]
-        }
-      },
-      recent_count: {
-        $sum: { $cond: [{ $gte: ["$timestamp", recentStart] }, 1, 0] }
-      },
-
-      // Baseline window: Collect arrays for percentile calc (90–102 min ago) – per device/DC
-      baseline_combined: {
-        $push: {
-          $cond: [
-            { $and: [{ $gte: ["$timestamp", baselineStart] }, { $lt: ["$timestamp", baselineEnd] }] },
-            { $divide: [{ $add: ["$cpu_usage_percent", "$memory_usage_percent"] }, 2] },
-            "\[ REMOVE"
-          ]
-        }
-      },
-      baseline_count: {
-        $sum: {
-          $cond: [
-            { $and: [{ $gte: ["$timestamp", baselineStart] }, { $lt: ["$timestamp", baselineEnd] }] },
-            1, 0
-          ]
-        }
-      }
-    }
-  },
-
-  // Step 3: Compute per-device/DC loads (own baseline)
-  {
-    $addFields: {
-      current_load: {
-        $round: [
-          { $divide: [{ $add: ["$recent_cpu", "$recent_mem"] }, 2] },
-          1
-        ]
-      },
-      own_baseline_load: {
-        $round: [
-          {
-            $cond: [
-              { $lt: ["$baseline_count", 3] },
-              5.0,
-              { $percentile: { input: "$baseline_combined", p: [0.5], method: "approximate" } }[0]  // Median
-            ]
-          },
-          1
-        ]
-      }
-    }
-  },
-
-  // Step 4: Group by service_name and device_id to compute cross-DC peer baseline (median across other DCs)
-  {
-    $group: {
-      _id: {
-        service_name: "$_id.service_name",
-        device_id: "$_id.device_id"
-      },
-      devices: {
-        $push: {
-          dc_name: "$_id.dc_name",
-          device_type: "$device_type",
-          hostname: "$hostname",
-          environment: "$environment",
-          current_load: "$current_load",
-          recent_samples: "$recent_count",
-          own_baseline_load: "$own_baseline_load",
-          own_absolute_delta: { $subtract: ["$current_load", "$own_baseline_load"] }
-        }
-      },
-      all_dc_baselines: { $push: "$own_baseline_load" }  // Collect baselines from all DCs for this device/service
-    }
-  },
-
-  // Step 5: For each device/service, compute peer baseline (median of other DCs' baselines) and blend/compare
-  {
-    $unwind: "$devices"  // Flatten back to per-device/DC
-  },
-  {
-    $addFields: {
-      // Peer baseline: Median of baselines from OTHER DCs (exclude own DC's baseline)
-      peer_baseline_load: {
-        $round: [
-          {
-            $cond: [
-              { $eq: [{ $size: "$all_dc_baselines" }, 1] },  // Only one DC? Fallback to own
-              "$devices.own_baseline_load",
-              { $percentile: {
-                  input: {
-                    $filter: {
-                      input: "$all_dc_baselines",
-                      as: "bl",
-                      cond: { $ne: [" \]bl", "$devices.own_baseline_load"] }  // Exclude own
-                    }
-                  },
-                  p: [0.5],
-                  method: "approximate"
-                } }[0]
-            ]
-          },
-          1
-        ]
-      }
-    }
-  },
-  {
-    $addFields: {
-      // Blended baseline: Max(own, peer) to avoid flat/low own baselines under-reporting activity
-      blended_baseline_load: {
-        $max: ["$devices.own_baseline_load", "$peer_baseline_load"]
-      },
-      // Use blended for delta (avoids flat baselines marking as active incorrectly)
-      absolute_delta: { $subtract: ["$devices.current_load", "$blended_baseline_load"] }
-    }
-  },
-  {
-    $addFields: {
-      relative_delta: {
-        $let: {
-          vars: {
-            safe_baseline: {
-              $cond: [{ $gt: ["$blended_baseline_load", 1] }, "$blended_baseline_load", 5]  // Fallback for low/zero
-            }
-          },
-          in: {
-            $round: [
-              { $multiply: [{ $divide: ["$absolute_delta", "$$safe_baseline"] }, 100] },
-              1
-            ]
-          }
-        }
-      }
-    }
-  },
-
-  // Step 6: Determine activity status (using relative with tolerance for small negatives)
-  {
-    $project: {
-      service_name: "$_id.service_name",
-      device_id: "$_id.device_id",
-      dc_name: "$devices.dc_name",
-      device_type: "$devices.device_type",
-      hostname: "$devices.hostname",
-      environment: "$devices.environment",
-      current_load: "$devices.current_load",
-      own_baseline_load: "$devices.own_baseline_load",
-      peer_baseline_load: 1,
-      blended_baseline_load: 1,
-      relative_delta: 1,
-
-      active: {
-        $cond: {
-          if: { $lte: ["$relative_delta", -10] },  // Significant drop → idle/inactive
-          then: false,
-          else: true  // All else → active
-        }
-      },
-
-      is_anomaly: {
-        $or: [
-          { $gte: ["$relative_delta", 50] },  // Relative spike
-          { $lte: ["$relative_delta", -50] }  // Large relative drop (possible failure)
-        ]
-      },
-
-      reason: {
-        $switch: {
-          branches: [
-            { case: { $gte: ["$relative_delta", 50] }, then: "High load (spike anomaly)" },
-            { case: { $lte: ["$relative_delta", -50] }, then: "Unexpected drop (possible failure)" },
-            { case: { $lte: ["$relative_delta", -10] }, then: "Idle (significant drop)" }
-          ],
-          default: "Active (moderate/sustained, including minor fluctuations)"
-        }
-      },
-
-      evaluated_at: now
-    }
-  },
-
-  // Step 7: Sort for better readability – services first, then devices
-  {
-    $sort: {
-      service_name: 1,
-      dc_name: 1,
-      active: -1,
-      current_load: -1
-    }
-  }
-])
+Documentation Summary: Activity Detection and Health Anomaly Algorithms
+This document summarizes two algorithms used in the "What's Running Where" feature for detecting active devices/services and health anomalies. The first is for OpenShift Container Platform (OCP) app services (using a MongoDB aggregation pipeline with cross-DC comparisons). The second is for Virtual Machines (VMs), with additional logic for database VMs. Both aim to provide accurate, real-time visibility into where applications are running, while flagging anomalies to prevent downtime.
+Why & How We Detect Active Activity & Health Anomalies
+Why:
+Accuracy Over Simplicity: Fixed thresholds (e.g., CPU > 80%) lead to false positives/negatives due to varying workloads, seasonality, and DC-specific behaviors. Dynamic baselines adapt to each device/service's "normal," reducing alert fatigue and missing issues like memory leaks or spikes.
+Proactive Monitoring: Early anomaly detection (e.g., spikes/drops) catches problems like overloads, failures, or inefficiencies before they cause outages, especially in large-scale environments (e.g., 200k devices, 100M+ metrics/day).
+Consistency Across DCs: Some DCs have "flat" baselines (e.g., idle periods), leading to inconsistencies. Cross-DC peer comparisons ensure fairness.
+Business Benefits: Provides a reliable map of active infrastructure, optimizes resource use (e.g., scale down idle VMs), and supports decisions like marking database replicas.
+How:
+Core Method: Compare recent metrics (CPU/memory) against a baseline to compute deltas. Use thresholds to classify activity and anomalies.
+OCP App Services: MongoDB pipeline aggregates time-series data, computes own/peer/blended baselines across DCs, and applies relative deltas for classification.
+VMs: Simpler in-memory or script-based calculation using absolute deltas, with special handling for database VMs (select highest utilization as active, others as replicas).
+Anomalies: Flagged for large deltas (e.g., >50% spike or <-50% drop), triggering alerts.
+Robustness: Medians for baselines (to ignore outliers), relative deltas (for scale-insensitivity), and blending (for DC consistency).
+Step-by-Step Algorithms with Examples
+1. OCP App Services Algorithm (MongoDB Aggregation Pipeline)
+This algorithm processes metrics in MongoDB for containerized services, incorporating cross-DC baselines to handle flat DCs. It outputs per-service/device/DC status.
+Step-by-Step:
+Filter Data: Query metrics for the app ID within the last ~2 hours.
+Why: Limits to relevant recent data for efficiency.
+Example: For app "my-app-123," fetch CPU/memory points since 102 minutes ago.
+Group by Service, Device, and DC: Compute recent averages (last 12 min) and baseline arrays (90-102 min ago) per group.
+Why: Enables per-DC baselines for cross-comparison.
+Example: For "auth-service" on "device-001" in "us-east-1," recent average CPU 75%/Memory 60% → current_load = 67.5%. Baseline array [8, 9, 7, 90 (outlier)].
+Compute Own Baseline: Use median of baseline array for the device's DC.
+Why: Robust to outliers in history.
+Example: Median of [8, 9, 7, 90] = 8.5% → own_baseline_load = 8.5%.
+Group for Cross-DC Peers: Collect baselines across DCs for the same service/device.
+Why: Identifies "peers" in other DCs.
+Example: Baselines: us-east-1: 8.5%, us-west-2: 20%, eu-central-1: 25%.
+Compute Peer and Blended Baselines: Median of other DCs' baselines; blend as max(own, peer).
+Why: Corrects flat own baselines using peers.
+Example: Peer median (excluding own) = 22.5% → blended = max(8.5, 22.5) = 22.5%.
+Calculate Deltas: Absolute (current - blended) and relative ((absolute / blended) * 100).
+Why: Relative handles scale differences.
+Example: Current 67.5%, blended 22.5% → absolute +45, relative +200%.
+Apply Thresholds and Classify: Use zones to set active/anomaly/reason.
+Why: Zones provide nuanced decisions.
+Example: Relative +200% → High Spike → Active + Anomaly.
+Sort and Output: By service/DC/active for readability.
+Why: User-friendly results.
+Threshold Zones with Examples (Using Relative Delta on Blended Baseline):
+Zone
+Rule
+Interpretation
+Example Scenario
+Decision
+Clearly Idle
+Relative Delta ≤ -10%
+Device is significantly below blended normal.
+Blended 30%, current 25% → delta -16.7%
+Inactive
+High Spike (Clear Anomaly)
+Relative Delta ≥ 50%
+Significant unexpected increase.
+Blended 20%, current 35% → delta +75%
+Active + Anomaly Flagged
+Unexpected Drop (Anomaly)
+Relative Delta ≤ -50%
+Unusual large decrease (possible failure).
+Blended 40%, current 15% → delta -62.5%
+Inactive + Anomaly Flagged
+Moderate / Sustained
+-10% < Relative Delta < 50%
+Device is working near expected levels.
+Blended 25%, current 28% → delta +12%
+Active (Healthy)
+2. VMs Algorithm
+This is a simpler, non-MongoDB algorithm (e.g., script-based) using absolute deltas. For database VMs, extract by DB name and mark the one with highest utilization as active; others as replication.
+Step-by-Step:
+Define “Current Load”: Average of (CPU % + Memory %) / 2 over the last 12 minutes.
+Why: Captures present state without spikes.
+Example: VM shows CPU 75%, Memory 60% → Current Load = 67.5%.
+Compute “Baseline Load”: Average of combined metric from 90–102 minutes ago.
+Why: Reflects normal without recent contamination.
+Example: 95 minutes ago, idle → Baseline Load = 8%.
+Calculate Deviation (Load Delta): Current Load – Baseline Load.
+Why: Measures change.
+Example: 67.5% – 8% = +59.5% delta.
+Apply Smart Thresholds: Classify into zones.
+Why: Avoids fixed rules.
+Example: Delta +59.5% → High Spike.
+Special Database VM Handling: Extract VMs by DB name; sort by utilization (current_load); mark highest as active, rest as replication.
+Why: Identifies primary vs. replicas in DB clusters.
+Example: DB "prod-db" on VMs A (load 50%), B (40%), C (45%) → Mark A active, B/C replication.
+Threshold Zones with Examples (Using Absolute Delta):
+Zone
+Rule
+Interpretation
+Example Scenario
+Decision
+Clearly Idle
+Current Load ≤ 10%
+Device is essentially doing nothing.
+Night-time cache server: Current Load 6%
+Inactive
+High Spike (Clear Anomaly)
+Current Load ≥ Baseline + 15%
+Significant unexpected increase.
+Web server: Baseline 12%, Current 65% → Delta +53%
+Active + Potential Anomaly
+Moderate / Sustained
+Everything else (Current > 10% AND not a high spike)
+Device is working at expected level.
+Background worker: Baseline 25%, Current 35% → Delta +10%
+Active (Healthy)
+Summary
+These algorithms provide adaptive, robust detection of active states and anomalies, tailored to OCP services (with DC blending for consistency) and VMs (with DB replication logic). They use dynamic baselines to handle variability, ensuring accurate infrastructure mapping and proactive alerts. Overall, this reduces errors, supports scaling, and enhances reliability—test thresholds with historical data for optimization.
