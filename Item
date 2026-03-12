@@ -1,0 +1,86 @@
+import org.bson.Document;
+import org.bson.types.ObjectId;
+import org.springframework.batch.item.ExecutionContext;
+import org.springframework.batch.item.ItemStreamReader;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+
+import java.util.List;
+
+public class MongoBatchListReader implements ItemStreamReader<List<Document>> {
+
+    private final MongoTemplate mongoTemplate;
+    private final String collectionName;
+    private final Criteria filterCriteria;   // null = no extra filter
+    private final int batchSize;
+
+    private ObjectId lastId;                 // for restartability
+    private boolean exhausted = false;
+
+    /**
+     * @param mongoTemplate  your MongoTemplate bean
+     * @param collectionName source collection
+     * @param filterCriteria optional filter (e.g. Criteria.where("status").is("PENDING"))
+     * @param batchSize      how many documents you want per call to processor (1000-5000 is good)
+     */
+    public MongoBatchListReader(MongoTemplate mongoTemplate,
+                                String collectionName,
+                                Criteria filterCriteria,
+                                int batchSize) {
+        this.mongoTemplate = mongoTemplate;
+        this.collectionName = collectionName;
+        this.filterCriteria = filterCriteria;
+        this.batchSize = batchSize;
+    }
+
+    @Override
+    public List<Document> read() {
+        if (exhausted) {
+            return null; // end of data
+        }
+
+        Query query = new Query();
+        if (filterCriteria != null) {
+            query.addCriteria(filterCriteria);
+        }
+        if (lastId != null) {
+            query.addCriteria(Criteria.where("_id").gt(lastId));
+        }
+        query.with(Sort.by(Sort.Direction.ASC, "_id"))
+             .limit(batchSize);
+
+        List<Document> documents = mongoTemplate.find(query, Document.class, collectionName);
+
+        if (documents.isEmpty()) {
+            exhausted = true;
+            return null;
+        }
+
+        // remember the last _id so next read continues exactly where we left off
+        lastId = documents.get(documents.size() - 1).getObjectId("_id");
+        return documents;
+    }
+
+    // ==================== Restart support ====================
+    @Override
+    public void open(ExecutionContext executionContext) {
+        if (executionContext.containsKey("last.read.id")) {
+            lastId = new ObjectId(executionContext.getString("last.read.id"));
+        }
+        exhausted = false;
+    }
+
+    @Override
+    public void update(ExecutionContext executionContext) {
+        if (lastId != null) {
+            executionContext.putString("last.read.id", lastId.toHexString());
+        }
+    }
+
+    @Override
+    public void close() {
+        // nothing to clean up
+    }
+}
