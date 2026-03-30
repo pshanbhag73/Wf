@@ -1,0 +1,21 @@
+db.jobHistories.updateMany(
+  {},
+  [
+    {
+      $set: {
+        endTime: {
+          $dateAdd: {
+            startDate: "$startTime",
+            unit: "millisecond",
+            amount: {
+              $multiply: [
+                { $add: [2.5, { $multiply: [{ $rand: {} }, 0.5] }] },
+                3600000
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+)
