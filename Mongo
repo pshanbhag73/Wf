@@ -19,3 +19,27 @@ db.jobHistories.updateMany(
     }
   ]
 )
+
+
+
+
+db.jobHistories.updateMany(
+  {},  // matches all documents
+  [
+    {
+      $set: {
+        endTime: {
+          $add: [
+            "$startTime",
+            {
+              $multiply: [
+                { $add: [2.5, { $multiply: [{ $rand: {} }, 0.5] }] },  // random hours: 2.5 to 3.0
+                3600000  // milliseconds in 1 hour (1000 * 60 * 60)
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+)
