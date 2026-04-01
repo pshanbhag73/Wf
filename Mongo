@@ -1,45 +1,107 @@
-db.jobHistories.updateMany(
-  {},
-  [
-    {
-      $set: {
-        endTime: {
-          $dateAdd: {
-            startDate: "$startTime",
-            unit: "millisecond",
-            amount: {
-              $multiply: [
-                { $add: [2.5, { $multiply: [{ $rand: {} }, 0.5] }] },
-                3600000
-              ]
-            }
+db.AppDeviceRelations.aggregate([
+  // Join with Application to get LOB
+  {
+    $lookup: {
+      from: "Application",
+      localField: "appid",          // ← CHANGE to your exact field name
+      foreignField: "appId",        // ← CHANGE to your exact field name in Application
+      as: "appInfo"
+    }
+  },
+  { $unwind: { path: "$appInfo", preserveNullAndEmptyArrays: false } },
+
+  // Join with Devices to get device type
+  {
+    $lookup: {
+      from: "Devices",
+      localField: "deviceid",       // ← CHANGE to your exact field name
+      foreignField: "deviceId",     // ← CHANGE to your exact field name in Devices
+      as: "deviceInfo"
+    }
+  },
+  { $unwind: { path: "$deviceInfo", preserveNullAndEmptyArrays: true } },
+
+  {
+    $facet: {
+      // Apps by LOB (using $addToSet for unique apps)
+      "appsByLob": [
+        { $group: { _id: "$appInfo.lob", apps: { $addToSet: "$appInfo.appId" } } },
+        { $project: { _id: 0, lob: "$_id", appCount: { $size: "$apps" } } }
+      ],
+
+      // Data Enters (relations) by LOB
+      "dataEntersByLob": [
+        { $group: { _id: "$appInfo.lob", dataEnterCount: { $sum: 1 } } },
+        { $project: { _id: 0, lob: "$_id", dataEnterCount: 1 } }
+      ],
+
+      // Unique Devices by LOB
+      "devicesByLob": [
+        { $group: { _id: { lob: "$appInfo.lob", deviceId: "$deviceid" } } },
+        { $group: { _id: "$_id.lob", deviceCount: { $sum: 1 } } },
+        { $project: { _id: 0, lob: "$_id", deviceCount: 1 } }
+      ],
+
+      // Device Types by LOB
+      "deviceTypesByLob": [
+        {
+          $group: {
+            _id: { lob: "$appInfo.lob", deviceType: "$deviceInfo.type" },  // ← CHANGE ".type" if needed
+            uniqueDevices: { $addToSet: "$deviceid" }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            lob: "$_id.lob",
+            deviceType: "$_id.deviceType",
+            deviceCount: { $size: "$uniqueDevices" }
           }
         }
-      }
+      ]
     }
-  ]
-)
+  },
 
-
-
-
-db.jobHistories.updateMany(
-  {},  // matches all documents
-  [
-    {
-      $set: {
-        endTime: {
-          $add: [
-            "$startTime",
-            {
-              $multiply: [
-                { $add: [2.5, { $multiply: [{ $rand: {} }, 0.5] }] },  // random hours: 2.5 to 3.0
-                3600000  // milliseconds in 1 hour (1000 * 60 * 60)
-              ]
+  // Reshape into desired output: one document with LOB as keys
+  { $project: { _id: 0 } },
+  {
+    $project: {
+      combined: {
+        $mergeObjects: [
+          // Apps
+          { $arrayToObject: { $map: {
+            input: "$appsByLob",
+            as: "item",
+            in: { k: "\[ item.lob", v: { appCount: " \]item.appCount" } }
+          }}},
+          // Data Enters
+          { $arrayToObject: { $map: {
+            input: "$dataEntersByLob",
+            as: "item",
+            in: { k: "\[ item.lob", v: { dataEnterCount: " \]item.dataEnterCount" } }
+          }}},
+          // Devices
+          { $arrayToObject: { $map: {
+            input: "$devicesByLob",
+            as: "item",
+            in: { k: "\[ item.lob", v: { deviceCount: " \]item.deviceCount" } }
+          }}},
+          // Device Types (grouped per LOB)
+          { $arrayToObject: { $map: {
+            input: { $groupBy: {
+              input: "$deviceTypesByLob",
+              key: "$lob",
+              value: { deviceType: "$deviceType", deviceCount: "$deviceCount" }
+            }},
+            as: "group",
+            in: {
+              k: "\[ group._id",
+              v: { deviceTypes: " \]group.values" }   // Note: $groupBy is MongoDB 5.0+
             }
-          ]
-        }
+          }}}
+        ]
       }
     }
-  ]
-)
+  },
+  { $replaceRoot: { newRoot: "$combined" } }
+])
