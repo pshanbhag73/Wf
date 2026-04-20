@@ -1,0 +1,190 @@
+ServiceNow Integration Design Document
+For Design Review – Ready to Copy-Paste into Confluence
+Page Title Suggestion:
+ServiceNow Incident & Change Integration – Design Review (Incident Pulse + Enterprise Critical Products)
+Labels / Categories: Architecture | Integration | ServiceNow | OCP | Spring-Boot
+1. Objective
+Provide a reliable, low-latency integration between the internal application (Spring Boot + Batch + MongoDB + Angular on OCP) and ServiceNow to fetch Incidents (every 15 minutes) and Changes (every hour), including impacted/affected services/CIs.
+The data will power two key use cases:
+Incident Pulse – Correlate network URL traceroute → IP-to-device mapping → device CPU/memory metrics with SNOW Incidents/Changes to triage latency/connectivity issues.
+Enterprise Critical Products – Surface Incidents & Changes that impact applications, Flows, and Business Functions.
+2. In-Scope / Out-of-Scope
+In Scope
+Polling of Incidents (incident table) and Changes (change_request table)
+Fetching affected CIs and impacted services (via task_ci and task_cmdb_ci_service relationships)
+Delta sync using sys_updated_on
+Storage in MongoDB
+REST endpoints for Angular front-end
+Correlation hooks for Use Case 1 & 2
+Out of Scope
+Bi-directional updates back to ServiceNow
+Full CMDB sync
+Real-time webhooks (future phase)
+ServiceNow OAuth token management UI
+3. High-Level Architecture (Draw.io Diagram Description)
+Recreate this exact diagram in draw.io (diagrams.net) – takes < 5 minutes:
+Open draw.io → New diagram → Blank
+Cloud shape (top-left, blue) → Label “ServiceNow (Production)”
+Inside: two small rectangles “Incident Table API” and “Change Request Table API”
+Large rectangle (center, green) → Label “OCP Namespace – my-app-prod”
+Inside it, draw a Kubernetes Pod icon → Label “Spring Boot Application (Batch + REST)”
+Inside the pod:
+Top: Scheduler (clock icon)
+Two horizontal boxes:
+“Incident Poller Job” (15 min cron)
+“Change Poller Job” (60 min cron)
+Arrow from both jobs → “RestTemplate / WebClient + OAuth2” → points to ServiceNow cloud
+Arrow down from jobs → “MongoDB Repository Layer”
+Below the pod: Cylinder shape (MongoDB) with three collections:
+snow_incidents
+snow_changes
+snow_service_mappings (denormalized impacted/affected)
+Right side: Browser icon (Angular UI) with two tabs:
+“Incident Pulse Dashboard”
+“Enterprise Critical Products”
+Arrows from MongoDB → Spring Boot REST API → Angular
+Left side (for Use Case 1): Two small boxes
+“URL Traceroute / IP Mapping Service”
+“Device CPU/Memory Telemetry”
+Dotted correlation lines to the Incident Pulse box
+Recommended Styling (draw.io):
+ServiceNow = Blue fill
+OCP / App = Green fill
+MongoDB = Purple cylinder
+Arrows = Black with “HTTPS” label on integration arrows
+Use “AWS” or “Kubernetes” shape library for OCP pod
+Export Options for Confluence:
+File → Export as → PNG (high res) OR
+File → Export → Draw.io XML → attach the .drawio file directly in Confluence (best practice – editable later)
+Alternative Quick Version (Mermaid – copy-paste into Confluence)
+flowchart TD
+    SN[ServiceNow<br/>Incident & Change APIs] -->|HTTPS + OAuth2| SB[Spring Boot<br/>Batch Scheduler on OCP]
+    SB --> IP[Incident Poller<br/>every 15 min]
+    SB --> CP[Change Poller<br/>every 60 min]
+    IP & CP --> Mongo[(MongoDB<br/>snow_incidents<br/>snow_changes<br/>snow_service_mappings)]
+    Mongo --> REST[Spring Boot REST API]
+    REST --> UI1[Incident Pulse<br/>Dashboard Angular]
+    REST --> UI2[Enterprise Critical Products<br/>Dashboard Angular]
+    style SN fill:#1E90FF
+    style SB fill:#32CD32
+4. Technology Stack (Confirmed)
+Layer
+Technology
+Notes
+Backend
+Spring Boot 3.x + Spring Batch
+Scheduler or Quartz
+Polling
+Spring @Scheduled or Batch jobs
+Delta sync
+HTTP Client
+WebClient (reactive preferred) + OAuth2
+With retry
+Database
+MongoDB (Atlas or OCP managed)
+TTL indexes optional
+Frontend
+Angular 17+
+Two feature modules
+Hosting
+OpenShift Container Platform
+Deployment + CronJob or internal scheduler
+Auth to SNOW
+OAuth2 Client Credentials (recommended) or Basic Auth
+Service account
+5. Integration Approach (Detailed)
+Authentication
+Preferred: OAuth2 Client Credentials flow (ServiceNow supports it).
+Store client-id, client-secret, token-endpoint in OCP Secrets / ConfigMap.
+Use Spring Security OAuth2 Client.
+Endpoints (Table API)
+Incidents: GET /api/now/table/incident?sysparm_query=sys_updated_on>javascript:gs.dateGenerate('yyyy-MM-dd HH:mm:ss')&sysparm_fields=number,short_description,priority,impact,urgency,category,state,assigned_to,cmdb_ci,sys_updated_on
+Changes: GET /api/now/table/change_request?... (same fields + type, risk, impact)
+Affected CIs: Query task_ci table where task=<incident_sys_id>
+Impacted Services: Query task_cmdb_ci_service or use business_service reference
+Delta Polling Logic
+Store last_sync_timestamp per job type in MongoDB (or Redis).
+Build encoded query: sys_updated_on>${last_sync} (use Instant in Java).
+On success, update timestamp.
+Batch Job Pseudocode
+@Scheduled(cron = "0 */15 * * * *") // every 15 min
+public void pollIncidents() {
+    String query = buildDeltaQuery("incident", lastIncidentSync);
+    List<IncidentDto> incidents = snowClient.getRecords("incident", query);
+    incidents.forEach(incident -> {
+        enrichWithAffectedCIsAndServices(incident);
+        mongoRepo.upsert(incident);
+    });
+    updateLastSync("incident");
+}
+6. MongoDB Data Model (Suggested Schemas)
+Collection: snow_incidents
+{
+  "_id": ObjectId,
+  "snowSysId": "string",
+  "number": "INC0012345",
+  "shortDescription": "...",
+  "state": 2,
+  "priority": 1,
+  "cmdbCi": { "id": "...", "name": "..." },
+  "affectedCis": [ { "id": "...", "name": "..." } ],
+  "impactedServices": [ { "id": "...", "name": "Business Service X" } ],
+  "sysUpdatedOn": ISODate,
+  "rawPayload": { ... } // full JSON for future proofing
+}
+Collection: snow_changes (similar structure + changeType, riskLevel)
+Collection: snow_service_mappings (denormalized lookup for fast joins in Use Case 2)
+7. How the Two Use Cases Will Consume the Data
+Use Case 1 – Incident Pulse
+URL traceroute service already exists → returns device/IP list.
+Backend endpoint: /api/incident-pulse/triage?deviceId=XYZ
+Logic: Query MongoDB for open incidents/changes where cmdbCi.name or affectedCis matches the device.
+Return correlated list + CPU/mem overlay.
+Use Case 2 – Enterprise Critical Products
+New Angular page filters by Business Function / Flow.
+Backend joins snow_service_mappings with internal Flow/Business Function mapping table.
+Shows active Incidents & Changes with impact score.
+8. Non-Functional Requirements
+Requirement
+Target
+How
+Polling latency
+< 2 min end-to-end
+WebClient + retry
+Data freshness
+Incidents ≤15 min, Changes ≤60 min
+Scheduler
+Error handling
+Retry 3× + DLQ (dead-letter)
+Spring Retry + Batch
+Idempotency
+Upsert on snowSysId
+Mongo unique index
+Security
+Secrets in OCP, least privilege
+ServiceNow read-only role
+Monitoring
+Prometheus + Grafana
+Micrometer + custom metrics
+Logging
+Structured JSON + correlation ID
+MDC + ELK
+9. Risks, Dependencies & Assumptions
+ServiceNow read-only API role will be granted (request already in progress).
+Rate limits: Table API is generous; monitor X-RateLimit headers.
+CMDB data quality in ServiceNow assumed reasonable.
+No real-time requirement (polling is acceptable).
+Dependencies
+ServiceNow team to approve OAuth client + grant roles.
+Network firewall rules (OCP → ServiceNow).
+10. Next Steps / Implementation Plan
+Today – Create draw.io diagram from description above + attach to this Confluence page.
+Day 1-2 – Get OAuth credentials & test API calls in Postman.
+Week 1 – Implement two Batch jobs + Mongo models.
+Week 2 – Build REST endpoints + Angular integration.
+Week 3 – Correlation logic + UAT for both use cases.
+Reviewers: Please add comments directly on this page.
+I will update the draw.io diagram live during the review meeting.
+You can now copy everything above straight into a new Confluence page.
+If you want me to generate the exact draw.io XML (so you can import with one click), just say the word and I’ll provide the full XML string.
+Ready for design review whenever you are! Let me know if you need any adjustments before the meeting.
