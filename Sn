@@ -188,3 +188,163 @@ I will update the draw.io diagram live during the review meeting.
 You can now copy everything above straight into a new Confluence page.
 If you want me to generate the exact draw.io XML (so you can import with one click), just say the word and I’ll provide the full XML string.
 Ready for design review whenever you are! Let me know if you need any adjustments before the meeting.
+
+
+
+
+Here is a complete, ready-to-use draw.io (diagrams.net) XML for the high-level architecture diagram described in the previous design.
+How to use it in Confluence:
+Go to your Confluence page (or create a new one).
+Type /draw or insert the draw.io Diagram macro.
+In the draw.io editor that opens, click File > Import from > Device (or Import).
+Copy the entire XML below into a new file on your computer, save it as servicenow-integration-architecture.drawio (or .xml), then upload/select that file.
+Alternatively: In the draw.io editor, go to File > Import, paste the XML directly if the option allows, or use the text area for import.
+Once imported, you can rearrange, add colors, icons, or labels as needed during review.
+Save the diagram in Confluence — it will be stored as an attachment and render nicely.
+Copy the full XML below (from <mxfile ...> to the closing </mxfile>):
+<mxfile host="app.diagrams.net" modified="2026-04-19T22:00:00.000Z" agent="Grok" version="24.7.0">
+  <diagram id="servicenow-integration" name="ServiceNow Integration Architecture">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- ServiceNow Cloud -->
+        <mxCell id="2" value="ServiceNow (Production)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#23456C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="280" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="Incident Table API" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6C8EBF;" vertex="1" parent="1">
+          <mxGeometry x="120" y="130" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" value="Change Request Table API" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6C8EBF;" vertex="1" parent="1">
+          <mxGeometry x="240" y="130" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" value="Affected CIs &amp; Services" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6C8EBF;" vertex="1" parent="1">
+          <mxGeometry x="120" y="190" width="220" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- OCP Application Container -->
+        <mxCell id="10" value="OCP Namespace - my-app-prod" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F5D0;strokeColor=#82B366;fontColor=#2C5F2C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="60" width="520" height="520" as="geometry"/>
+        </mxCell>
+        
+        <!-- Spring Boot Pod -->
+        <mxCell id="11" value="Spring Boot Application&#xa;(Batch + REST)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#D5E8D4;strokeColor=#82B366;fontColor=#2C5F2C;" vertex="1" parent="1">
+          <mxGeometry x="580" y="120" width="320" height="180" as="geometry"/>
+        </mxCell>
+        
+        <!-- Scheduler -->
+        <mxCell id="12" value="Scheduler&#xa;(@Scheduled / Spring Batch)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;" vertex="1" parent="1">
+          <mxGeometry x="620" y="150" width="120" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Incident Poller -->
+        <mxCell id="13" value="Incident Poller Job&#xa;(every 15 min)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;" vertex="1" parent="1">
+          <mxGeometry x="780" y="160" width="100" height="50" as="geometry"/>
+        </mxCell>
+        
+        <!-- Change Poller -->
+        <mxCell id="14" value="Change Poller Job&#xa;(every 60 min)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;" vertex="1" parent="1">
+          <mxGeometry x="780" y="230" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- OAuth / WebClient -->
+        <mxCell id="15" value="WebClient + OAuth2&#xa;(Client Credentials)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;" vertex="1" parent="1">
+          <mxGeometry x="920" y="180" width="140" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- MongoDB -->
+        <mxCell id="20" value="MongoDB" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#E1D5E7;strokeColor=#9673A6;" vertex="1" parent="1">
+          <mxGeometry x="620" y="380" width="260" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" value="snow_incidents" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="400" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" value="snow_changes" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="430" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" value="snow_service_mappings" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="460" width="160" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Angular UI -->
+        <mxCell id="30" value="Angular UI" style="shape=mxgraph.mockup.containers.browser;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="120" width="280" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" value="Incident Pulse&#xa;Dashboard" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="180" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" value="Enterprise Critical Products&#xa;Dashboard" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="270" width="200" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Use Case 1 side elements -->
+        <mxCell id="40" value="URL Traceroute /&#xa;IP Mapping Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;" vertex="1" parent="1">
+          <mxGeometry x="80" y="320" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" value="Device CPU/Memory&#xa;Telemetry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;" vertex="1" parent="1">
+          <mxGeometry x="80" y="420" width="160" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrows / Connections -->
+        <!-- SNOW to App -->
+        <mxCell id="50" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.3;jumpStyle=arc;jumpSize=12;endArrow=classic;endFill=1;strokeColor=#6C8EBF;" edge="1" parent="1" source="5" target="15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="51" value="HTTPS + OAuth2" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=2;fontSize=10;" vertex="1" parent="1" connectable="0">
+          <mxGeometry x="380" y="170" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Pollers to WebClient -->
+        <mxCell id="52" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=classic;endFill=1;" edge="1" parent="1" source="13" target="15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="53" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.7;endArrow=classic;endFill=1;" edge="1" parent="1" source="14" target="15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- WebClient to Mongo -->
+        <mxCell id="54" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=classic;endFill=1;strokeColor=#82B366;" edge="1" parent="1" source="15" target="20">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Mongo to REST / UI -->
+        <mxCell id="55" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=classic;endFill=1;strokeColor=#82B366;" edge="1" parent="1" source="20" target="31">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="56" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.7;entryX=0;entryY=0.6;endArrow=classic;endFill=1;strokeColor=#82B366;" edge="1" parent="1" source="20" target="32">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Correlation for Use Case 1 -->
+        <mxCell id="60" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=classic;endFill=1;strokeColor=#D79B00;" edge="1" parent="1" source="40" target="31">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="61" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=classic;endFill=1;strokeColor=#D79B00;" edge="1" parent="1" source="41" target="31">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Labels on arrows if needed (optional) -->
+        <mxCell id="70" value="Delta Sync" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=2;fontSize=9;" vertex="1" parent="1" connectable="0">
+          <mxGeometry x="420" y="240" width="60" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="71" value="REST API" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=2;fontSize=10;" vertex="1" parent="1" connectable="0">
+          <mxGeometry x="900" y="520" width="60" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+This XML creates a clean, professional high-level diagram matching the architecture:
+ServiceNow on the left (blue tones)
+OCP / Spring Boot in the center (green)
+MongoDB as a cylinder (purple)
+Angular UI on the right
+Pollers, scheduler, and correlation lines for the two use cases
+After importing, you can easily:
+Change colors
+Add Kubernetes pod icons (search "kubernetes" in shape library)
+Add more details
+Export as PNG/SVG if needed
+Let me know if you want a more detailed version (e.g., with C4 model layers, separate component diagram, or additional elements like retry logic / secrets). I can refine the XML further.
