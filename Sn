@@ -3,206 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>What's Running Where - New-Gen vs Heritage</title>
+    <title>What's Running Where</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', system-ui, sans-serif; }
-        table { border-collapse: collapse; }
-        th, td { border: 1px solid #334155; padding: 4px 8px; font-size: 12px; text-align: center; }
-        .app-name { text-align: left; padding-left: 12px; font-weight: 600; cursor: pointer; }
-        .header-newgen { background: #166534; color: white; }
-        .header-heritage { background: #334155; color: white; }
-        .region-east { background: #1e40af; color: white; }
-        .region-west { background: #1e40af; color: white; }
-        .green { background: #166534; color: white; cursor: pointer; }
-        .muted-green { background: #4ade80; color: #0f172a; font-weight: 600; cursor: pointer; }
-        .yellow { background: #eab308; color: #0f172a; cursor: pointer; }
-        .red { background: #ef4444; color: white; cursor: pointer; }
-        .modal { animation: modalPop 0.3s ease-out; }
+        .tab-active { border-bottom: 3px solid #22c55e; color: white; font-weight: 600; }
+        .modal { animation: modalPop 0.25s ease-out; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 p-6">
 
     <div class="max-w-[2100px] mx-auto">
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold">What's Running Where</h1>
-            <div class="flex items-center gap-6 text-sm">
-                <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-4xl font-bold">What's Running Where</h1>
+                <p class="text-slate-400 mt-1">5,000 Apps • 12 Datacenters • Live</p>
+            </div>
+            <div class="flex items-center gap-3 text-sm">
+                <div class="flex items-center gap-2 bg-slate-800 px-4 py-1.5 rounded-full">
+                    <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></div>
                     <span class="text-emerald-400 font-medium">LIVE</span>
                 </div>
-                <div class="text-slate-400">Auto-refresh every 2 minutes</div>
+                <div class="text-slate-400">Auto-refresh every 2 min</div>
             </div>
-            <div class="text-slate-400 text-sm">5,000 Apps • 12 Datacenters (4 New-Gen)</div>
         </div>
 
-        <!-- Filter Bar -->
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 mb-6 flex gap-4 text-sm">
-            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">LOB: <span class="font-semibold">All</span> ▼</div>
-            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">Region: <span class="font-semibold">All</span> ▼</div>
-            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">DC Type: <span class="font-semibold">New-Gen + Heritage</span> ▼</div>
-            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">Compute: <span class="font-semibold">All</span> ▼</div>
+        <!-- Tabs -->
+        <div class="flex border-b border-slate-700 mb-6">
+            <button onclick="switchTab(0)" id="tab-0"
+                    class="tab-active px-8 py-4 text-lg">1. Datacenters (App Level)</button>
+            <button onclick="switchTab(1)" id="tab-1"
+                    class="px-8 py-4 text-lg text-slate-400 hover:text-white">2. Expanded Detailed View</button>
         </div>
 
-        <table class="w-full text-xs">
-            <thead>
-                <tr>
-                    <th rowspan="3" class="w-64 bg-slate-900 text-white">LOB / App</th>
-                    <!-- New-Gen -->
-                    <th colspan="8" class="header-newgen text-lg py-1">NEW-GEN (4 DCs)</th>
-                    <!-- Heritage -->
-                    <th colspan="8" class="header-heritage text-lg py-1">HERITAGE (8 DCs)</th>
-                </tr>
-                <tr>
-                    <th colspan="4" class="region-east py-1">EAST<br><span class="text-xs">(us-east-1 • us-east-2)</span></th>
-                    <th colspan="4" class="region-west py-1">WEST<br><span class="text-xs">(us-west-2 • us-west-1)</span></th>
-                    <th colspan="4" class="region-east py-1">EAST<br><span class="text-xs">(Legacy)</span></th>
-                    <th colspan="4" class="region-west py-1">WEST<br><span class="text-xs">(Legacy)</span></th>
-                </tr>
-                <tr class="bg-slate-800 text-slate-300 text-[10px]">
-                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
-                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
-                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
-                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
-                </tr>
-            </thead>
+        <!-- TAB 1: Datacenters View (App Level Only) -->
+        <div id="tab-content-0">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                    <div class="text-xl font-semibold">New-Gen Datacenters - App Volumes</div>
+                    <div class="text-emerald-400 text-sm">4 New-Gen DCs • Aggregated (All Compute)</div>
+                </div>
 
-            <tbody class="text-slate-100">
-                <!-- Clickable OCP cells -->
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Retail Banking - auth-service</td>
-                    <td onclick="showOCPDetails('Retail Banking - auth-service', 'us-east-1', '18/22', 'Healthy')" class="green">18/22</td>
-                    <td class="green">14/19</td>
-                    <td class="green">12/18</td>
-                    <td class="green">8/12</td>
-                    <td onclick="showOCPDetails('Retail Banking - auth-service', 'us-west-2', '22/24', 'Healthy')" class="green">22/24</td>
-                    <td class="green">19/23</td>
-                    <td class="green">15/20</td>
-                    <td class="green">9/14</td>
-                    <td class="muted-green">7/11</td>
-                    <td class="muted-green">5/9</td>
-                    <td class="muted-green">4/8</td>
-                    <td class="muted-green">3/6</td>
-                    <td class="muted-green">6/10</td>
-                    <td class="muted-green">4/8</td>
-                    <td class="muted-green">3/7</td>
-                    <td class="muted-green">2/5</td>
-                </tr>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-slate-800 text-slate-300">
+                            <th class="text-left px-6 py-4">App</th>
+                            <th class="px-4 py-4 text-center">us-east-1</th>
+                            <th class="px-4 py-4 text-center">us-east-2</th>
+                            <th class="px-4 py-4 text-center">us-west-2</th>
+                            <th class="px-4 py-4 text-center">us-west-1</th>
+                            <th class="px-6 py-4 text-center">Heritage Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        <tr class="hover:bg-slate-800/50">
+                            <td class="px-6 py-4 font-semibold">Retail Banking - auth-service</td>
+                            <td class="px-4 py-4 text-center font-mono">892</td>
+                            <td class="px-4 py-4 text-center font-mono">674</td>
+                            <td class="px-4 py-4 text-center font-mono">1,034</td>
+                            <td class="px-4 py-4 text-center font-mono">521</td>
+                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">312</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/50">
+                            <td class="px-6 py-4 font-semibold">Payments - prod-db-cluster</td>
+                            <td class="px-4 py-4 text-center font-mono">1,245</td>
+                            <td class="px-4 py-4 text-center font-mono">983</td>
+                            <td class="px-4 py-4 text-center font-mono">1,478</td>
+                            <td class="px-4 py-4 text-center font-mono">892</td>
+                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">289</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/50">
+                            <td class="px-6 py-4 font-semibold">Customer Services - user-api</td>
+                            <td class="px-4 py-4 text-center font-mono">674</td>
+                            <td class="px-4 py-4 text-center font-mono">521</td>
+                            <td class="px-4 py-4 text-center font-mono">892</td>
+                            <td class="px-4 py-4 text-center font-mono">456</td>
+                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">156</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/50">
+                            <td class="px-6 py-4 font-semibold">Fraud Detection - ml-inference</td>
+                            <td class="px-4 py-4 text-center font-mono">1,034</td>
+                            <td class="px-4 py-4 text-center font-mono">892</td>
+                            <td class="px-4 py-4 text-center font-mono">1,245</td>
+                            <td class="px-4 py-4 text-center font-mono">674</td>
+                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">234</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/50">
+                            <td class="px-6 py-4 font-semibold">Loan Services - loan-processing</td>
+                            <td class="px-4 py-4 text-center font-mono">521</td>
+                            <td class="px-4 py-4 text-center font-mono">456</td>
+                            <td class="px-4 py-4 text-center font-mono">674</td>
+                            <td class="px-4 py-4 text-center font-mono">312</td>
+                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">178</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Payments - prod-db-cluster</td>
-                    <td onclick="showOCPDetails('Payments - prod-db-cluster', 'us-east-1', '21/24', 'Spike')" class="green">21/24</td>
-                    <td class="green">17/22</td>
-                    <td class="green">14/19</td>
-                    <td class="green">11/15</td>
-                    <td onclick="showOCPDetails('Payments - prod-db-cluster', 'us-west-2', '23/24', 'Healthy')" class="green">23/24</td>
-                    <td class="green">20/23</td>
-                    <td class="green">16/21</td>
-                    <td class="green">12/17</td>
-                    <td class="muted-green">8/13</td>
-                    <td class="muted-green">6/11</td>
-                    <td class="muted-green">5/9</td>
-                    <td class="muted-green">4/7</td>
-                    <td class="muted-green">7/12</td>
-                    <td class="muted-green">5/10</td>
-                    <td class="muted-green">4/8</td>
-                    <td class="muted-green">3/6</td>
-                </tr>
-
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Customer Services - user-api</td>
-                    <td onclick="showOCPDetails('Customer Services - user-api', 'us-east-2', '15/19', 'Healthy')" class="green">15/19</td>
-                    <td class="green">12/16</td>
-                    <td class="green">9/13</td>
-                    <td class="green">6/10</td>
-                    <td onclick="showOCPDetails('Customer Services - user-api', 'us-west-1', '18/22', 'Idle')" class="green">18/22</td>
-                    <td class="green">14/18</td>
-                    <td class="green">11/15</td>
-                    <td class="green">7/11</td>
-                    <td class="muted-green">9/14</td>
-                    <td class="muted-green">7/11</td>
-                    <td class="muted-green">5/9</td>
-                    <td class="muted-green">3/6</td>
-                    <td class="muted-green">6/10</td>
-                    <td class="muted-green">4/8</td>
-                    <td class="muted-green">3/7</td>
-                    <td class="muted-green">2/5</td>
-                </tr>
-
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Fraud Detection - ml-inference</td>
-                    <td onclick="showOCPDetails('Fraud Detection - ml-inference', 'us-east-1', '19/23', 'Spike')" class="green">19/23</td>
-                    <td class="yellow">16/20</td>
-                    <td class="red">13/17</td>
-                    <td class="green">8/12</td>
-                    <td onclick="showOCPDetails('Fraud Detection - ml-inference', 'us-west-2', '21/24', 'Anomaly')" class="red">21/24</td>
-                    <td class="green">18/22</td>
-                    <td class="green">14/19</td>
-                    <td class="green">9/13</td>
-                    <td class="muted-green">10/15</td>
-                    <td class="muted-green">8/12</td>
-                    <td class="muted-green">6/10</td>
-                    <td class="muted-green">4/7</td>
-                    <td class="muted-green">7/11</td>
-                    <td class="muted-green">5/9</td>
-                    <td class="muted-green">4/8</td>
-                    <td class="muted-green">3/6</td>
-                </tr>
-            </tbody>
-        </table>
+        <!-- TAB 2: Expanded Detailed View -->
+        <div id="tab-content-1" class="hidden">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6">
+                <h2 class="text-2xl font-semibold mb-6">Expanded Detailed View (Full Breakdown)</h2>
+                
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="bg-slate-800 px-4 py-3 text-left">LOB / App</th>
+                            <th colspan="4" class="bg-emerald-900 text-center py-2">NEW-GEN</th>
+                            <th colspan="4" class="bg-slate-700 text-center py-2">HERITAGE</th>
+                        </tr>
+                        <tr class="bg-slate-800 text-xs">
+                            <th class="py-1">us-east-1</th>
+                            <th class="py-1">us-east-2</th>
+                            <th class="py-1">us-west-2</th>
+                            <th class="py-1">us-west-1</th>
+                            <th class="py-1">East Legacy</th>
+                            <th class="py-1">West Legacy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-t border-slate-700 hover:bg-slate-800/50">
+                            <td class="px-4 py-3 font-semibold">Retail Banking - auth-service</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-east-1', '892')">892</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-east-2', '674')">674</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-west-2', '1034')">1,034</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-west-1', '521')">521</td>
+                            <td class="muted-green">124</td>
+                            <td class="muted-green">89</td>
+                        </tr>
+                        <tr class="border-t border-slate-700 hover:bg-slate-800/50">
+                            <td class="px-4 py-3 font-semibold">Payments - prod-db-cluster</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-east-1', '1245')">1,245</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-east-2', '983')">983</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-west-2', '1478')">1,478</td>
+                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-west-1', '892')">892</td>
+                            <td class="muted-green">156</td>
+                            <td class="muted-green">112</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <!-- Drill-down Modal -->
-    <div id="modal" onclick="if(event.target === this) hideModal()" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-        <div onclick="event.stopImmediatePropagation()" class="modal bg-slate-800 rounded-2xl w-[620px] p-8 text-slate-100 shadow-2xl">
-            <div class="flex justify-between items-start mb-6">
+    <!-- Modal -->
+    <div id="modal" onclick="if(event.target.id === 'modal') hideModal()" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div onclick="event.stopImmediatePropagation()" class="bg-slate-800 rounded-2xl w-[560px] p-8 text-white">
+            <div class="flex justify-between mb-6">
                 <div>
                     <div id="modal-app" class="text-2xl font-semibold"></div>
-                    <div id="modal-dc" class="text-emerald-400 text-sm font-medium"></div>
+                    <div id="modal-dc" class="text-emerald-400 text-sm mt-1"></div>
                 </div>
-                <button onclick="hideModal()" class="text-slate-400 hover:text-white text-3xl leading-none">×</button>
+                <button onclick="hideModal()" class="text-3xl text-slate-400 hover:text-white">×</button>
             </div>
 
-            <div class="grid grid-cols-3 gap-6 mb-8">
+            <div class="grid grid-cols-3 gap-4 mb-8">
                 <div class="bg-slate-900 rounded-xl p-5">
-                    <div class="text-slate-400 text-xs">Current Load</div>
-                    <div id="modal-current" class="text-4xl font-bold text-white"></div>
-                </div>
-                <div class="bg-slate-900 rounded-xl p-5">
-                    <div class="text-slate-400 text-xs">Blended Baseline</div>
-                    <div id="modal-baseline" class="text-4xl font-bold text-white"></div>
+                    <div class="text-xs text-slate-400">Current Load</div>
+                    <div id="modal-current" class="text-4xl font-bold mt-1"></div>
                 </div>
                 <div class="bg-slate-900 rounded-xl p-5">
-                    <div class="text-slate-400 text-xs">Relative Delta</div>
-                    <div id="modal-delta" class="text-4xl font-bold"></div>
+                    <div class="text-xs text-slate-400">Baseline</div>
+                    <div id="modal-baseline" class="text-4xl font-bold mt-1"></div>
+                </div>
+                <div class="bg-slate-900 rounded-xl p-5">
+                    <div class="text-xs text-slate-400">Delta</div>
+                    <div id="modal-delta" class="text-4xl font-bold mt-1"></div>
                 </div>
             </div>
 
-            <div id="modal-reason" class="text-lg leading-relaxed mb-8"></div>
-
-            <div class="text-xs text-slate-400">Last 12 minutes trend • OCP pods in this cell</div>
-
-            <div class="mt-4 bg-slate-900 rounded-xl p-5 text-sm">
-                <div id="modal-details" class="space-y-2"></div>
-            </div>
-
-            <div class="mt-8 text-center text-xs text-slate-400">
-                Click anywhere outside to close • Data from MongoDB pipeline
-            </div>
+            <div id="modal-reason" class="text-lg leading-relaxed mb-6"></div>
+            <div class="text-xs text-slate-400">Click outside to close</div>
         </div>
     </div>
 
     <script>
-        function showOCPDetails(app, dc, count, status) {
+        function switchTab(tab) {
+            document.getElementById('tab-content-0').classList.add('hidden');
+            document.getElementById('tab-content-1').classList.add('hidden');
+            document.getElementById('tab-0').classList.remove('tab-active');
+            document.getElementById('tab-1').classList.remove('tab-active');
+
+            if (tab === 0) {
+                document.getElementById('tab-content-0').classList.remove('hidden');
+                document.getElementById('tab-0').classList.add('tab-active');
+            } else {
+                document.getElementById('tab-content-1').classList.remove('hidden');
+                document.getElementById('tab-1').classList.add('tab-active');
+            }
+        }
+
+        function showDetail(app, dc, count) {
             const modal = document.getElementById('modal');
             document.getElementById('modal-app').textContent = app;
-            document.getElementById('modal-dc').textContent = dc + " • OCP";
+            document.getElementById('modal-dc').textContent = dc;
 
-            // Realistic examples
-            let current = count.split('/')[0];
-            let baseline = Math.floor(Math.random() * 12) + 8;
-            let delta = Math.round(((current - baseline) / baseline) * 100);
+            const current = parseInt(count);
+            const baseline = Math.floor(Math.random() * 10) + 8;
+            const delta = Math.round(((current - baseline) / baseline) * 100);
 
             document.getElementById('modal-current').textContent = current + "%";
             document.getElementById('modal-baseline').textContent = baseline + "%";
@@ -210,21 +211,8 @@
                 `<span class="text-emerald-400">+${delta}%</span>` : 
                 `<span class="text-amber-400">${delta}%</span>`;
 
-            let reasonText = "";
-            if (status === "Healthy") reasonText = "Load is steady and within expected range for this New-Gen DC.";
-            else if (status === "Spike") reasonText = "Significant spike detected above blended baseline. Possible traffic surge.";
-            else if (status === "Anomaly") reasonText = "Unexpected high activity or anomaly detected. Investigation recommended.";
-            else reasonText = "Normal operation in this OCP cluster.";
-
-            document.getElementById('modal-reason').innerHTML = `<span class="text-emerald-400 font-medium">Status:</span> ${reasonText}`;
-
-            // Example pod list
-            document.getElementById('modal-details').innerHTML = `
-                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-01</span><span class="text-emerald-400">19%</span></div>
-                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-02</span><span class="text-emerald-400">21%</span></div>
-                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-03</span><span class="text-emerald-400">17%</span></div>
-                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-04</span><span class="text-amber-400">24%</span></div>
-            `;
+            document.getElementById('modal-reason').innerHTML = 
+                `Volume in <strong>${dc}</strong> represents aggregated compute (OCP + VM + DB + Avi) for this app.`;
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -236,7 +224,10 @@
             modal.classList.remove('flex');
         }
 
-        // Tailwind script already included
+        // Default to Tab 1
+        window.onload = function() {
+            document.getElementById('tab-0').classList.add('tab-active');
+        }
     </script>
 </body>
 </html>
