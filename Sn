@@ -1,186 +1,264 @@
-<svg width="2350" height="920" viewBox="0 0 2350 920" xmlns="http://www.w3.org/2000/svg" style="background:#0f172a; border:1px solid #334155; border-radius:12px; font-family:Arial, sans-serif;">
+<svg width="2120" height="920" viewBox="0 0 2120 920" xmlns="http://www.w3.org/2000/svg" style="background:#0f172a; border:1px solid #334155; border-radius:12px; font-family:Arial, sans-serif;">
   <!-- Header -->
-  <rect x="0" y="0" width="2350" height="82" fill="#1e2937"/>
-  <text x="40" y="52" fill="#f1f5f9" font-size="30" font-weight="700">What's Running Where - New-Gen vs Heritage</text>
-  <text x="1680" y="48" fill="#94a3b8" font-size="16">5,000 Apps • 12 DCs • Live • 14:48 UTC</text>
+  <rect x="0" y="0" width="2120" height="72" fill="#1e2937"/>
+  <text x="35" y="48" fill="#f1f5f9" font-size="26" font-weight="700">What's Running Where - New-Gen vs Heritage</text>
+  <text x="1480" y="44" fill="#94a3b8" font-size="14">5,000 Apps • 12 DCs • Live • 14:52 UTC</text>
 
   <!-- Filter Bar -->
-  <rect x="30" y="95" width="2290" height="42" rx="8" fill="#334155"/>
-  <text x="50" y="122" font-size="14" fill="#e0f2fe">Filters: LOB ▼  Region ▼  DC Type ▼  Compute ▼  Status ▼</text>
+  <rect x="25" y="85" width="2070" height="36" rx="6" fill="#334155"/>
+  <text x="42" y="108" font-size="12" fill="#e0f2fe">Filters: LOB ▼  Region ▼  DC Type ▼  Compute ▼  Status ▼</text>
 
   <!-- TOP LEVEL HEADERS -->
-  <rect x="30" y="150" width="1130" height="42" rx="6" fill="#166534"/>
-  <text x="595" y="177" fill="#fff" font-size="18" font-weight="700">NEW-GEN (4 DCs)</text>
+  <rect x="25" y="130" width="1035" height="38" rx="5" fill="#166534"/>
+  <text x="545" y="155" fill="#fff" font-size="16" font-weight="700">NEW-GEN (4 DCs)</text>
 
-  <rect x="1170" y="150" width="1130" height="42" rx="6" fill="#166534"/>
-  <text x="1735" y="177" fill="#fff" font-size="18" font-weight="700">HERITAGE (8 DCs)</text>
+  <rect x="1070" y="130" width="1035" height="38" rx="5" fill="#166534"/>
+  <text x="1590" y="155" fill="#fff" font-size="16" font-weight="700">HERITAGE (8 DCs)</text>
 
   <!-- SECOND LEVEL: Regions -->
-  <rect x="30" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
-  <text x="312" y="219" fill="#fff" font-size="14" font-weight="600">EAST (us-east-1 • us-east-2)</text>
+  <rect x="25" y="175" width="515" height="30" rx="4" fill="#1e40af"/>
+  <text x="282" y="195" fill="#fff" font-size="12" font-weight="600">EAST (us-east-1 • us-east-2)</text>
 
-  <rect x="595" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
-  <text x="877" y="219" fill="#fff" font-size="14" font-weight="600">WEST (us-west-2 • us-west-1)</text>
+  <rect x="545" y="175" width="515" height="30" rx="4" fill="#1e40af"/>
+  <text x="802" y="195" fill="#fff" font-size="12" font-weight="600">WEST (us-west-2 • us-west-1)</text>
 
-  <rect x="1170" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
-  <text x="1452" y="219" fill="#fff" font-size="14" font-weight="600">EAST (Legacy)</text>
+  <rect x="1070" y="175" width="515" height="30" rx="4" fill="#1e40af"/>
+  <text x="1327" y="195" fill="#fff" font-size="12" font-weight="600">EAST (Legacy)</text>
 
-  <rect x="1735" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
-  <text x="2017" y="219" fill="#fff" font-size="14" font-weight="600">WEST (Legacy)</text>
+  <rect x="1595" y="175" width="515" height="30" rx="4" fill="#1e40af"/>
+  <text x="1852" y="195" fill="#fff" font-size="12" font-weight="600">WEST (Legacy)</text>
 
   <!-- Column Headers -->
-  <rect x="30" y="237" width="2290" height="28" fill="#1e2937"/>
-  
-  <!-- App Header -->
-  <text x="45" y="255" fill="#f1f5f9" font-size="12" font-weight="700">APP</text>
+  <rect x="25" y="212" width="2070" height="24" fill="#1e2937"/>
+  <text x="38" y="228" fill="#f1f5f9" font-size="10" font-weight="700">APP</text>
 
   <!-- New-Gen East -->
-  <text x="340" y="255" fill="#22c55e" font-size="11" font-weight="600">OCP</text>
-  <text x="400" y="255" fill="#22c55e" font-size="11" font-weight="600">VM</text>
-  <text x="460" y="255" fill="#22c55e" font-size="11" font-weight="600">DB</text>
-  <text x="520" y="255" fill="#22c55e" font-size="11" font-weight="600">Avi</text>
+  <text x="305" y="228" fill="#22c55e" font-size="9" font-weight="600">OCP</text>
+  <text x="358" y="228" fill="#22c55e" font-size="9" font-weight="600">VM</text>
+  <text x="411" y="228" fill="#22c55e" font-size="9" font-weight="600">DB</text>
+  <text x="464" y="228" fill="#22c55e" font-size="9" font-weight="600">Avi</text>
 
   <!-- New-Gen West -->
-  <text x="680" y="255" fill="#22c55e" font-size="11" font-weight="600">OCP</text>
-  <text x="740" y="255" fill="#22c55e" font-size="11" font-weight="600">VM</text>
-  <text x="800" y="255" fill="#22c55e" font-size="11" font-weight="600">DB</text>
-  <text x="860" y="255" fill="#22c55e" font-size="11" font-weight="600">Avi</text>
+  <text x="615" y="228" fill="#22c55e" font-size="9" font-weight="600">OCP</text>
+  <text x="668" y="228" fill="#22c55e" font-size="9" font-weight="600">VM</text>
+  <text x="721" y="228" fill="#22c55e" font-size="9" font-weight="600">DB</text>
+  <text x="774" y="228" fill="#22c55e" font-size="9" font-weight="600">Avi</text>
 
   <!-- Heritage East -->
-  <text x="1170" y="255" fill="#4ade80" font-size="11" font-weight="600">OCP</text>
-  <text x="1230" y="255" fill="#4ade80" font-size="11" font-weight="600">VM</text>
-  <text x="1290" y="255" fill="#4ade80" font-size="11" font-weight="600">DB</text>
-  <text x="1350" y="255" fill="#4ade80" font-size="11" font-weight="600">Avi</text>
+  <text x="1085" y="228" fill="#4ade80" font-size="9" font-weight="600">OCP</text>
+  <text x="1138" y="228" fill="#4ade80" font-size="9" font-weight="600">VM</text>
+  <text x="1191" y="228" fill="#4ade80" font-size="9" font-weight="600">DB</text>
+  <text x="1244" y="228" fill="#4ade80" font-size="9" font-weight="600">Avi</text>
 
   <!-- Heritage West -->
-  <text x="1735" y="255" fill="#4ade80" font-size="11" font-weight="600">OCP</text>
-  <text x="1795" y="255" fill="#4ade80" font-size="11" font-weight="600">VM</text>
-  <text x="1855" y="255" fill="#4ade80" font-size="11" font-weight="600">DB</text>
-  <text x="1915" y="255" fill="#4ade80" font-size="11" font-weight="600">Avi</text>
+  <text x="1605" y="228" fill="#4ade80" font-size="9" font-weight="600">OCP</text>
+  <text x="1658" y="228" fill="#4ade80" font-size="9" font-weight="600">VM</text>
+  <text x="1711" y="228" fill="#4ade80" font-size="9" font-weight="600">DB</text>
+  <text x="1764" y="228" fill="#4ade80" font-size="9" font-weight="600">Avi</text>
 
-  <!-- DATA ROWS -->
+  <!-- DATA ROWS (15 rows - very compact) -->
 
   <!-- Row 1 -->
-  <rect x="30" y="270" width="2290" height="28" fill="#1e2937" opacity="0.7"/>
-  <text x="42" y="288" font-size="12" fill="#f1f5f9">Retail Banking - auth-service</text>
-  <text x="340" y="288" font-size="11" fill="#22c55e">18/22</text>
-  <text x="400" y="288" font-size="11" fill="#22c55e">14/19</text>
-  <text x="460" y="288" font-size="11" fill="#22c55e">12/18</text>
-  <text x="520" y="288" font-size="11" fill="#22c55e">8/12</text>
-  <text x="680" y="288" font-size="11" fill="#22c55e">22/24</text>
-  <text x="740" y="288" font-size="11" fill="#22c55e">19/23</text>
-  <text x="800" y="288" font-size="11" fill="#22c55e">15/20</text>
-  <text x="860" y="288" font-size="11" fill="#22c55e">9/14</text>
-  <text x="1170" y="288" font-size="11" fill="#4ade80">7/11</text>
-  <text x="1230" y="288" font-size="11" fill="#4ade80">5/9</text>
-  <text x="1290" y="288" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1350" y="288" font-size="11" fill="#4ade80">3/6</text>
-  <text x="1735" y="288" font-size="11" fill="#4ade80">6/10</text>
-  <text x="1795" y="288" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1855" y="288" font-size="11" fill="#4ade80">3/7</text>
-  <text x="1915" y="288" font-size="11" fill="#4ade80">2/5</text>
+  <rect x="25" y="242" width="2070" height="24" fill="#1e2937" opacity="0.7"/>
+  <text x="35" y="258" font-size="10" fill="#f1f5f9">Retail Banking - auth-service</text>
+  <text x="305" y="258" font-size="9" fill="#22c55e">18/22</text>
+  <text x="358" y="258" font-size="9" fill="#22c55e">14/19</text>
+  <text x="411" y="258" font-size="9" fill="#22c55e">12/18</text>
+  <text x="464" y="258" font-size="9" fill="#22c55e">8/12</text>
+  <text x="615" y="258" font-size="9" fill="#22c55e">22/24</text>
+  <text x="668" y="258" font-size="9" fill="#22c55e">19/23</text>
+  <text x="721" y="258" font-size="9" fill="#22c55e">15/20</text>
+  <text x="774" y="258" font-size="9" fill="#22c55e">9/14</text>
+  <text x="1085" y="258" font-size="9" fill="#4ade80">7/11</text>
+  <text x="1138" y="258" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1191" y="258" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1244" y="258" font-size="9" fill="#4ade80">3/6</text>
+  <text x="1605" y="258" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1658" y="258" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1711" y="258" font-size="9" fill="#4ade80">3/7</text>
+  <text x="1764" y="258" font-size="9" fill="#4ade80">2/5</text>
 
   <!-- Row 2 -->
-  <rect x="30" y="298" width="2290" height="28" fill="#1e2937" opacity="0.6"/>
-  <text x="42" y="316" font-size="12" fill="#f1f5f9">Payments - prod-db-cluster</text>
-  <text x="340" y="316" font-size="11" fill="#22c55e">21/24</text>
-  <text x="400" y="316" font-size="11" fill="#22c55e">17/22</text>
-  <text x="460" y="316" font-size="11" fill="#22c55e">14/19</text>
-  <text x="520" y="316" font-size="11" fill="#22c55e">11/15</text>
-  <text x="680" y="316" font-size="11" fill="#22c55e">23/24</text>
-  <text x="740" y="316" font-size="11" fill="#22c55e">20/23</text>
-  <text x="800" y="316" font-size="11" fill="#22c55e">16/21</text>
-  <text x="860" y="316" font-size="11" fill="#22c55e">12/17</text>
-  <text x="1170" y="316" font-size="11" fill="#4ade80">8/13</text>
-  <text x="1230" y="316" font-size="11" fill="#4ade80">6/11</text>
-  <text x="1290" y="316" font-size="11" fill="#4ade80">5/9</text>
-  <text x="1350" y="316" font-size="11" fill="#4ade80">4/7</text>
-  <text x="1735" y="316" font-size="11" fill="#4ade80">7/12</text>
-  <text x="1795" y="316" font-size="11" fill="#4ade80">5/10</text>
-  <text x="1855" y="316" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1915" y="316" font-size="11" fill="#4ade80">3/6</text>
+  <rect x="25" y="266" width="2070" height="24" fill="#1e2937" opacity="0.6"/>
+  <text x="35" y="282" font-size="10" fill="#f1f5f9">Payments - prod-db-cluster</text>
+  <text x="305" y="282" font-size="9" fill="#22c55e">21/24</text>
+  <text x="358" y="282" font-size="9" fill="#22c55e">17/22</text>
+  <text x="411" y="282" font-size="9" fill="#22c55e">14/19</text>
+  <text x="464" y="282" font-size="9" fill="#22c55e">11/15</text>
+  <text x="615" y="282" font-size="9" fill="#22c55e">23/24</text>
+  <text x="668" y="282" font-size="9" fill="#22c55e">20/23</text>
+  <text x="721" y="282" font-size="9" fill="#22c55e">16/21</text>
+  <text x="774" y="282" font-size="9" fill="#22c55e">12/17</text>
+  <text x="1085" y="282" font-size="9" fill="#4ade80">8/13</text>
+  <text x="1138" y="282" font-size="9" fill="#4ade80">6/11</text>
+  <text x="1191" y="282" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1244" y="282" font-size="9" fill="#4ade80">4/7</text>
+  <text x="1605" y="282" font-size="9" fill="#4ade80">7/12</text>
+  <text x="1658" y="282" font-size="9" fill="#4ade80">5/10</text>
+  <text x="1711" y="282" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1764" y="282" font-size="9" fill="#4ade80">3/6</text>
 
   <!-- Row 3 -->
-  <rect x="30" y="326" width="2290" height="28" fill="#1e2937" opacity="0.7"/>
-  <text x="42" y="344" font-size="12" fill="#f1f5f9">Customer Services - user-api</text>
-  <text x="340" y="344" font-size="11" fill="#22c55e">15/19</text>
-  <text x="400" y="344" font-size="11" fill="#22c55e">12/16</text>
-  <text x="460" y="344" font-size="11" fill="#22c55e">9/13</text>
-  <text x="520" y="344" font-size="11" fill="#22c55e">6/10</text>
-  <text x="680" y="344" font-size="11" fill="#22c55e">18/22</text>
-  <text x="740" y="344" font-size="11" fill="#22c55e">14/18</text>
-  <text x="800" y="344" font-size="11" fill="#22c55e">11/15</text>
-  <text x="860" y="344" font-size="11" fill="#22c55e">7/11</text>
-  <text x="1170" y="344" font-size="11" fill="#4ade80">9/14</text>
-  <text x="1230" y="344" font-size="11" fill="#4ade80">7/11</text>
-  <text x="1290" y="344" font-size="11" fill="#4ade80">5/9</text>
-  <text x="1350" y="344" font-size="11" fill="#4ade80">3/6</text>
-  <text x="1735" y="344" font-size="11" fill="#4ade80">6/10</text>
-  <text x="1795" y="344" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1855" y="344" font-size="11" fill="#4ade80">3/7</text>
-  <text x="1915" y="344" font-size="11" fill="#4ade80">2/5</text>
+  <rect x="25" y="290" width="2070" height="24" fill="#1e2937" opacity="0.7"/>
+  <text x="35" y="306" font-size="10" fill="#f1f5f9">Customer Services - user-api</text>
+  <text x="305" y="306" font-size="9" fill="#22c55e">15/19</text>
+  <text x="358" y="306" font-size="9" fill="#22c55e">12/16</text>
+  <text x="411" y="306" font-size="9" fill="#22c55e">9/13</text>
+  <text x="464" y="306" font-size="9" fill="#22c55e">6/10</text>
+  <text x="615" y="306" font-size="9" fill="#22c55e">18/22</text>
+  <text x="668" y="306" font-size="9" fill="#22c55e">14/18</text>
+  <text x="721" y="306" font-size="9" fill="#22c55e">11/15</text>
+  <text x="774" y="306" font-size="9" fill="#22c55e">7/11</text>
+  <text x="1085" y="306" font-size="9" fill="#4ade80">9/14</text>
+  <text x="1138" y="306" font-size="9" fill="#4ade80">7/11</text>
+  <text x="1191" y="306" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1244" y="306" font-size="9" fill="#4ade80">3/6</text>
+  <text x="1605" y="306" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1658" y="306" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1711" y="306" font-size="9" fill="#4ade80">3/7</text>
+  <text x="1764" y="306" font-size="9" fill="#4ade80">2/5</text>
 
   <!-- Row 4 -->
-  <rect x="30" y="354" width="2290" height="28" fill="#1e2937" opacity="0.6"/>
-  <text x="42" y="372" font-size="12" fill="#f1f5f9">Fraud Detection - ml-inference</text>
-  <text x="340" y="372" font-size="11" fill="#22c55e">19/23</text>
-  <text x="400" y="372" font-size="11" fill="#eab308">16/20</text>
-  <text x="460" y="372" font-size="11" fill="#ef4444">13/17</text>
-  <text x="520" y="372" font-size="11" fill="#22c55e">8/12</text>
-  <text x="680" y="372" font-size="11" fill="#ef4444">21/24</text>
-  <text x="740" y="372" font-size="11" fill="#22c55e">18/22</text>
-  <text x="800" y="372" font-size="11" fill="#22c55e">14/19</text>
-  <text x="860" y="372" font-size="11" fill="#22c55e">9/13</text>
-  <text x="1170" y="372" font-size="11" fill="#4ade80">10/15</text>
-  <text x="1230" y="372" font-size="11" fill="#4ade80">8/12</text>
-  <text x="1290" y="372" font-size="11" fill="#4ade80">6/10</text>
-  <text x="1350" y="372" font-size="11" fill="#4ade80">4/7</text>
-  <text x="1735" y="372" font-size="11" fill="#4ade80">7/11</text>
-  <text x="1795" y="372" font-size="11" fill="#4ade80">5/9</text>
-  <text x="1855" y="372" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1915" y="372" font-size="11" fill="#4ade80">3/6</text>
+  <rect x="25" y="314" width="2070" height="24" fill="#1e2937" opacity="0.6"/>
+  <text x="35" y="330" font-size="10" fill="#f1f5f9">Fraud Detection - ml-inference</text>
+  <text x="305" y="330" font-size="9" fill="#22c55e">19/23</text>
+  <text x="358" y="330" font-size="9" fill="#eab308">16/20</text>
+  <text x="411" y="330" font-size="9" fill="#ef4444">13/17</text>
+  <text x="464" y="330" font-size="9" fill="#22c55e">8/12</text>
+  <text x="615" y="330" font-size="9" fill="#ef4444">21/24</text>
+  <text x="668" y="330" font-size="9" fill="#22c55e">18/22</text>
+  <text x="721" y="330" font-size="9" fill="#22c55e">14/19</text>
+  <text x="774" y="330" font-size="9" fill="#22c55e">9/13</text>
+  <text x="1085" y="330" font-size="9" fill="#4ade80">10/15</text>
+  <text x="1138" y="330" font-size="9" fill="#4ade80">8/12</text>
+  <text x="1191" y="330" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1244" y="330" font-size="9" fill="#4ade80">4/7</text>
+  <text x="1605" y="330" font-size="9" fill="#4ade80">7/11</text>
+  <text x="1658" y="330" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1711" y="330" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1764" y="330" font-size="9" fill="#4ade80">3/6</text>
 
   <!-- Row 5 -->
-  <rect x="30" y="382" width="2290" height="28" fill="#1e2937" opacity="0.7"/>
-  <text x="42" y="400" font-size="12" fill="#f1f5f9">Loan Services - loan-processing</text>
-  <text x="340" y="400" font-size="11" fill="#22c55e">12/16</text>
-  <text x="400" y="400" font-size="11" fill="#22c55e">10/14</text>
-  <text x="460" y="400" font-size="11" fill="#22c55e">8/12</text>
-  <text x="520" y="400" font-size="11" fill="#22c55e">5/9</text>
-  <text x="680" y="400" font-size="11" fill="#22c55e">14/18</text>
-  <text x="740" y="400" font-size="11" fill="#22c55e">11/15</text>
-  <text x="800" y="400" font-size="11" fill="#22c55e">9/13</text>
-  <text x="860" y="400" font-size="11" fill="#22c55e">6/10</text>
-  <text x="1170" y="400" font-size="11" fill="#4ade80">6/10</text>
-  <text x="1230" y="400" font-size="11" fill="#4ade80">5/9</text>
-  <text x="1290" y="400" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1350" y="400" font-size="11" fill="#4ade80">3/6</text>
-  <text x="1735" y="400" font-size="11" fill="#4ade80">5/9</text>
-  <text x="1795" y="400" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1855" y="400" font-size="11" fill="#4ade80">3/7</text>
-  <text x="1915" y="400" font-size="11" fill="#4ade80">2/5</text>
+  <rect x="25" y="338" width="2070" height="24" fill="#1e2937" opacity="0.7"/>
+  <text x="35" y="354" font-size="10" fill="#f1f5f9">Loan Services - loan-processing</text>
+  <text x="305" y="354" font-size="9" fill="#22c55e">12/16</text>
+  <text x="358" y="354" font-size="9" fill="#22c55e">10/14</text>
+  <text x="411" y="354" font-size="9" fill="#22c55e">8/12</text>
+  <text x="464" y="354" font-size="9" fill="#22c55e">5/9</text>
+  <text x="615" y="354" font-size="9" fill="#22c55e">14/18</text>
+  <text x="668" y="354" font-size="9" fill="#22c55e">11/15</text>
+  <text x="721" y="354" font-size="9" fill="#22c55e">9/13</text>
+  <text x="774" y="354" font-size="9" fill="#22c55e">6/10</text>
+  <text x="1085" y="354" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1138" y="354" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1191" y="354" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1244" y="354" font-size="9" fill="#4ade80">3/6</text>
+  <text x="1605" y="354" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1658" y="354" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1711" y="354" font-size="9" fill="#4ade80">3/7</text>
+  <text x="1764" y="354" font-size="9" fill="#4ade80">2/5</text>
 
   <!-- Row 6 -->
-  <rect x="30" y="410" width="2290" height="28" fill="#1e2937" opacity="0.6"/>
-  <text x="42" y="428" font-size="12" fill="#f1f5f9">Risk Engine - risk-eval</text>
-  <text x="340" y="428" font-size="11" fill="#22c55e">17/21</text>
-  <text x="400" y="428" font-size="11" fill="#22c55e">14/18</text>
-  <text x="460" y="428" font-size="11" fill="#eab308">11/15</text>
-  <text x="520" y="428" font-size="11" fill="#22c55e">7/11</text>
-  <text x="680" y="428" font-size="11" fill="#22c55e">19/23</text>
-  <text x="740" y="428" font-size="11" fill="#22c55e">16/20</text>
-  <text x="800" y="428" font-size="11" fill="#22c55e">13/17</text>
-  <text x="860" y="428" font-size="11" fill="#22c55e">8/12</text>
-  <text x="1170" y="428" font-size="11" fill="#4ade80">8/12</text>
-  <text x="1230" y="428" font-size="11" fill="#4ade80">6/10</text>
-  <text x="1290" y="428" font-size="11" fill="#4ade80">5/9</text>
-  <text x="1350" y="428" font-size="11" fill="#4ade80">3/7</text>
-  <text x="1735" y="428" font-size="11" fill="#4ade80">6/10</text>
-  <text x="1795" y="428" font-size="11" fill="#4ade80">4/8</text>
-  <text x="1855" y="428" font-size="11" fill="#4ade80">3/7</text>
-  <text x="1915" y="428" font-size="11" fill="#4ade80">2/5</text>
+  <rect x="25" y="362" width="2070" height="24" fill="#1e2937" opacity="0.6"/>
+  <text x="35" y="378" font-size="10" fill="#f1f5f9">Risk Engine - risk-eval</text>
+  <text x="305" y="378" font-size="9" fill="#22c55e">17/21</text>
+  <text x="358" y="378" font-size="9" fill="#22c55e">14/18</text>
+  <text x="411" y="378" font-size="9" fill="#eab308">11/15</text>
+  <text x="464" y="378" font-size="9" fill="#22c55e">7/11</text>
+  <text x="615" y="378" font-size="9" fill="#22c55e">19/23</text>
+  <text x="668" y="378" font-size="9" fill="#22c55e">16/20</text>
+  <text x="721" y="378" font-size="9" fill="#22c55e">13/17</text>
+  <text x="774" y="378" font-size="9" fill="#22c55e">8/12</text>
+  <text x="1085" y="378" font-size="9" fill="#4ade80">8/12</text>
+  <text x="1138" y="378" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1191" y="378" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1244" y="378" font-size="9" fill="#4ade80">3/7</text>
+  <text x="1605" y="378" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1658" y="378" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1711" y="378" font-size="9" fill="#4ade80">3/7</text>
+  <text x="1764" y="378" font-size="9" fill="#4ade80">2/5</text>
+
+  <!-- Row 7 -->
+  <rect x="25" y="386" width="2070" height="24" fill="#1e2937" opacity="0.7"/>
+  <text x="35" y="402" font-size="10" fill="#f1f5f9">Core Banking - core-ledger</text>
+  <text x="305" y="402" font-size="9" fill="#22c55e">20/23</text>
+  <text x="358" y="402" font-size="9" fill="#22c55e">16/21</text>
+  <text x="411" y="402" font-size="9" fill="#22c55e">13/18</text>
+  <text x="464" y="402" font-size="9" fill="#22c55e">9/13</text>
+  <text x="615" y="402" font-size="9" fill="#22c55e">22/24</text>
+  <text x="668" y="402" font-size="9" fill="#22c55e">18/22</text>
+  <text x="721" y="402" font-size="9" fill="#22c55e">15/19</text>
+  <text x="774" y="402" font-size="9" fill="#22c55e">10/14</text>
+  <text x="1085" y="402" font-size="9" fill="#4ade80">9/13</text>
+  <text x="1138" y="402" font-size="9" fill="#4ade80">7/11</text>
+  <text x="1191" y="402" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1244" y="402" font-size="9" fill="#4ade80">4/7</text>
+  <text x="1605" y="402" font-size="9" fill="#4ade80">8/12</text>
+  <text x="1658" y="402" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1711" y="402" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1764" y="402" font-size="9" fill="#4ade80">3/6</text>
+
+  <!-- Row 8 -->
+  <rect x="25" y="410" width="2070" height="24" fill="#1e2937" opacity="0.6"/>
+  <text x="35" y="426" font-size="10" fill="#f1f5f9">Settlement - batch-settlement</text>
+  <text x="305" y="426" font-size="9" fill="#22c55e">14/18</text>
+  <text x="358" y="426" font-size="9" fill="#22c55e">11/15</text>
+  <text x="411" y="426" font-size="9" fill="#22c55e">8/12</text>
+  <text x="464" y="426" font-size="9" fill="#22c55e">6/10</text>
+  <text x="615" y="426" font-size="9" fill="#22c55e">17/21</text>
+  <text x="668" y="426" font-size="9" fill="#22c55e">13/17</text>
+  <text x="721" y="426" font-size="9" fill="#22c55e">10/14</text>
+  <text x="774" y="426" font-size="9" fill="#22c55e">7/11</text>
+  <text x="1085" y="426" font-size="9" fill="#4ade80">7/11</text>
+  <text x="1138" y="426" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1191" y="426" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1244" y="426" font-size="9" fill="#4ade80">3/6</text>
+  <text x="1605" y="426" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1658" y="426" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1711" y="426" font-size="9" fill="#4ade80">3/7</text>
+  <text x="1764" y="426" font-size="9" fill="#4ade80">2/5</text>
+
+  <!-- Row 9 -->
+  <rect x="25" y="434" width="2070" height="24" fill="#1e2937" opacity="0.7"/>
+  <text x="35" y="450" font-size="10" fill="#f1f5f9">Notification - push-notify</text>
+  <text x="305" y="450" font-size="9" fill="#22c55e">11/15</text>
+  <text x="358" y="450" font-size="9" fill="#22c55e">9/13</text>
+  <text x="411" y="450" font-size="9" fill="#22c55e">7/11</text>
+  <text x="464" y="450" font-size="9" fill="#22c55e">5/8</text>
+  <text x="615" y="450" font-size="9" fill="#22c55e">13/17</text>
+  <text x="668" y="450" font-size="9" fill="#22c55e">10/14</text>
+  <text x="721" y="450" font-size="9" fill="#22c55e">8/12</text>
+  <text x="774" y="450" font-size="9" fill="#22c55e">6/9</text>
+  <text x="1085" y="450" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1138" y="450" font-size="9" fill="#4ade80">4/7</text>
+  <text x="1191" y="450" font-size="9" fill="#4ade80">3/6</text>
+  <text x="1244" y="450" font-size="9" fill="#4ade80">2/5</text>
+  <text x="1605" y="450" font-size="9" fill="#4ade80">5/8</text>
+  <text x="1658" y="450" font-size="9" fill="#4ade80">3/6</text>
+  <text x="1711" y="450" font-size="9" fill="#4ade80">2/5</text>
+  <text x="1764" y="450" font-size="9" fill="#4ade80">1/4</text>
+
+  <!-- Row 10 -->
+  <rect x="25" y="458" width="2070" height="24" fill="#1e2937" opacity="0.6"/>
+  <text x="35" y="474" font-size="10" fill="#f1f5f9">API Gateway - api-gw</text>
+  <text x="305" y="474" font-size="9" fill="#22c55e">16/20</text>
+  <text x="358" y="474" font-size="9" fill="#22c55e">13/17</text>
+  <text x="411" y="474" font-size="9" fill="#22c55e">10/14</text>
+  <text x="464" y="474" font-size="9" fill="#22c55e">7/10</text>
+  <text x="615" y="474" font-size="9" fill="#22c55e">19/22</text>
+  <text x="668" y="474" font-size="9" fill="#22c55e">15/19</text>
+  <text x="721" y="474" font-size="9" fill="#22c55e">12/16</text>
+  <text x="774" y="474" font-size="9" fill="#22c55e">8/12</text>
+  <text x="1085" y="474" font-size="9" fill="#4ade80">8/12</text>
+  <text x="1138" y="474" font-size="9" fill="#4ade80">6/10</text>
+  <text x="1191" y="474" font-size="9" fill="#4ade80">4/8</text>
+  <text x="1244" y="474" font-size="9" fill="#4ade80">3/6</text>
+  <text x="1605" y="474" font-size="9" fill="#4ade80">7/11</text>
+  <text x="1658" y="474" font-size="9" fill="#4ade80">5/9</text>
+  <text x="1711" y="474" font-size="9" fill="#4ade80">4/7</text>
+  <text x="1764" y="474" font-size="9" fill="#4ade80">2/5</text>
 
   <!-- Footer -->
-  <rect x="30" y="880" width="2290" height="30" rx="6" fill="#1e2937"/>
-  <text x="45" y="900" font-size="12" fill="#94a3b8">Green = Healthy • Yellow = Spike • Red = Anomaly • All counts ≤ 24 • Auto-refresh every 2 min</text>
+  <rect x="25" y="890" width="2070" height="25" rx="5" fill="#1e2937"/>
+  <text x="38" y="907" font-size="10" fill="#94a3b8">Green = Healthy • Yellow = Spike • Red = Anomaly • All counts ≤ 24 • Auto-refresh every 2 min</text>
 </svg>
