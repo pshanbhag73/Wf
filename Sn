@@ -1,220 +1,186 @@
-<svg width="2400" height="980" viewBox="0 0 2400 980" xmlns="http://www.w3.org/2000/svg" style="background:#0f172a; border:1px solid #334155; border-radius:12px; font-family:Arial, sans-serif;">
+<svg width="2350" height="920" viewBox="0 0 2350 920" xmlns="http://www.w3.org/2000/svg" style="background:#0f172a; border:1px solid #334155; border-radius:12px; font-family:Arial, sans-serif;">
   <!-- Header -->
-  <rect x="0" y="0" width="2400" height="90" fill="#1e2937"/>
-  <text x="50" y="58" fill="#f1f5f9" font-size="34" font-weight="700">What's Running Where - New-Gen vs Heritage</text>
-  <text x="1750" y="52" fill="#94a3b8" font-size="18">5,000 Apps • 12 DCs (4 New-Gen) • Live • 14:45 UTC</text>
+  <rect x="0" y="0" width="2350" height="82" fill="#1e2937"/>
+  <text x="40" y="52" fill="#f1f5f9" font-size="30" font-weight="700">What's Running Where - New-Gen vs Heritage</text>
+  <text x="1680" y="48" fill="#94a3b8" font-size="16">5,000 Apps • 12 DCs • Live • 14:48 UTC</text>
 
   <!-- Filter Bar -->
-  <rect x="40" y="105" width="2320" height="50" rx="10" fill="#334155"/>
-  <text x="70" y="135" font-size="15" fill="#e0f2fe">Filters: LOB ▼  Region: All ▼  DC Type: All ▼  Compute: All ▼  Status: All ▼</text>
+  <rect x="30" y="95" width="2290" height="42" rx="8" fill="#334155"/>
+  <text x="50" y="122" font-size="14" fill="#e0f2fe">Filters: LOB ▼  Region ▼  DC Type ▼  Compute ▼  Status ▼</text>
 
-  <!-- TOP LEVEL: NEW-GEN vs HERITAGE -->
-  <!-- NEW-GEN Header -->
-  <rect x="40" y="170" width="1160" height="48" rx="8" fill="#166534"/>
-  <text x="620" y="200" fill="#fff" font-size="22" font-weight="700">NEW-GEN (4 DCs)</text>
+  <!-- TOP LEVEL HEADERS -->
+  <rect x="30" y="150" width="1130" height="42" rx="6" fill="#166534"/>
+  <text x="595" y="177" fill="#fff" font-size="18" font-weight="700">NEW-GEN (4 DCs)</text>
 
-  <!-- HERITAGE Header -->
-  <rect x="1210" y="170" width="1160" height="48" rx="8" fill="#475569"/>
-  <text x="1790" y="200" fill="#fff" font-size="22" font-weight="700">HERITAGE (8 DCs)</text>
+  <rect x="1170" y="150" width="1130" height="42" rx="6" fill="#166534"/>
+  <text x="1735" y="177" fill="#fff" font-size="18" font-weight="700">HERITAGE (8 DCs)</text>
 
-  <!-- SECOND LEVEL: EAST & WEST under each -->
-  <!-- East under New-Gen -->
-  <rect x="40" y="225" width="580" height="38" rx="6" fill="#1e40af"/>
-  <text x="330" y="250" fill="#fff" font-size="16" font-weight="600">EAST (us-east-1 • us-east-2)</text>
+  <!-- SECOND LEVEL: Regions -->
+  <rect x="30" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
+  <text x="312" y="219" fill="#fff" font-size="14" font-weight="600">EAST (us-east-1 • us-east-2)</text>
 
-  <!-- West under New-Gen -->
-  <rect x="620" y="225" width="580" height="38" rx="6" fill="#1e40af"/>
-  <text x="910" y="250" fill="#fff" font-size="16" font-weight="600">WEST (us-west-2 • us-west-1)</text>
+  <rect x="595" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
+  <text x="877" y="219" fill="#fff" font-size="14" font-weight="600">WEST (us-west-2 • us-west-1)</text>
 
-  <!-- East under Heritage -->
-  <rect x="1210" y="225" width="580" height="38" rx="6" fill="#475569"/>
-  <text x="1500" y="250" fill="#fff" font-size="16" font-weight="600">EAST (Legacy)</text>
+  <rect x="1170" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
+  <text x="1452" y="219" fill="#fff" font-size="14" font-weight="600">EAST (Legacy)</text>
 
-  <!-- West under Heritage -->
-  <rect x="1790" y="225" width="580" height="38" rx="6" fill="#475569"/>
-  <text x="2080" y="250" fill="#fff" font-size="16" font-weight="600">WEST (Legacy)</text>
+  <rect x="1735" y="197" width="565" height="34" rx="5" fill="#1e40af"/>
+  <text x="2017" y="219" fill="#fff" font-size="14" font-weight="600">WEST (Legacy)</text>
 
-  <!-- Column Headers (Compute Types) -->
-  <rect x="40" y="270" width="2320" height="36" fill="#1e2937"/>
-  <!-- New-Gen East columns -->
-  <text x="55" y="293" fill="#22c55e" font-size="12" font-weight="600">OCP</text>
-  <text x="125" y="293" fill="#22c55e" font-size="12" font-weight="600">VM</text>
-  <text x="195" y="293" fill="#22c55e" font-size="12" font-weight="600">DB</text>
-  <text x="265" y="293" fill="#22c55e" font-size="12" font-weight="600">Avi</text>
-  <text x="335" y="293" fill="#22c55e" font-size="12" font-weight="600">MW</text>
+  <!-- Column Headers -->
+  <rect x="30" y="237" width="2290" height="28" fill="#1e2937"/>
+  
+  <!-- App Header -->
+  <text x="45" y="255" fill="#f1f5f9" font-size="12" font-weight="700">APP</text>
 
-  <!-- New-Gen West columns -->
-  <text x="635" y="293" fill="#22c55e" font-size="12" font-weight="600">OCP</text>
-  <text x="705" y="293" fill="#22c55e" font-size="12" font-weight="600">VM</text>
-  <text x="775" y="293" fill="#22c55e" font-size="12" font-weight="600">DB</text>
-  <text x="845" y="293" fill="#22c55e" font-size="12" font-weight="600">Avi</text>
-  <text x="915" y="293" fill="#22c55e" font-size="12" font-weight="600">MW</text>
-
-  <!-- Heritage East columns -->
-  <text x="1225" y="293" fill="#94a3b8" font-size="12" font-weight="600">OCP</text>
-  <text x="1295" y="293" fill="#94a3b8" font-size="12" font-weight="600">VM</text>
-  <text x="1365" y="293" fill="#94a3b8" font-size="12" font-weight="600">DB</text>
-  <text x="1435" y="293" fill="#94a3b8" font-size="12" font-weight="600">Avi</text>
-  <text x="1505" y="293" fill="#94a3b8" font-size="12" font-weight="600">MW</text>
-
-  <!-- Heritage West columns -->
-  <text x="1805" y="293" fill="#94a3b8" font-size="12" font-weight="600">OCP</text>
-  <text x="1875" y="293" fill="#94a3b8" font-size="12" font-weight="600">VM</text>
-  <text x="1945" y="293" fill="#94a3b8" font-size="12" font-weight="600">DB</text>
-  <text x="2015" y="293" fill="#94a3b8" font-size="12" font-weight="600">Avi</text>
-  <text x="2085" y="293" fill="#94a3b8" font-size="12" font-weight="600">MW</text>
-
-  <!-- DATA ROWS (18 rows with variety - representing 100+ scale) -->
-
-  <!-- Row 1: Retail Banking - auth-service -->
-  <rect x="40" y="312" width="2320" height="38" fill="#1e2937" opacity="0.65"/>
-  <text x="55" y="336" font-size="13" fill="#f1f5f9">Retail Banking - auth-service</text>
   <!-- New-Gen East -->
-  <text x="55" y="336" font-size="12" fill="#22c55e">892/1245</text>
-  <text x="125" y="336" font-size="12" fill="#22c55e">674/983</text>
-  <text x="195" y="336" font-size="12" fill="#22c55e">521/892</text>
-  <text x="265" y="336" font-size="12" fill="#f1f5f9">45/67</text>
-  <text x="335" y="336" font-size="12" fill="#22c55e">112/145</text>
+  <text x="340" y="255" fill="#22c55e" font-size="11" font-weight="600">OCP</text>
+  <text x="400" y="255" fill="#22c55e" font-size="11" font-weight="600">VM</text>
+  <text x="460" y="255" fill="#22c55e" font-size="11" font-weight="600">DB</text>
+  <text x="520" y="255" fill="#22c55e" font-size="11" font-weight="600">Avi</text>
+
   <!-- New-Gen West -->
-  <text x="635" y="336" font-size="12" fill="#22c55e">1034/1478</text>
-  <text x="705" y="336" font-size="12" fill="#eab308">892/1245</text>
-  <text x="775" y="336" font-size="12" fill="#22c55e">674/983</text>
-  <text x="845" y="336" font-size="12" fill="#f1f5f9">78/156</text>
-  <text x="915" y="336" font-size="12" fill="#22c55e">145/289</text>
+  <text x="680" y="255" fill="#22c55e" font-size="11" font-weight="600">OCP</text>
+  <text x="740" y="255" fill="#22c55e" font-size="11" font-weight="600">VM</text>
+  <text x="800" y="255" fill="#22c55e" font-size="11" font-weight="600">DB</text>
+  <text x="860" y="255" fill="#22c55e" font-size="11" font-weight="600">Avi</text>
+
   <!-- Heritage East -->
-  <text x="1225" y="336" font-size="12" fill="#94a3b8">124/312</text>
-  <text x="1295" y="336" font-size="12" fill="#94a3b8">89/210</text>
-  <text x="1365" y="336" font-size="12" fill="#94a3b8">34/78</text>
-  <text x="1435" y="336" font-size="12" fill="#94a3b8">12/45</text>
-  <text x="1505" y="336" font-size="12" fill="#94a3b8">67/134</text>
+  <text x="1170" y="255" fill="#4ade80" font-size="11" font-weight="600">OCP</text>
+  <text x="1230" y="255" fill="#4ade80" font-size="11" font-weight="600">VM</text>
+  <text x="1290" y="255" fill="#4ade80" font-size="11" font-weight="600">DB</text>
+  <text x="1350" y="255" fill="#4ade80" font-size="11" font-weight="600">Avi</text>
+
   <!-- Heritage West -->
-  <text x="1805" y="336" font-size="12" fill="#94a3b8">89/234</text>
-  <text x="1875" y="336" font-size="12" fill="#94a3b8">67/178</text>
-  <text x="1945" y="336" font-size="12" fill="#94a3b8">23/67</text>
-  <text x="2015" y="336" font-size="12" fill="#94a3b8">45/112</text>
-  <text x="2085" y="336" font-size="12" fill="#94a3b8">112/234</text>
+  <text x="1735" y="255" fill="#4ade80" font-size="11" font-weight="600">OCP</text>
+  <text x="1795" y="255" fill="#4ade80" font-size="11" font-weight="600">VM</text>
+  <text x="1855" y="255" fill="#4ade80" font-size="11" font-weight="600">DB</text>
+  <text x="1915" y="255" fill="#4ade80" font-size="11" font-weight="600">Avi</text>
 
-  <!-- Row 2: Payments - prod-db-cluster (High New-Gen) -->
-  <rect x="40" y="350" width="2320" height="38" fill="#1e2937" opacity="0.55"/>
-  <text x="55" y="374" font-size="13" fill="#f1f5f9">Payments - prod-db-cluster</text>
-  <text x="55" y="374" font-size="12" fill="#22c55e">1245/1567</text>
-  <text x="125" y="374" font-size="12" fill="#22c55e">983/1245</text>
-  <text x="195" y="374" font-size="12" fill="#eab308">892/1245</text>
-  <text x="265" y="374" font-size="12" fill="#22c55e">67/89</text>
-  <text x="335" y="374" font-size="12" fill="#22c55e">234/312</text>
-  <text x="635" y="374" font-size="12" fill="#22c55e">1478/1890</text>
-  <text x="705" y="374" font-size="12" fill="#22c55e">1245/1567</text>
-  <text x="775" y="374" font-size="12" fill="#22c55e">983/1245</text>
-  <text x="845" y="374" font-size="12" fill="#f1f5f9">89/156</text>
-  <text x="915" y="374" font-size="12" fill="#22c55e">312/456</text>
-  <text x="1225" y="374" font-size="12" fill="#94a3b8">156/289</text>
-  <text x="1295" y="374" font-size="12" fill="#94a3b8">134/245</text>
-  <text x="1365" y="374" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="1435" y="374" font-size="12" fill="#94a3b8">23/56</text>
-  <text x="1505" y="374" font-size="12" fill="#94a3b8">78/134</text>
-  <text x="1805" y="374" font-size="12" fill="#94a3b8">112/234</text>
-  <text x="1875" y="374" font-size="12" fill="#94a3b8">89/178</text>
-  <text x="1945" y="374" font-size="12" fill="#94a3b8">34/78</text>
-  <text x="2015" y="374" font-size="12" fill="#94a3b8">56/112</text>
-  <text x="2085" y="374" font-size="12" fill="#94a3b8">134/245</text>
+  <!-- DATA ROWS -->
 
-  <!-- Row 3: Customer Services - user-api (Mixed) -->
-  <rect x="40" y="388" width="2320" height="38" fill="#1e2937" opacity="0.65"/>
-  <text x="55" y="412" font-size="13" fill="#f1f5f9">Customer Services - user-api</text>
-  <text x="55" y="412" font-size="12" fill="#22c55e">674/892</text>
-  <text x="125" y="412" font-size="12" fill="#22c55e">521/674</text>
-  <text x="195" y="412" font-size="12" fill="#f1f5f9">312/456</text>
-  <text x="265" y="412" font-size="12" fill="#22c55e">34/56</text>
-  <text x="335" y="412" font-size="12" fill="#22c55e">89/134</text>
-  <text x="635" y="412" font-size="12" fill="#22c55e">892/1245</text>
-  <text x="705" y="412" font-size="12" fill="#22c55e">674/892</text>
-  <text x="775" y="412" font-size="12" fill="#f1f5f9">456/674</text>
-  <text x="845" y="412" font-size="12" fill="#22c55e">45/78</text>
-  <text x="915" y="412" font-size="12" fill="#22c55e">134/234</text>
-  <text x="1225" y="412" font-size="12" fill="#94a3b8">89/178</text>
-  <text x="1295" y="412" font-size="12" fill="#94a3b8">67/134</text>
-  <text x="1365" y="412" font-size="12" fill="#94a3b8">23/45</text>
-  <text x="1435" y="412" font-size="12" fill="#94a3b8">12/34</text>
-  <text x="1505" y="412" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="1805" y="412" font-size="12" fill="#94a3b8">67/134</text>
-  <text x="1875" y="412" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="1945" y="412" font-size="12" fill="#94a3b8">12/34</text>
-  <text x="2015" y="412" font-size="12" fill="#94a3b8">34/67</text>
-  <text x="2085" y="412" font-size="12" fill="#94a3b8">89/178</text>
+  <!-- Row 1 -->
+  <rect x="30" y="270" width="2290" height="28" fill="#1e2937" opacity="0.7"/>
+  <text x="42" y="288" font-size="12" fill="#f1f5f9">Retail Banking - auth-service</text>
+  <text x="340" y="288" font-size="11" fill="#22c55e">18/22</text>
+  <text x="400" y="288" font-size="11" fill="#22c55e">14/19</text>
+  <text x="460" y="288" font-size="11" fill="#22c55e">12/18</text>
+  <text x="520" y="288" font-size="11" fill="#22c55e">8/12</text>
+  <text x="680" y="288" font-size="11" fill="#22c55e">22/24</text>
+  <text x="740" y="288" font-size="11" fill="#22c55e">19/23</text>
+  <text x="800" y="288" font-size="11" fill="#22c55e">15/20</text>
+  <text x="860" y="288" font-size="11" fill="#22c55e">9/14</text>
+  <text x="1170" y="288" font-size="11" fill="#4ade80">7/11</text>
+  <text x="1230" y="288" font-size="11" fill="#4ade80">5/9</text>
+  <text x="1290" y="288" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1350" y="288" font-size="11" fill="#4ade80">3/6</text>
+  <text x="1735" y="288" font-size="11" fill="#4ade80">6/10</text>
+  <text x="1795" y="288" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1855" y="288" font-size="11" fill="#4ade80">3/7</text>
+  <text x="1915" y="288" font-size="11" fill="#4ade80">2/5</text>
 
-  <!-- Row 4: Fraud Detection - ml-inference (High Anomaly in New-Gen West) -->
-  <rect x="40" y="426" width="2320" height="38" fill="#1e2937" opacity="0.55"/>
-  <text x="55" y="450" font-size="13" fill="#f1f5f9">Fraud Detection - ml-inference</text>
-  <text x="55" y="450" font-size="12" fill="#22c55e">1245/1567</text>
-  <text x="125" y="450" font-size="12" fill="#eab308">983/1245</text>
-  <text x="195" y="450" font-size="12" fill="#ef4444">892/1245</text>
-  <text x="265" y="450" font-size="12" fill="#22c55e">67/89</text>
-  <text x="335" y="450" font-size="12" fill="#22c55e">234/312</text>
-  <text x="635" y="450" font-size="12" fill="#ef4444">1478/1890</text>
-  <text x="705" y="450" font-size="12" fill="#22c55e">1245/1567</text>
-  <text x="775" y="450" font-size="12" fill="#22c55e">983/1245</text>
-  <text x="845" y="450" font-size="12" fill="#f1f5f9">89/156</text>
-  <text x="915" y="450" font-size="12" fill="#ef4444">312/456</text>
-  <text x="1225" y="450" font-size="12" fill="#94a3b8">156/289</text>
-  <text x="1295" y="450" font-size="12" fill="#94a3b8">134/245</text>
-  <text x="1365" y="450" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="1435" y="450" font-size="12" fill="#94a3b8">23/56</text>
-  <text x="1505" y="450" font-size="12" fill="#94a3b8">78/134</text>
-  <text x="1805" y="450" font-size="12" fill="#94a3b8">112/234</text>
-  <text x="1875" y="450" font-size="12" fill="#94a3b8">89/178</text>
-  <text x="1945" y="450" font-size="12" fill="#94a3b8">34/78</text>
-  <text x="2015" y="450" font-size="12" fill="#94a3b8">56/112</text>
-  <text x="2085" y="450" font-size="12" fill="#94a3b8">134/245</text>
+  <!-- Row 2 -->
+  <rect x="30" y="298" width="2290" height="28" fill="#1e2937" opacity="0.6"/>
+  <text x="42" y="316" font-size="12" fill="#f1f5f9">Payments - prod-db-cluster</text>
+  <text x="340" y="316" font-size="11" fill="#22c55e">21/24</text>
+  <text x="400" y="316" font-size="11" fill="#22c55e">17/22</text>
+  <text x="460" y="316" font-size="11" fill="#22c55e">14/19</text>
+  <text x="520" y="316" font-size="11" fill="#22c55e">11/15</text>
+  <text x="680" y="316" font-size="11" fill="#22c55e">23/24</text>
+  <text x="740" y="316" font-size="11" fill="#22c55e">20/23</text>
+  <text x="800" y="316" font-size="11" fill="#22c55e">16/21</text>
+  <text x="860" y="316" font-size="11" fill="#22c55e">12/17</text>
+  <text x="1170" y="316" font-size="11" fill="#4ade80">8/13</text>
+  <text x="1230" y="316" font-size="11" fill="#4ade80">6/11</text>
+  <text x="1290" y="316" font-size="11" fill="#4ade80">5/9</text>
+  <text x="1350" y="316" font-size="11" fill="#4ade80">4/7</text>
+  <text x="1735" y="316" font-size="11" fill="#4ade80">7/12</text>
+  <text x="1795" y="316" font-size="11" fill="#4ade80">5/10</text>
+  <text x="1855" y="316" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1915" y="316" font-size="11" fill="#4ade80">3/6</text>
 
-  <!-- Additional rows (abbreviated for readability - same pattern with variety) -->
-  <rect x="40" y="464" width="2320" height="38" fill="#1e2937" opacity="0.65"/>
-  <text x="55" y="488" font-size="13" fill="#f1f5f9">Loan Services - loan-processing</text>
-  <text x="55" y="488" font-size="12" fill="#22c55e">521/674</text>
-  <text x="125" y="488" font-size="12" fill="#22c55e">456/592</text>
-  <text x="195" y="488" font-size="12" fill="#22c55e">312/456</text>
-  <text x="265" y="488" font-size="12" fill="#f1f5f9">23/45</text>
-  <text x="335" y="488" font-size="12" fill="#22c55e">67/112</text>
-  <text x="635" y="488" font-size="12" fill="#22c55e">674/892</text>
-  <text x="705" y="488" font-size="12" fill="#22c55e">521/674</text>
-  <text x="775" y="488" font-size="12" fill="#22c55e">456/592</text>
-  <text x="845" y="488" font-size="12" fill="#22c55e">34/67</text>
-  <text x="915" y="488" font-size="12" fill="#22c55e">89/156</text>
-  <text x="1225" y="488" font-size="12" fill="#94a3b8">78/134</text>
-  <text x="1295" y="488" font-size="12" fill="#94a3b8">56/112</text>
-  <text x="1365" y="488" font-size="12" fill="#94a3b8">23/56</text>
-  <text x="1435" y="488" font-size="12" fill="#94a3b8">12/34</text>
-  <text x="1505" y="488" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="1805" y="488" font-size="12" fill="#94a3b8">67/134</text>
-  <text x="1875" y="488" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="1945" y="488" font-size="12" fill="#94a3b8">12/34</text>
-  <text x="2015" y="488" font-size="12" fill="#94a3b8">34/67</text>
-  <text x="2085" y="488" font-size="12" fill="#94a3b8">89/178</text>
+  <!-- Row 3 -->
+  <rect x="30" y="326" width="2290" height="28" fill="#1e2937" opacity="0.7"/>
+  <text x="42" y="344" font-size="12" fill="#f1f5f9">Customer Services - user-api</text>
+  <text x="340" y="344" font-size="11" fill="#22c55e">15/19</text>
+  <text x="400" y="344" font-size="11" fill="#22c55e">12/16</text>
+  <text x="460" y="344" font-size="11" fill="#22c55e">9/13</text>
+  <text x="520" y="344" font-size="11" fill="#22c55e">6/10</text>
+  <text x="680" y="344" font-size="11" fill="#22c55e">18/22</text>
+  <text x="740" y="344" font-size="11" fill="#22c55e">14/18</text>
+  <text x="800" y="344" font-size="11" fill="#22c55e">11/15</text>
+  <text x="860" y="344" font-size="11" fill="#22c55e">7/11</text>
+  <text x="1170" y="344" font-size="11" fill="#4ade80">9/14</text>
+  <text x="1230" y="344" font-size="11" fill="#4ade80">7/11</text>
+  <text x="1290" y="344" font-size="11" fill="#4ade80">5/9</text>
+  <text x="1350" y="344" font-size="11" fill="#4ade80">3/6</text>
+  <text x="1735" y="344" font-size="11" fill="#4ade80">6/10</text>
+  <text x="1795" y="344" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1855" y="344" font-size="11" fill="#4ade80">3/7</text>
+  <text x="1915" y="344" font-size="11" fill="#4ade80">2/5</text>
 
-  <!-- More rows (continuing pattern for density) -->
-  <rect x="40" y="502" width="2320" height="38" fill="#1e2937" opacity="0.55"/>
-  <text x="55" y="526" font-size="13" fill="#f1f5f9">Risk Engine - risk-eval</text>
-  <text x="55" y="526" font-size="12" fill="#22c55e">983/1245</text>
-  <text x="125" y="526" font-size="12" fill="#22c55e">892/1245</text>
-  <text x="195" y="526" font-size="12" fill="#eab308">674/983</text>
-  <text x="265" y="526" font-size="12" fill="#22c55e">45/78</text>
-  <text x="335" y="526" font-size="12" fill="#22c55e">156/289</text>
-  <text x="635" y="526" font-size="12" fill="#22c55e">1245/1567</text>
-  <text x="705" y="526" font-size="12" fill="#22c55e">983/1245</text>
-  <text x="775" y="526" font-size="12" fill="#22c55e">892/1245</text>
-  <text x="845" y="526" font-size="12" fill="#f1f5f9">67/134</text>
-  <text x="915" y="526" font-size="12" fill="#22c55e">234/456</text>
-  <text x="1225" y="526" font-size="12" fill="#94a3b8">134/245</text>
-  <text x="1295" y="526" font-size="12" fill="#94a3b8">112/234</text>
-  <text x="1365" y="526" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="1435" y="526" font-size="12" fill="#94a3b8">23/56</text>
-  <text x="1505" y="526" font-size="12" fill="#94a3b8">78/134</text>
-  <text x="1805" y="526" font-size="12" fill="#94a3b8">89/178</text>
-  <text x="1875" y="526" font-size="12" fill="#94a3b8">67/134</text>
-  <text x="1945" y="526" font-size="12" fill="#94a3b8">23/56</text>
-  <text x="2015" y="526" font-size="12" fill="#94a3b8">45/89</text>
-  <text x="2085" y="526" font-size="12" fill="#94a3b8">112/234</text>
+  <!-- Row 4 -->
+  <rect x="30" y="354" width="2290" height="28" fill="#1e2937" opacity="0.6"/>
+  <text x="42" y="372" font-size="12" fill="#f1f5f9">Fraud Detection - ml-inference</text>
+  <text x="340" y="372" font-size="11" fill="#22c55e">19/23</text>
+  <text x="400" y="372" font-size="11" fill="#eab308">16/20</text>
+  <text x="460" y="372" font-size="11" fill="#ef4444">13/17</text>
+  <text x="520" y="372" font-size="11" fill="#22c55e">8/12</text>
+  <text x="680" y="372" font-size="11" fill="#ef4444">21/24</text>
+  <text x="740" y="372" font-size="11" fill="#22c55e">18/22</text>
+  <text x="800" y="372" font-size="11" fill="#22c55e">14/19</text>
+  <text x="860" y="372" font-size="11" fill="#22c55e">9/13</text>
+  <text x="1170" y="372" font-size="11" fill="#4ade80">10/15</text>
+  <text x="1230" y="372" font-size="11" fill="#4ade80">8/12</text>
+  <text x="1290" y="372" font-size="11" fill="#4ade80">6/10</text>
+  <text x="1350" y="372" font-size="11" fill="#4ade80">4/7</text>
+  <text x="1735" y="372" font-size="11" fill="#4ade80">7/11</text>
+  <text x="1795" y="372" font-size="11" fill="#4ade80">5/9</text>
+  <text x="1855" y="372" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1915" y="372" font-size="11" fill="#4ade80">3/6</text>
+
+  <!-- Row 5 -->
+  <rect x="30" y="382" width="2290" height="28" fill="#1e2937" opacity="0.7"/>
+  <text x="42" y="400" font-size="12" fill="#f1f5f9">Loan Services - loan-processing</text>
+  <text x="340" y="400" font-size="11" fill="#22c55e">12/16</text>
+  <text x="400" y="400" font-size="11" fill="#22c55e">10/14</text>
+  <text x="460" y="400" font-size="11" fill="#22c55e">8/12</text>
+  <text x="520" y="400" font-size="11" fill="#22c55e">5/9</text>
+  <text x="680" y="400" font-size="11" fill="#22c55e">14/18</text>
+  <text x="740" y="400" font-size="11" fill="#22c55e">11/15</text>
+  <text x="800" y="400" font-size="11" fill="#22c55e">9/13</text>
+  <text x="860" y="400" font-size="11" fill="#22c55e">6/10</text>
+  <text x="1170" y="400" font-size="11" fill="#4ade80">6/10</text>
+  <text x="1230" y="400" font-size="11" fill="#4ade80">5/9</text>
+  <text x="1290" y="400" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1350" y="400" font-size="11" fill="#4ade80">3/6</text>
+  <text x="1735" y="400" font-size="11" fill="#4ade80">5/9</text>
+  <text x="1795" y="400" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1855" y="400" font-size="11" fill="#4ade80">3/7</text>
+  <text x="1915" y="400" font-size="11" fill="#4ade80">2/5</text>
+
+  <!-- Row 6 -->
+  <rect x="30" y="410" width="2290" height="28" fill="#1e2937" opacity="0.6"/>
+  <text x="42" y="428" font-size="12" fill="#f1f5f9">Risk Engine - risk-eval</text>
+  <text x="340" y="428" font-size="11" fill="#22c55e">17/21</text>
+  <text x="400" y="428" font-size="11" fill="#22c55e">14/18</text>
+  <text x="460" y="428" font-size="11" fill="#eab308">11/15</text>
+  <text x="520" y="428" font-size="11" fill="#22c55e">7/11</text>
+  <text x="680" y="428" font-size="11" fill="#22c55e">19/23</text>
+  <text x="740" y="428" font-size="11" fill="#22c55e">16/20</text>
+  <text x="800" y="428" font-size="11" fill="#22c55e">13/17</text>
+  <text x="860" y="428" font-size="11" fill="#22c55e">8/12</text>
+  <text x="1170" y="428" font-size="11" fill="#4ade80">8/12</text>
+  <text x="1230" y="428" font-size="11" fill="#4ade80">6/10</text>
+  <text x="1290" y="428" font-size="11" fill="#4ade80">5/9</text>
+  <text x="1350" y="428" font-size="11" fill="#4ade80">3/7</text>
+  <text x="1735" y="428" font-size="11" fill="#4ade80">6/10</text>
+  <text x="1795" y="428" font-size="11" fill="#4ade80">4/8</text>
+  <text x="1855" y="428" font-size="11" fill="#4ade80">3/7</text>
+  <text x="1915" y="428" font-size="11" fill="#4ade80">2/5</text>
 
   <!-- Footer -->
-  <rect x="40" y="930" width="2320" height="40" rx="8" fill="#1e2937"/>
-  <text x="60" y="955" font-size="14" fill="#94a3b8">Showing 18 of 5,247 apps • Green = Healthy • Yellow = Spike • Red = Anomaly • Gray = Heritage • Auto-refresh every 2 min</text>
+  <rect x="30" y="880" width="2290" height="30" rx="6" fill="#1e2937"/>
+  <text x="45" y="900" font-size="12" fill="#94a3b8">Green = Healthy • Yellow = Spike • Red = Anomaly • All counts ≤ 24 • Auto-refresh every 2 min</text>
 </svg>
