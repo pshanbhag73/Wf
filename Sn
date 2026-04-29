@@ -1,17 +1,106 @@
-Executive Summary: ServiceNow Incident & Change Integration
-Overview
-This integration enables the Spring Boot application (running on OCP with MongoDB and Angular frontend) to poll ServiceNow Incidents every 15 minutes and Changes every hour, including affected CIs, impacted services, and related details. Data is stored in MongoDB for fast querying and consumed by two operational dashboards.
-How It Gets Used
-Incident Pulse Dashboard (Use Case 1):
-Analysts input a URL or IP → system runs traceroute, maps to devices, checks CPU/memory telemetry, and automatically correlates with relevant open Incidents and recent Changes in ServiceNow.
-Result: A single unified view showing if a network latency or connectivity issue is linked to a ServiceNow Incident (e.g., hardware failure) or Change (e.g., recent upgrade).
-Enterprise Critical Products Dashboard (Use Case 2):
-Product owners and architects select a Business Function or Flow → the system joins ServiceNow impacted services with internal application/flow mappings.
-Result: Clear visibility of active Incidents and in-flight Changes that could affect critical applications or business processes.
-Value Add in Incident Management
-Faster Triage & Root Cause Analysis: Automatic correlation reduces manual tool-switching and cuts mean-time-to-identify (MTTI) significantly — often from 45–90 minutes to under 10 minutes for network and infrastructure-related incidents.
-Proactive Risk Mitigation: Surfaces Changes that overlap with performance issues or business flows before they escalate into major outages, helping prevent 20–30% of change-induced incidents.
-Reduced MTTR & Downtime: Teams get full context (network + telemetry + ServiceNow data) in one place, enabling quicker resolution and better hand-offs.
-Improved Business Alignment: Stakeholders see exact impact on Flows and Business Functions, supporting faster communication, prioritization, and compliance.
-Overall Efficiency: Eliminates silos between monitoring tools and ITSM, reduces noise, provides audit-ready history, and creates a foundation for future AIOps enhancements.
-This integration turns reactive incident management into a proactive, context-rich process, delivering measurable improvements in operational resilience and service quality.
+<svg width="2200" height="920" viewBox="0 0 2200 920" xmlns="http://www.w3.org/2000/svg" style="background:#0f172a; border:1px solid #334155; border-radius:12px; font-family:Arial, sans-serif;">
+  <!-- Header -->
+  <rect x="0" y="0" width="2200" height="85" fill="#1e2937"/>
+  <text x="50" y="55" fill="#f1f5f9" font-size="32" font-weight="700">What's Running Where - New-Gen vs Heritage</text>
+  <text x="1650" y="50" fill="#94a3b8" font-size="17">5,000 Apps • 12 DCs • Live • 14:42 UTC</text>
+
+  <!-- Filter Bar -->
+  <rect x="40" y="100" width="2120" height="55" rx="10" fill="#334155"/>
+  <text x="70" y="132" font-size="15" fill="#e0f2fe">Filters: LOB ▼  Region: All ▼  DC Type: New-Gen + Heritage ▼  Compute: All ▼</text>
+
+  <!-- Main Grid -->
+
+  <!-- Row 1: Merged Region Headers (Colspan Simulation) -->
+  <!-- EAST REGION -->
+  <rect x="40" y="170" width="1080" height="45" rx="6" fill="#1e40af"/>
+  <text x="500" y="198" fill="#fff" font-size="20" font-weight="700">EAST REGION</text>
+
+  <!-- WEST REGION -->
+  <rect x="1130" y="170" width="1080" height="45" rx="6" fill="#1e40af"/>
+  <text x="1590" y="198" fill="#fff" font-size="20" font-weight="700">WEST REGION</text>
+
+  <!-- Row 2: New-Gen vs Heritage under each Region -->
+  <!-- EAST New-Gen -->
+  <rect x="40" y="220" width="540" height="40" rx="4" fill="#166534"/>
+  <text x="280" y="245" fill="#fff" font-size="15" font-weight="600">New-Gen (us-east-1 + us-east-2)</text>
+
+  <!-- EAST Heritage -->
+  <rect x="580" y="220" width="540" height="40" rx="4" fill="#475569"/>
+  <text x="820" y="245" fill="#fff" font-size="15" font-weight="600">Heritage (East)</text>
+
+  <!-- WEST New-Gen -->
+  <rect x="1130" y="220" width="540" height="40" rx="4" fill="#166534"/>
+  <text x="1370" y="245" fill="#fff" font-size="15" font-weight="600">New-Gen (us-west-2 + us-west-1)</text>
+
+  <!-- WEST Heritage -->
+  <rect x="1670" y="220" width="540" height="40" rx="4" fill="#475569"/>
+  <text x="1910" y="245" fill="#fff" font-size="15" font-weight="600">Heritage (West)</text>
+
+  <!-- Column Headers (Compute Types) -->
+  <rect x="40" y="265" width="2120" height="38" fill="#1e2937"/>
+  <!-- EAST New-Gen columns -->
+  <text x="55" y="288" fill="#22c55e" font-size="13" font-weight="600">OCP</text>
+  <text x="145" y="288" fill="#22c55e" font-size="13" font-weight="600">VM</text>
+  <text x="235" y="288" fill="#22c55e" font-size="13" font-weight="600">DB</text>
+  <text x="325" y="288" fill="#22c55e" font-size="13" font-weight="600">Avi</text>
+  <text x="415" y="288" fill="#22c55e" font-size="13" font-weight="600">MW</text>
+
+  <!-- EAST Heritage columns -->
+  <text x="595" y="288" fill="#94a3b8" font-size="13" font-weight="600">OCP</text>
+  <text x="685" y="288" fill="#94a3b8" font-size="13" font-weight="600">VM</text>
+  <text x="775" y="288" fill="#94a3b8" font-size="13" font-weight="600">DB</text>
+  <text x="865" y="288" fill="#94a3b8" font-size="13" font-weight="600">Avi</text>
+  <text x="955" y="288" fill="#94a3b8" font-size="13" font-weight="600">MW</text>
+
+  <!-- WEST New-Gen columns -->
+  <text x="1145" y="288" fill="#22c55e" font-size="13" font-weight="600">OCP</text>
+  <text x="1235" y="288" fill="#22c55e" font-size="13" font-weight="600">VM</text>
+  <text x="1325" y="288" fill="#22c55e" font-size="13" font-weight="600">DB</text>
+  <text x="1415" y="288" fill="#22c55e" font-size="13" font-weight="600">Avi</text>
+  <text x="1505" y="288" fill="#22c55e" font-size="13" font-weight="600">MW</text>
+
+  <!-- WEST Heritage columns -->
+  <text x="1685" y="288" fill="#94a3b8" font-size="13" font-weight="600">OCP</text>
+  <text x="1775" y="288" fill="#94a3b8" font-size="13" font-weight="600">VM</text>
+  <text x="1865" y="288" fill="#94a3b8" font-size="13" font-weight="600">DB</text>
+  <text x="1955" y="288" fill="#94a3b8" font-size="13" font-weight="600">Avi</text>
+  <text x="2045" y="288" fill="#94a3b8" font-size="13" font-weight="600">MW</text>
+
+  <!-- Data Rows (Sample - 12 rows) -->
+  <!-- Row 1: Retail Banking - auth-service -->
+  <rect x="40" y="308" width="2120" height="42" fill="#1e2937" opacity="0.7"/>
+  <text x="55" y="333" font-size="14" fill="#f1f5f9">Retail Banking - auth-service</text>
+  <!-- East New-Gen -->
+  <text x="55" y="333" font-size="13" fill="#22c55e">892/1245</text>
+  <text x="145" y="333" font-size="13" fill="#22c55e">674/983</text>
+  <text x="235" y="333" font-size="13" fill="#22c55e">521/892</text>
+  <text x="325" y="333" font-size="13" fill="#f1f5f9">45/67</text>
+  <text x="415" y="333" font-size="13" fill="#22c55e">112/145</text>
+  <!-- East Heritage -->
+  <text x="595" y="333" font-size="13" fill="#94a3b8">124/312</text>
+  <text x="685" y="333" font-size="13" fill="#94a3b8">89/210</text>
+  <text x="775" y="333" font-size="13" fill="#94a3b8">34/78</text>
+  <text x="865" y="333" font-size="13" fill="#94a3b8">12/45</text>
+  <text x="955" y="333" font-size="13" fill="#94a3b8">67/134</text>
+  <!-- West New-Gen -->
+  <text x="1145" y="333" font-size="13" fill="#22c55e">1034/1478</text>
+  <text x="1235" y="333" font-size="13" fill="#22c55e">892/1245</text>
+  <text x="1325" y="333" font-size="13" fill="#22c55e">674/983</text>
+  <text x="1415" y="333" font-size="13" fill="#f1f5f9">78/156</text>
+  <text x="1505" y="333" font-size="13" fill="#22c55e">145/289</text>
+  <!-- West Heritage -->
+  <text x="1685" y="333" font-size="13" fill="#94a3b8">89/234</text>
+  <text x="1775" y="333" font-size="13" fill="#94a3b8">67/178</text>
+  <text x="1865" y="333" font-size="13" fill="#94a3b8">23/67</text>
+  <text x="1955" y="333" font-size="13" fill="#94a3b8">45/112</text>
+  <text x="2045" y="333" font-size="13" fill="#94a3b8">112/234</text>
+
+  <!-- More rows (abbreviated for space - same pattern) -->
+  <rect x="40" y="350" width="2120" height="42" fill="#1e2937" opacity="0.6"/>
+  <text x="55" y="375" font-size="14" fill="#f1f5f9">Payments - prod-db-cluster</text>
+  <!-- ... (same column structure as above, with different numbers) -->
+
+  <!-- Footer -->
+  <rect x="40" y="870" width="2120" height="40" rx="8" fill="#1e2937"/>
+  <text x="60" y="895" font-size="14" fill="#94a3b8">Green = Healthy • Red = Anomaly/Issue • Gray = Heritage/Legacy • All compute types shown per App • Auto-refresh every 2 min</text>
+</svg>
