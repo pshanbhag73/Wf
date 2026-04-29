@@ -9,16 +9,17 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', system-ui, sans-serif; }
         table { border-collapse: collapse; }
-        th, td { border: 1px solid #334155; padding: 4px 6px; font-size: 12px; text-align: center; }
-        .app-name { text-align: left; padding-left: 12px; font-weight: 600; }
+        th, td { border: 1px solid #334155; padding: 4px 8px; font-size: 12px; text-align: center; }
+        .app-name { text-align: left; padding-left: 12px; font-weight: 600; cursor: pointer; }
         .header-newgen { background: #166534; color: white; }
         .header-heritage { background: #334155; color: white; }
         .region-east { background: #1e40af; color: white; }
         .region-west { background: #1e40af; color: white; }
-        .green { background: #166534; color: white; }
-        .muted-green { background: #4ade80; color: #0f172a; font-weight: 600; }
-        .yellow { background: #eab308; color: #0f172a; }
-        .red { background: #ef4444; color: white; }
+        .green { background: #166534; color: white; cursor: pointer; }
+        .muted-green { background: #4ade80; color: #0f172a; font-weight: 600; cursor: pointer; }
+        .yellow { background: #eab308; color: #0f172a; cursor: pointer; }
+        .red { background: #ef4444; color: white; cursor: pointer; }
+        .modal { animation: modalPop 0.3s ease-out; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 p-6">
@@ -26,22 +27,26 @@
     <div class="max-w-[2100px] mx-auto">
         <div class="flex items-center justify-between mb-6">
             <h1 class="text-3xl font-bold">What's Running Where</h1>
-            <div class="text-emerald-400 text-sm font-medium">LIVE • Auto-refresh every 2 minutes</div>
+            <div class="flex items-center gap-6 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+                    <span class="text-emerald-400 font-medium">LIVE</span>
+                </div>
+                <div class="text-slate-400">Auto-refresh every 2 minutes</div>
+            </div>
             <div class="text-slate-400 text-sm">5,000 Apps • 12 Datacenters (4 New-Gen)</div>
         </div>
 
-        <!-- Filters -->
+        <!-- Filter Bar -->
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 mb-6 flex gap-4 text-sm">
-            <div class="bg-slate-700 px-4 py-2 rounded-lg">LOB: <span class="font-semibold">All</span> ▼</div>
-            <div class="bg-slate-700 px-4 py-2 rounded-lg">Region: <span class="font-semibold">All</span> ▼</div>
-            <div class="bg-slate-700 px-4 py-2 rounded-lg">DC Type: <span class="font-semibold">New-Gen + Heritage</span> ▼</div>
-            <div class="bg-slate-700 px-4 py-2 rounded-lg">Compute: <span class="font-semibold">All</span> ▼</div>
-            <div class="bg-slate-700 px-4 py-2 rounded-lg">Status: <span class="font-semibold">All</span> ▼</div>
+            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">LOB: <span class="font-semibold">All</span> ▼</div>
+            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">Region: <span class="font-semibold">All</span> ▼</div>
+            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">DC Type: <span class="font-semibold">New-Gen + Heritage</span> ▼</div>
+            <div class="bg-slate-700 px-4 py-2 rounded-lg cursor-pointer">Compute: <span class="font-semibold">All</span> ▼</div>
         </div>
 
         <table class="w-full text-xs">
             <thead>
-                <!-- Top Level -->
                 <tr>
                     <th rowspan="3" class="w-64 bg-slate-900 text-white">LOB / App</th>
                     <!-- New-Gen -->
@@ -49,124 +54,189 @@
                     <!-- Heritage -->
                     <th colspan="8" class="header-heritage text-lg py-1">HERITAGE (8 DCs)</th>
                 </tr>
-
-                <!-- Region Level -->
                 <tr>
                     <th colspan="4" class="region-east py-1">EAST<br><span class="text-xs">(us-east-1 • us-east-2)</span></th>
                     <th colspan="4" class="region-west py-1">WEST<br><span class="text-xs">(us-west-2 • us-west-1)</span></th>
                     <th colspan="4" class="region-east py-1">EAST<br><span class="text-xs">(Legacy)</span></th>
                     <th colspan="4" class="region-west py-1">WEST<br><span class="text-xs">(Legacy)</span></th>
                 </tr>
-
-                <!-- Compute Headers -->
                 <tr class="bg-slate-800 text-slate-300 text-[10px]">
-                    <th class="py-1">OCP</th>
-                    <th class="py-1">VM</th>
-                    <th class="py-1">DB</th>
-                    <th class="py-1">Avi</th>
-                    <th class="py-1">OCP</th>
-                    <th class="py-1">VM</th>
-                    <th class="py-1">DB</th>
-                    <th class="py-1">Avi</th>
-                    <th class="py-1">OCP</th>
-                    <th class="py-1">VM</th>
-                    <th class="py-1">DB</th>
-                    <th class="py-1">Avi</th>
-                    <th class="py-1">OCP</th>
-                    <th class="py-1">VM</th>
-                    <th class="py-1">DB</th>
-                    <th class="py-1">Avi</th>
+                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
+                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
+                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
+                    <th class="py-1">OCP</th><th class="py-1">VM</th><th class="py-1">DB</th><th class="py-1">Avi</th>
                 </tr>
             </thead>
 
             <tbody class="text-slate-100">
-                <!-- Row 1 -->
+                <!-- Clickable OCP cells -->
                 <tr class="hover:bg-slate-800/50">
                     <td class="app-name">Retail Banking - auth-service</td>
-                    <td class="green">18/22</td><td class="green">14/19</td><td class="green">12/18</td><td class="green">8/12</td>
-                    <td class="green">22/24</td><td class="green">19/23</td><td class="green">15/20</td><td class="green">9/14</td>
-                    <td class="muted-green">7/11</td><td class="muted-green">5/9</td><td class="muted-green">4/8</td><td class="muted-green">3/6</td>
-                    <td class="muted-green">6/10</td><td class="muted-green">4/8</td><td class="muted-green">3/7</td><td class="muted-green">2/5</td>
+                    <td onclick="showOCPDetails('Retail Banking - auth-service', 'us-east-1', '18/22', 'Healthy')" class="green">18/22</td>
+                    <td class="green">14/19</td>
+                    <td class="green">12/18</td>
+                    <td class="green">8/12</td>
+                    <td onclick="showOCPDetails('Retail Banking - auth-service', 'us-west-2', '22/24', 'Healthy')" class="green">22/24</td>
+                    <td class="green">19/23</td>
+                    <td class="green">15/20</td>
+                    <td class="green">9/14</td>
+                    <td class="muted-green">7/11</td>
+                    <td class="muted-green">5/9</td>
+                    <td class="muted-green">4/8</td>
+                    <td class="muted-green">3/6</td>
+                    <td class="muted-green">6/10</td>
+                    <td class="muted-green">4/8</td>
+                    <td class="muted-green">3/7</td>
+                    <td class="muted-green">2/5</td>
                 </tr>
-                <!-- Row 2 -->
+
                 <tr class="hover:bg-slate-800/50">
                     <td class="app-name">Payments - prod-db-cluster</td>
-                    <td class="green">21/24</td><td class="green">17/22</td><td class="green">14/19</td><td class="green">11/15</td>
-                    <td class="green">23/24</td><td class="green">20/23</td><td class="green">16/21</td><td class="green">12/17</td>
-                    <td class="muted-green">8/13</td><td class="muted-green">6/11</td><td class="muted-green">5/9</td><td class="muted-green">4/7</td>
-                    <td class="muted-green">7/12</td><td class="muted-green">5/10</td><td class="muted-green">4/8</td><td class="muted-green">3/6</td>
+                    <td onclick="showOCPDetails('Payments - prod-db-cluster', 'us-east-1', '21/24', 'Spike')" class="green">21/24</td>
+                    <td class="green">17/22</td>
+                    <td class="green">14/19</td>
+                    <td class="green">11/15</td>
+                    <td onclick="showOCPDetails('Payments - prod-db-cluster', 'us-west-2', '23/24', 'Healthy')" class="green">23/24</td>
+                    <td class="green">20/23</td>
+                    <td class="green">16/21</td>
+                    <td class="green">12/17</td>
+                    <td class="muted-green">8/13</td>
+                    <td class="muted-green">6/11</td>
+                    <td class="muted-green">5/9</td>
+                    <td class="muted-green">4/7</td>
+                    <td class="muted-green">7/12</td>
+                    <td class="muted-green">5/10</td>
+                    <td class="muted-green">4/8</td>
+                    <td class="muted-green">3/6</td>
                 </tr>
-                <!-- Row 3 -->
+
                 <tr class="hover:bg-slate-800/50">
                     <td class="app-name">Customer Services - user-api</td>
-                    <td class="green">15/19</td><td class="green">12/16</td><td class="green">9/13</td><td class="green">6/10</td>
-                    <td class="green">18/22</td><td class="green">14/18</td><td class="green">11/15</td><td class="green">7/11</td>
-                    <td class="muted-green">9/14</td><td class="muted-green">7/11</td><td class="muted-green">5/9</td><td class="muted-green">3/6</td>
-                    <td class="muted-green">6/10</td><td class="muted-green">4/8</td><td class="muted-green">3/7</td><td class="muted-green">2/5</td>
+                    <td onclick="showOCPDetails('Customer Services - user-api', 'us-east-2', '15/19', 'Healthy')" class="green">15/19</td>
+                    <td class="green">12/16</td>
+                    <td class="green">9/13</td>
+                    <td class="green">6/10</td>
+                    <td onclick="showOCPDetails('Customer Services - user-api', 'us-west-1', '18/22', 'Idle')" class="green">18/22</td>
+                    <td class="green">14/18</td>
+                    <td class="green">11/15</td>
+                    <td class="green">7/11</td>
+                    <td class="muted-green">9/14</td>
+                    <td class="muted-green">7/11</td>
+                    <td class="muted-green">5/9</td>
+                    <td class="muted-green">3/6</td>
+                    <td class="muted-green">6/10</td>
+                    <td class="muted-green">4/8</td>
+                    <td class="muted-green">3/7</td>
+                    <td class="muted-green">2/5</td>
                 </tr>
-                <!-- Row 4 -->
+
                 <tr class="hover:bg-slate-800/50">
                     <td class="app-name">Fraud Detection - ml-inference</td>
-                    <td class="green">19/23</td><td class="yellow">16/20</td><td class="red">13/17</td><td class="green">8/12</td>
-                    <td class="red">21/24</td><td class="green">18/22</td><td class="green">14/19</td><td class="green">9/13</td>
-                    <td class="muted-green">10/15</td><td class="muted-green">8/12</td><td class="muted-green">6/10</td><td class="muted-green">4/7</td>
-                    <td class="muted-green">7/11</td><td class="muted-green">5/9</td><td class="muted-green">4/8</td><td class="muted-green">3/6</td>
-                </tr>
-                <!-- Row 5 -->
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Loan Services - loan-processing</td>
-                    <td class="green">12/16</td><td class="green">10/14</td><td class="green">8/12</td><td class="green">5/9</td>
-                    <td class="green">14/18</td><td class="green">11/15</td><td class="green">9/13</td><td class="green">6/10</td>
-                    <td class="muted-green">6/10</td><td class="muted-green">5/9</td><td class="muted-green">4/8</td><td class="muted-green">3/6</td>
-                    <td class="muted-green">5/9</td><td class="muted-green">4/8</td><td class="muted-green">3/7</td><td class="muted-green">2/5</td>
-                </tr>
-                <!-- Row 6 -->
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Risk Engine - risk-eval</td>
-                    <td class="green">17/21</td><td class="green">14/18</td><td class="yellow">11/15</td><td class="green">7/11</td>
-                    <td class="green">19/23</td><td class="green">16/20</td><td class="green">13/17</td><td class="green">8/12</td>
-                    <td class="muted-green">8/12</td><td class="muted-green">6/10</td><td class="muted-green">5/9</td><td class="muted-green">3/7</td>
-                    <td class="muted-green">6/10</td><td class="muted-green">4/8</td><td class="muted-green">3/7</td><td class="muted-green">2/5</td>
-                </tr>
-                <!-- Row 7 -->
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Core Banking - core-ledger</td>
-                    <td class="green">20/23</td><td class="green">16/21</td><td class="green">13/18</td><td class="green">9/13</td>
-                    <td class="green">22/24</td><td class="green">18/22</td><td class="green">15/19</td><td class="green">10/14</td>
-                    <td class="muted-green">9/13</td><td class="muted-green">7/11</td><td class="muted-green">5/9</td><td class="muted-green">4/7</td>
-                    <td class="muted-green">8/12</td><td class="muted-green">6/10</td><td class="muted-green">4/8</td><td class="muted-green">3/6</td>
-                </tr>
-                <!-- Row 8 -->
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Settlement - batch-settlement</td>
-                    <td class="green">14/18</td><td class="green">11/15</td><td class="green">8/12</td><td class="green">6/10</td>
-                    <td class="green">17/21</td><td class="green">13/17</td><td class="green">10/14</td><td class="green">7/11</td>
-                    <td class="muted-green">7/11</td><td class="muted-green">5/9</td><td class="muted-green">4/8</td><td class="muted-green">3/6</td>
-                    <td class="muted-green">6/10</td><td class="muted-green">4/8</td><td class="muted-green">3/7</td><td class="muted-green">2/5</td>
-                </tr>
-                <!-- Row 9 -->
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">Notification - push-notify</td>
-                    <td class="green">11/15</td><td class="green">9/13</td><td class="green">7/11</td><td class="green">5/8</td>
-                    <td class="green">13/17</td><td class="green">10/14</td><td class="green">8/12</td><td class="green">6/9</td>
-                    <td class="muted-green">5/9</td><td class="muted-green">4/7</td><td class="muted-green">3/6</td><td class="muted-green">2/5</td>
-                    <td class="muted-green">5/8</td><td class="muted-green">3/6</td><td class="muted-green">2/5</td><td class="muted-green">1/4</td>
-                </tr>
-                <!-- Row 10 -->
-                <tr class="hover:bg-slate-800/50">
-                    <td class="app-name">API Gateway - api-gw</td>
-                    <td class="green">16/20</td><td class="green">13/17</td><td class="green">10/14</td><td class="green">7/10</td>
-                    <td class="green">19/22</td><td class="green">15/19</td><td class="green">12/16</td><td class="green">8/12</td>
-                    <td class="muted-green">8/12</td><td class="muted-green">6/10</td><td class="muted-green">4/8</td><td class="muted-green">3/6</td>
-                    <td class="muted-green">7/11</td><td class="muted-green">5/9</td><td class="muted-green">4/7</td><td class="muted-green">2/5</td>
+                    <td onclick="showOCPDetails('Fraud Detection - ml-inference', 'us-east-1', '19/23', 'Spike')" class="green">19/23</td>
+                    <td class="yellow">16/20</td>
+                    <td class="red">13/17</td>
+                    <td class="green">8/12</td>
+                    <td onclick="showOCPDetails('Fraud Detection - ml-inference', 'us-west-2', '21/24', 'Anomaly')" class="red">21/24</td>
+                    <td class="green">18/22</td>
+                    <td class="green">14/19</td>
+                    <td class="green">9/13</td>
+                    <td class="muted-green">10/15</td>
+                    <td class="muted-green">8/12</td>
+                    <td class="muted-green">6/10</td>
+                    <td class="muted-green">4/7</td>
+                    <td class="muted-green">7/11</td>
+                    <td class="muted-green">5/9</td>
+                    <td class="muted-green">4/8</td>
+                    <td class="muted-green">3/6</td>
                 </tr>
             </tbody>
         </table>
+    </div>
 
-        <div class="mt-6 text-center text-slate-400 text-xs">
-            Green = Healthy • Yellow = Spike • Red = Anomaly • All counts ≤ 24 • Auto-refresh every 2 minutes
+    <!-- Drill-down Modal -->
+    <div id="modal" onclick="if(event.target === this) hideModal()" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div onclick="event.stopImmediatePropagation()" class="modal bg-slate-800 rounded-2xl w-[620px] p-8 text-slate-100 shadow-2xl">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <div id="modal-app" class="text-2xl font-semibold"></div>
+                    <div id="modal-dc" class="text-emerald-400 text-sm font-medium"></div>
+                </div>
+                <button onclick="hideModal()" class="text-slate-400 hover:text-white text-3xl leading-none">×</button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div class="bg-slate-900 rounded-xl p-5">
+                    <div class="text-slate-400 text-xs">Current Load</div>
+                    <div id="modal-current" class="text-4xl font-bold text-white"></div>
+                </div>
+                <div class="bg-slate-900 rounded-xl p-5">
+                    <div class="text-slate-400 text-xs">Blended Baseline</div>
+                    <div id="modal-baseline" class="text-4xl font-bold text-white"></div>
+                </div>
+                <div class="bg-slate-900 rounded-xl p-5">
+                    <div class="text-slate-400 text-xs">Relative Delta</div>
+                    <div id="modal-delta" class="text-4xl font-bold"></div>
+                </div>
+            </div>
+
+            <div id="modal-reason" class="text-lg leading-relaxed mb-8"></div>
+
+            <div class="text-xs text-slate-400">Last 12 minutes trend • OCP pods in this cell</div>
+
+            <div class="mt-4 bg-slate-900 rounded-xl p-5 text-sm">
+                <div id="modal-details" class="space-y-2"></div>
+            </div>
+
+            <div class="mt-8 text-center text-xs text-slate-400">
+                Click anywhere outside to close • Data from MongoDB pipeline
+            </div>
         </div>
     </div>
 
+    <script>
+        function showOCPDetails(app, dc, count, status) {
+            const modal = document.getElementById('modal');
+            document.getElementById('modal-app').textContent = app;
+            document.getElementById('modal-dc').textContent = dc + " • OCP";
+
+            // Realistic examples
+            let current = count.split('/')[0];
+            let baseline = Math.floor(Math.random() * 12) + 8;
+            let delta = Math.round(((current - baseline) / baseline) * 100);
+
+            document.getElementById('modal-current').textContent = current + "%";
+            document.getElementById('modal-baseline').textContent = baseline + "%";
+            document.getElementById('modal-delta').innerHTML = delta > 0 ? 
+                `<span class="text-emerald-400">+${delta}%</span>` : 
+                `<span class="text-amber-400">${delta}%</span>`;
+
+            let reasonText = "";
+            if (status === "Healthy") reasonText = "Load is steady and within expected range for this New-Gen DC.";
+            else if (status === "Spike") reasonText = "Significant spike detected above blended baseline. Possible traffic surge.";
+            else if (status === "Anomaly") reasonText = "Unexpected high activity or anomaly detected. Investigation recommended.";
+            else reasonText = "Normal operation in this OCP cluster.";
+
+            document.getElementById('modal-reason').innerHTML = `<span class="text-emerald-400 font-medium">Status:</span> ${reasonText}`;
+
+            // Example pod list
+            document.getElementById('modal-details').innerHTML = `
+                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-01</span><span class="text-emerald-400">19%</span></div>
+                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-02</span><span class="text-emerald-400">21%</span></div>
+                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-03</span><span class="text-emerald-400">17%</span></div>
+                <div class="flex justify-between text-xs"><span class="text-slate-400">pod-auth-04</span><span class="text-amber-400">24%</span></div>
+            `;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Tailwind script already included
+    </script>
 </body>
 </html>
