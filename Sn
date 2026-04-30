@@ -7,8 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; }
-        .tab-active { border-bottom: 3px solid #22c55e; color: white; font-weight: 600; }
-        .modal { animation: modalPop 0.25s ease-out; }
+        .expandable-row { cursor: pointer; }
+        .expandable-row:hover { background-color: #1e2937; }
+        .expand-content { display: none; }
+        .expanded .expand-content { display: table-row; }
+        .status-active { background-color: #166534; color: white; }
+        .status-passive { background-color: #c2410c; color: white; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 p-6">
@@ -17,216 +21,199 @@
         
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-4xl font-bold">What's Running Where</h1>
-                <p class="text-slate-400 mt-1">5,000 Apps • 12 Datacenters • Live</p>
-            </div>
-            <div class="flex items-center gap-3 text-sm">
+            <h1 class="text-4xl font-bold">What's Running Where</h1>
+            <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 bg-slate-800 px-4 py-1.5 rounded-full">
                     <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></div>
-                    <span class="text-emerald-400 font-medium">LIVE</span>
+                    <span class="text-emerald-400 text-sm font-medium">LIVE</span>
                 </div>
-                <div class="text-slate-400">Auto-refresh every 2 min</div>
+                <div class="text-slate-400 text-sm">Auto-refresh every 2 min</div>
             </div>
         </div>
 
         <!-- Tabs -->
         <div class="flex border-b border-slate-700 mb-6">
             <button onclick="switchTab(0)" id="tab-0"
-                    class="tab-active px-8 py-4 text-lg">1. Datacenters (App Level)</button>
+                    class="px-8 py-4 text-lg border-b-4 border-emerald-500 font-semibold">1. Datacenters (App Level)</button>
             <button onclick="switchTab(1)" id="tab-1"
                     class="px-8 py-4 text-lg text-slate-400 hover:text-white">2. Expanded Detailed View</button>
         </div>
 
-        <!-- TAB 1: Datacenters View (App Level Only) -->
+        <!-- TAB 1: Datacenters View with Row-Level Expansion -->
         <div id="tab-content-0">
             <div class="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <div class="px-6 py-4 border-b border-slate-700">
                     <div class="text-xl font-semibold">New-Gen Datacenters - App Volumes</div>
-                    <div class="text-emerald-400 text-sm">4 New-Gen DCs • Aggregated (All Compute)</div>
+                    <div class="text-emerald-400 text-sm">Click any app to expand and see component-level status</div>
                 </div>
 
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="bg-slate-800 text-slate-300">
-                            <th class="text-left px-6 py-4">App</th>
+                            <th class="text-left px-6 py-4">App / Component</th>
                             <th class="px-4 py-4 text-center">us-east-1</th>
                             <th class="px-4 py-4 text-center">us-east-2</th>
                             <th class="px-4 py-4 text-center">us-west-2</th>
                             <th class="px-4 py-4 text-center">us-west-1</th>
-                            <th class="px-6 py-4 text-center">Heritage Total</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-700">
-                        <tr class="hover:bg-slate-800/50">
-                            <td class="px-6 py-4 font-semibold">Retail Banking - auth-service</td>
+                    <tbody>
+                        
+                        <!-- Expandable App Row 1 -->
+                        <tr class="expandable-row border-b border-slate-700 hover:bg-slate-800/50" onclick="toggleExpand(this)">
+                            <td class="px-6 py-4 font-semibold flex items-center gap-2">
+                                <span>▶</span> Retail Banking - auth-service
+                            </td>
                             <td class="px-4 py-4 text-center font-mono">892</td>
                             <td class="px-4 py-4 text-center font-mono">674</td>
                             <td class="px-4 py-4 text-center font-mono">1,034</td>
                             <td class="px-4 py-4 text-center font-mono">521</td>
-                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">312</td>
                         </tr>
-                        <tr class="hover:bg-slate-800/50">
-                            <td class="px-6 py-4 font-semibold">Payments - prod-db-cluster</td>
+                        
+                        <!-- Expanded Content Row 1 -->
+                        <tr class="expand-content bg-slate-950 border-b border-slate-700">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="pl-8">
+                                    <table class="w-full text-xs">
+                                        <tr>
+                                            <td class="py-1.5 text-slate-400 w-48">API Pods (OCP)</td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-passive px-3 py-0.5 rounded text-xs">PASSIVE</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="py-1.5 text-slate-400">Oracle RAC</td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-passive px-3 py-0.5 rounded text-xs">PASSIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-passive px-3 py-0.5 rounded text-xs">PASSIVE</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="py-1.5 text-slate-400">Redis Cluster</td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-passive px-3 py-0.5 rounded text-xs">PASSIVE</span></td>
+                                            <td class="px-4 py-1.5"></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="py-1.5 text-slate-400">Kafka Topics</td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Expandable App Row 2 -->
+                        <tr class="expandable-row border-b border-slate-700 hover:bg-slate-800/50" onclick="toggleExpand(this)">
+                            <td class="px-6 py-4 font-semibold flex items-center gap-2">
+                                <span>▶</span> Payments - prod-db-cluster
+                            </td>
                             <td class="px-4 py-4 text-center font-mono">1,245</td>
                             <td class="px-4 py-4 text-center font-mono">983</td>
                             <td class="px-4 py-4 text-center font-mono">1,478</td>
                             <td class="px-4 py-4 text-center font-mono">892</td>
-                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">289</td>
                         </tr>
-                        <tr class="hover:bg-slate-800/50">
-                            <td class="px-6 py-4 font-semibold">Customer Services - user-api</td>
+                        
+                        <tr class="expand-content bg-slate-950 border-b border-slate-700">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="pl-8">
+                                    <table class="w-full text-xs">
+                                        <tr>
+                                            <td class="py-1.5 text-slate-400 w-48">API Pods (OCP)</td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="py-1.5 text-slate-400">Oracle RAC</td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-passive px-3 py-0.5 rounded text-xs">PASSIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-passive px-3 py-0.5 rounded text-xs">PASSIVE</span></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- More apps... (you can add more) -->
+                        <tr class="expandable-row border-b border-slate-700 hover:bg-slate-800/50" onclick="toggleExpand(this)">
+                            <td class="px-6 py-4 font-semibold flex items-center gap-2">
+                                <span>▶</span> Customer Services - user-api
+                            </td>
                             <td class="px-4 py-4 text-center font-mono">674</td>
                             <td class="px-4 py-4 text-center font-mono">521</td>
                             <td class="px-4 py-4 text-center font-mono">892</td>
                             <td class="px-4 py-4 text-center font-mono">456</td>
-                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">156</td>
                         </tr>
-                        <tr class="hover:bg-slate-800/50">
-                            <td class="px-6 py-4 font-semibold">Fraud Detection - ml-inference</td>
-                            <td class="px-4 py-4 text-center font-mono">1,034</td>
-                            <td class="px-4 py-4 text-center font-mono">892</td>
-                            <td class="px-4 py-4 text-center font-mono">1,245</td>
-                            <td class="px-4 py-4 text-center font-mono">674</td>
-                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">234</td>
+                        
+                        <tr class="expand-content bg-slate-950 border-b border-slate-700">
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="pl-8">
+                                    <table class="w-full text-xs">
+                                        <tr>
+                                            <td class="py-1.5 text-slate-400 w-48">API Pods (OCP)</td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                            <td class="px-4 py-1.5"><span class="status-active px-3 py-0.5 rounded text-xs">ACTIVE</span></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </td>
                         </tr>
-                        <tr class="hover:bg-slate-800/50">
-                            <td class="px-6 py-4 font-semibold">Loan Services - loan-processing</td>
-                            <td class="px-4 py-4 text-center font-mono">521</td>
-                            <td class="px-4 py-4 text-center font-mono">456</td>
-                            <td class="px-4 py-4 text-center font-mono">674</td>
-                            <td class="px-4 py-4 text-center font-mono">312</td>
-                            <td class="px-6 py-4 text-center text-emerald-400 font-mono">178</td>
-                        </tr>
+
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 2: Expanded Detailed View -->
+        <!-- TAB 2: Expanded Detailed View (placeholder) -->
         <div id="tab-content-1" class="hidden">
             <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6">
-                <h2 class="text-2xl font-semibold mb-6">Expanded Detailed View (Full Breakdown)</h2>
-                
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr>
-                            <th rowspan="2" class="bg-slate-800 px-4 py-3 text-left">LOB / App</th>
-                            <th colspan="4" class="bg-emerald-900 text-center py-2">NEW-GEN</th>
-                            <th colspan="4" class="bg-slate-700 text-center py-2">HERITAGE</th>
-                        </tr>
-                        <tr class="bg-slate-800 text-xs">
-                            <th class="py-1">us-east-1</th>
-                            <th class="py-1">us-east-2</th>
-                            <th class="py-1">us-west-2</th>
-                            <th class="py-1">us-west-1</th>
-                            <th class="py-1">East Legacy</th>
-                            <th class="py-1">West Legacy</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="border-t border-slate-700 hover:bg-slate-800/50">
-                            <td class="px-4 py-3 font-semibold">Retail Banking - auth-service</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-east-1', '892')">892</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-east-2', '674')">674</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-west-2', '1034')">1,034</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Retail Banking - auth-service', 'us-west-1', '521')">521</td>
-                            <td class="muted-green">124</td>
-                            <td class="muted-green">89</td>
-                        </tr>
-                        <tr class="border-t border-slate-700 hover:bg-slate-800/50">
-                            <td class="px-4 py-3 font-semibold">Payments - prod-db-cluster</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-east-1', '1245')">1,245</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-east-2', '983')">983</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-west-2', '1478')">1,478</td>
-                            <td class="green cursor-pointer" onclick="showDetail('Payments - prod-db-cluster', 'us-west-1', '892')">892</td>
-                            <td class="muted-green">156</td>
-                            <td class="muted-green">112</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <h2 class="text-2xl font-semibold mb-6">Expanded Detailed View</h2>
+                <p class="text-slate-400">Full detailed view coming soon...</p>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal -->
-    <div id="modal" onclick="if(event.target.id === 'modal') hideModal()" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-        <div onclick="event.stopImmediatePropagation()" class="bg-slate-800 rounded-2xl w-[560px] p-8 text-white">
-            <div class="flex justify-between mb-6">
-                <div>
-                    <div id="modal-app" class="text-2xl font-semibold"></div>
-                    <div id="modal-dc" class="text-emerald-400 text-sm mt-1"></div>
-                </div>
-                <button onclick="hideModal()" class="text-3xl text-slate-400 hover:text-white">×</button>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4 mb-8">
-                <div class="bg-slate-900 rounded-xl p-5">
-                    <div class="text-xs text-slate-400">Current Load</div>
-                    <div id="modal-current" class="text-4xl font-bold mt-1"></div>
-                </div>
-                <div class="bg-slate-900 rounded-xl p-5">
-                    <div class="text-xs text-slate-400">Baseline</div>
-                    <div id="modal-baseline" class="text-4xl font-bold mt-1"></div>
-                </div>
-                <div class="bg-slate-900 rounded-xl p-5">
-                    <div class="text-xs text-slate-400">Delta</div>
-                    <div id="modal-delta" class="text-4xl font-bold mt-1"></div>
-                </div>
-            </div>
-
-            <div id="modal-reason" class="text-lg leading-relaxed mb-6"></div>
-            <div class="text-xs text-slate-400">Click outside to close</div>
         </div>
     </div>
 
     <script>
-        function switchTab(tab) {
-            document.getElementById('tab-content-0').classList.add('hidden');
-            document.getElementById('tab-content-1').classList.add('hidden');
-            document.getElementById('tab-0').classList.remove('tab-active');
-            document.getElementById('tab-1').classList.remove('tab-active');
-
-            if (tab === 0) {
-                document.getElementById('tab-content-0').classList.remove('hidden');
-                document.getElementById('tab-0').classList.add('tab-active');
-            } else {
-                document.getElementById('tab-content-1').classList.remove('hidden');
-                document.getElementById('tab-1').classList.add('tab-active');
+        function toggleExpand(row) {
+            const nextRow = row.nextElementSibling;
+            if (nextRow && nextRow.classList.contains('expand-content')) {
+                const isExpanded = nextRow.style.display === 'table-row';
+                nextRow.style.display = isExpanded ? 'none' : 'table-row';
+                row.classList.toggle('expanded', !isExpanded);
+                
+                // Toggle arrow
+                const arrow = row.querySelector('span');
+                if (arrow) arrow.textContent = isExpanded ? '▶' : '▼';
             }
         }
 
-        function showDetail(app, dc, count) {
-            const modal = document.getElementById('modal');
-            document.getElementById('modal-app').textContent = app;
-            document.getElementById('modal-dc').textContent = dc;
+        function switchTab(tab) {
+            document.getElementById('tab-content-0').classList.add('hidden');
+            document.getElementById('tab-content-1').classList.add('hidden');
+            document.getElementById('tab-0').classList.remove('border-b-4', 'border-emerald-500');
+            document.getElementById('tab-1').classList.remove('border-b-4', 'border-emerald-500');
 
-            const current = parseInt(count);
-            const baseline = Math.floor(Math.random() * 10) + 8;
-            const delta = Math.round(((current - baseline) / baseline) * 100);
-
-            document.getElementById('modal-current').textContent = current + "%";
-            document.getElementById('modal-baseline').textContent = baseline + "%";
-            document.getElementById('modal-delta').innerHTML = delta > 0 ? 
-                `<span class="text-emerald-400">+${delta}%</span>` : 
-                `<span class="text-amber-400">${delta}%</span>`;
-
-            document.getElementById('modal-reason').innerHTML = 
-                `Volume in <strong>${dc}</strong> represents aggregated compute (OCP + VM + DB + Avi) for this app.`;
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            if (tab === 0) {
+                document.getElementById('tab-content-0').classList.remove('hidden');
+                document.getElementById('tab-0').classList.add('border-b-4', 'border-emerald-500');
+            } else {
+                document.getElementById('tab-content-1').classList.remove('hidden');
+                document.getElementById('tab-1').classList.add('border-b-4', 'border-emerald-500');
+            }
         }
 
-        function hideModal() {
-            const modal = document.getElementById('modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
-        // Default to Tab 1
         window.onload = function() {
-            document.getElementById('tab-0').classList.add('tab-active');
+            document.getElementById('tab-0').classList.add('border-b-4', 'border-emerald-500');
         }
     </script>
 </body>
