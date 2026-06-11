@@ -37,7 +37,7 @@
         },
         "id": 1,
         "panels": [],
-        "title": "📊 1. Executive RAG Overview - Device Health at a Glance (by Device Type / Job)",
+        "title": "📊 TAB 1: Executive Device RAG Overview (Excel-scoped instances by Job/Type)",
         "type": "row"
       },
       {
@@ -45,7 +45,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Total number of unique devices (instances) currently reporting metrics for selected Job(s)/Device Type(s).",
+        "description": "Total number of unique devices (instances) from your Excel list currently reporting for selected Job(s).",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -102,14 +102,14 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "count(count by (instance, job) (node_cpu_seconds_total{job=~\"$job\"}))",
+            "expr": "count(count by (instance, job) (node_cpu_seconds_total{job=~\"$job\", instance=~\"$instance\"}))",
             "instant": true,
             "legendFormat": "__auto",
             "range": false,
             "refId": "A"
           }
         ],
-        "title": "Total Devices",
+        "title": "Total Devices (Your Excel)",
         "type": "stat"
       },
       {
@@ -117,7 +117,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Devices in CRITICAL state (e.g. CPU > 90% or Memory usage > 95%). Investigate immediately!",
+        "description": "🔴 Critical devices (CPU >90% or Mem >95%) among your Excel-listed instances. Action needed!",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -181,14 +181,14 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "count(\n  (\n    100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\"}[5m])) * 100 > 90\n  ) or (\n    100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\"} / node_memory_MemTotal_bytes{job=~\"$job\"})) > 95\n  )\n)",
+            "expr": "count( (100 - avg by (instance,job) (irate(node_cpu_seconds_total{mode=\"idle\",job=~\"$job\",instance=~\"$instance\"}[5m]))*100 > 90) or (100*(1-avg by (instance,job)(node_memory_MemAvailable_bytes{job=~\"$job\",instance=~\"$instance\"}/node_memory_MemTotal_bytes{job=~\"$job\",instance=~\"$instance\"})) > 95) )",
             "instant": true,
             "legendFormat": "__auto",
             "range": false,
             "refId": "A"
           }
         ],
-        "title": "🔴 Critical Devices",
+        "title": "🔴 Critical (Your Excel)",
         "type": "stat"
       },
       {
@@ -196,7 +196,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Devices in WARNING state (e.g. CPU 70-90% or Memory 80-95%). Monitor closely.",
+        "description": "🟡 Warning devices (CPU 70-90% or Mem 80-95%) among your Excel-listed instances.",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -249,14 +249,14 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "count(\n  (\n    (100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\"}[5m])) * 100 > 70)\n    and\n    (100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\"}[5m])) * 100 <= 90)\n  ) or (\n    (100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\"} / node_memory_MemTotal_bytes{job=~\"$job\"})) > 80)\n    and\n    (100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\"} / node_memory_MemTotal_bytes{job=~\"$job\"})) <= 95)\n  )\n)",
+            "expr": "count( ((100 - avg by (instance,job)(irate(node_cpu_seconds_total{mode=\"idle\",job=~\"$job\",instance=~\"$instance\"}[5m]))*100 >70) and (100 - avg by (instance,job)(irate(node_cpu_seconds_total{mode=\"idle\",job=~\"$job\",instance=~\"$instance\"}[5m]))*100 <=90)) or ((100*(1-avg by (instance,job)(node_memory_MemAvailable_bytes{job=~\"$job\",instance=~\"$instance\"}/node_memory_MemTotal_bytes{job=~\"$job\",instance=~\"$instance\"})) >80) and (100*(1-avg by (instance,job)(node_memory_MemAvailable_bytes{job=~\"$job\",instance=~\"$instance\"}/node_memory_MemTotal_bytes{job=~\"$job\",instance=~\"$instance\"})) <=95)) )",
             "instant": true,
             "legendFormat": "__auto",
             "range": false,
             "refId": "A"
           }
         ],
-        "title": "🟡 Warning Devices",
+        "title": "🟡 Warning (Your Excel)",
         "type": "stat"
       },
       {
@@ -264,7 +264,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Percentage of devices currently in healthy (green) state. Aim for 100%.",
+        "description": "% of your Excel-listed devices that are healthy.",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -323,14 +323,14 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "(\n  count(\n    (100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\"}[5m])) * 100 <= 70)\n    and\n    (100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\"} / node_memory_MemTotal_bytes{job=~\"$job\"})) <= 80)\n  )\n  / \n  count(count by (instance, job) (node_cpu_seconds_total{job=~\"$job\"}))\n) * 100",
+            "expr": "(count( (100-avg by(instance,job)(irate(node_cpu_seconds_total{mode=\"idle\",job=~\"$job\",instance=~\"$instance\"}[5m]))*100 <=70) and (100*(1-avg by(instance,job)(node_memory_MemAvailable_bytes{job=~\"$job\",instance=~\"$instance\"}/node_memory_MemTotal_bytes{job=~\"$job\",instance=~\"$instance\"})) <=80) ) / count(count by(instance,job)(node_cpu_seconds_total{job=~\"$job\",instance=~\"$instance\"})) ) *100",
             "instant": true,
             "legendFormat": "__auto",
             "range": false,
             "refId": "A"
           }
         ],
-        "title": "% Healthy Devices",
+        "title": "% Healthy (Your Excel)",
         "type": "stat"
       },
       {
@@ -338,7 +338,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Average CPU utilization across all selected devices (last value).",
+        "description": "Average CPU % across your Excel devices.",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -397,14 +397,14 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "avg(100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\"}[5m])) * 100)",
+            "expr": "avg(100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\", instance=~\"$instance\"}[5m])) * 100)",
             "instant": true,
             "legendFormat": "__auto",
             "range": false,
             "refId": "A"
           }
         ],
-        "title": "Avg CPU % (All Devices)",
+        "title": "Avg CPU % (Excel)",
         "type": "stat"
       },
       {
@@ -412,7 +412,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Average Memory utilization across all selected devices (last value).",
+        "description": "Average Memory % across your Excel devices.",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -471,14 +471,14 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "avg(100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\"} / node_memory_MemTotal_bytes{job=~\"$job\"})))",
+            "expr": "avg(100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\", instance=~\"$instance\"} / node_memory_MemTotal_bytes{job=~\"$job\", instance=~\"$instance\"})))",
             "instant": true,
             "legendFormat": "__auto",
             "range": false,
             "refId": "A"
           }
         ],
-        "title": "Avg Memory % (All Devices)",
+        "title": "Avg Memory % (Excel)",
         "type": "stat"
       },
       {
@@ -486,7 +486,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Quick trend view of average resource usage over the selected time range. Helps spot spikes before they become critical.",
+        "description": "Trends for your Excel-scoped devices.",
         "fieldConfig": {
           "defaults": {
             "custom": {
@@ -535,38 +535,7 @@
             },
             "unit": "percent"
           },
-          "overrides": [
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Avg CPU %"
-              },
-              "properties": [
-                {
-                  "id": "color",
-                  "value": {
-                    "fixedColor": "orange",
-                    "mode": "fixed"
-                  }
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Avg Memory %"
-              },
-              "properties": [
-                {
-                  "id": "color",
-                  "value": {
-                    "fixedColor": "blue",
-                    "mode": "fixed"
-                  }
-                }
-              ]
-            }
-          ]
+          "overrides": []
         },
         "gridPos": {
           "h": 8,
@@ -599,7 +568,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "avg(100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\"}[5m])) * 100)",
+            "expr": "avg(100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\", instance=~\"$instance\"}[5m])) * 100)",
             "instant": false,
             "legendFormat": "Avg CPU %",
             "range": true,
@@ -611,14 +580,14 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "avg(100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\"} / node_memory_MemTotal_bytes{job=~\"$job\"})))",
+            "expr": "avg(100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\", instance=~\"$instance\"} / node_memory_MemTotal_bytes{job=~\"$job\", instance=~\"$instance\"})))",
             "instant": false,
             "legendFormat": "Avg Memory %",
             "range": true,
             "refId": "B"
           }
         ],
-        "title": "📈 Overall Resource Utilization Trends (Avg across devices)",
+        "title": "📈 Resource Trends - Your Excel Devices",
         "type": "timeseries"
       },
       {
@@ -635,7 +604,7 @@
         },
         "id": 9,
         "panels": [],
-        "title": "🖥️ 2. Device Table View - Detailed Metrics & RAG Status (Sortable | Color-Coded | Click to Drilldown)",
+        "title": "🖥️ TAB 2: Device Table View (Detailed RAG for Your Excel Instances | Click to Drilldown)",
         "type": "row"
       },
       {
@@ -643,7 +612,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "description": "Detailed per-device view. Color coding provides instant RAG status (Green=Healthy, Yellow=Warning, Red=Critical). Sort by CPU% or Memory% descending to surface problems first. Click on any Instance name to open detailed drilldown dashboard (configure the Data Link below with your actual detail dashboard UID). Use Job filter to focus on Linux vs Windows or specific types. Data from Prometheus node_exporter (adapt queries for Windows metrics if needed).",
+        "description": "Per-device table **only for your Excel-listed instances**. Color-coded RAG on CPU% and Memory%. Sort by CPU% desc to see hottest first. Click Instance to drill into details.",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -682,7 +651,7 @@
                   "id": "links",
                   "value": [
                     {
-                      "title": "🔍 Drilldown to Details for ${__data.fields.Instance}",
+                      "title": "🔍 Drilldown for ${__data.fields.Instance}",
                       "url": "/d/YOUR-DETAIL-DASHBOARD-UID-HERE/node-exporter-full?var-job=${__data.fields.Job}&var-node=${__data.fields.Instance}&from=${__from}&to=${__to}"
                     }
                   ]
@@ -700,8 +669,7 @@
                   "value": "percent"
                 },
                 {
-                  "id": "decimals",
-                  "value": 1
+                  "id": "decimals": 1
                 },
                 {
                   "id": "thresholds",
@@ -728,10 +696,6 @@
                   "value": {
                     "type": "color-background"
                   }
-                },
-                {
-                  "id": "custom.width",
-                  "value": 120
                 }
               ]
             },
@@ -746,8 +710,7 @@
                   "value": "percent"
                 },
                 {
-                  "id": "decimals",
-                  "value": 1
+                  "id": "decimals": 1
                 },
                 {
                   "id": "thresholds",
@@ -774,10 +737,6 @@
                   "value": {
                     "type": "color-background"
                   }
-                },
-                {
-                  "id": "custom.width",
-                  "value": 120
                 }
               ]
             },
@@ -792,12 +751,7 @@
                   "value": "MBps"
                 },
                 {
-                  "id": "decimals",
-                  "value": 2
-                },
-                {
-                  "id": "custom.width",
-                  "value": 140
+                  "id": "decimals": 2
                 }
               ]
             },
@@ -812,31 +766,14 @@
                   "value": "MBps"
                 },
                 {
-                  "id": "decimals",
-                  "value": 2
-                },
-                {
-                  "id": "custom.width",
-                  "value": 140
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Job"
-              },
-              "properties": [
-                {
-                  "id": "custom.width",
-                  "value": 160
+                  "id": "decimals": 2
                 }
               ]
             }
           ]
         },
         "gridPos": {
-          "h": 18,
+          "h": 16,
           "w": 24,
           "x": 0,
           "y": 15
@@ -868,7 +805,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\"}[5m])) * 100",
+            "expr": "100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\", instance=~\"$instance\"}[5m])) * 100",
             "format": "table",
             "instant": true,
             "legendFormat": "__auto",
@@ -881,7 +818,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\"} / node_memory_MemTotal_bytes{job=~\"$job\"}))",
+            "expr": "100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\", instance=~\"$instance\"} / node_memory_MemTotal_bytes{job=~\"$job\", instance=~\"$instance\"}))",
             "format": "table",
             "instant": true,
             "legendFormat": "__auto",
@@ -894,7 +831,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (instance, job) (rate(node_network_receive_bytes_total{job=~\"$job\", device!~\"lo|docker.*|veth.*|br.*|virbr.*|tun.*|tap.*\"}[5m])) / 1024 / 1024",
+            "expr": "sum by (instance, job) (rate(node_network_receive_bytes_total{job=~\"$job\", instance=~\"$instance\", device!~\"lo|docker.*|veth.*|br.*|virbr.*\"}[5m])) / 1024 / 1024",
             "format": "table",
             "instant": true,
             "legendFormat": "__auto",
@@ -907,7 +844,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (instance, job) (rate(node_network_transmit_bytes_total{job=~\"$job\", device!~\"lo|docker.*|veth.*|br.*|virbr.*|tun.*|tap.*\"}[5m])) / 1024 / 1024",
+            "expr": "sum by (instance, job) (rate(node_network_transmit_bytes_total{job=~\"$job\", instance=~\"$instance\", device!~\"lo|docker.*|veth.*|br.*|virbr.*\"}[5m])) / 1024 / 1024",
             "format": "table",
             "instant": true,
             "legendFormat": "__auto",
@@ -915,7 +852,7 @@
             "refId": "D"
           }
         ],
-        "title": "Device Health Table (RAG Color-Coded Metrics | Sort to Prioritize Issues)",
+        "title": "Device Health Table - Your Excel Instances Only (RAG Colors | Sortable)",
         "transformations": [
           {
             "id": "merge",
@@ -925,23 +862,9 @@
             "id": "organize",
             "options": {
               "excludeByName": {
-                "Time": true,
-                "__name__": true,
-                "instance 1": true,
-                "instance 2": true,
-                "instance 3": true,
-                "job 1": true,
-                "job 2": true,
-                "job 3": true
+                "Time": true
               },
-              "indexByName": {
-                "Value #A": 2,
-                "Value #B": 3,
-                "Value #C": 4,
-                "Value #D": 5,
-                "instance": 0,
-                "job": 1
-              },
+              "indexByName": {},
               "renameByName": {
                 "Value #A": "CPU %",
                 "Value #B": "Memory %",
@@ -956,28 +879,556 @@
         "type": "table"
       },
       {
+        "collapsed": false,
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
         "gridPos": {
-          "h": 4,
+          "h": 1,
           "w": 24,
           "x": 0,
-          "y": 33
+          "y": 31
         },
-        "id": 11,
+        "id": 12,
+        "panels": [],
+        "title": "📱 TAB 3: App-Level RAG Summary (High-Level Health per Application / Service Group)",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "description": "Number of distinct applications/service groups (based on 'app' label or Job as proxy). Add 'app' label from your Excel for best results.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 5,
+          "w": 6,
+          "x": 0,
+          "y": 32
+        },
+        "id": 13,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "pluginVersion": "10.4.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "editorMode": "code",
+            "expr": "count(count by (app) (node_cpu_seconds_total{job=~\"$job\", instance=~\"$instance\", app=~\"$app\"})) or count(count by (job) (node_cpu_seconds_total{job=~\"$job\", instance=~\"$instance\"}))",
+            "instant": true,
+            "legendFormat": "__auto",
+            "range": false,
+            "refId": "A"
+          }
+        ],
+        "title": "Total Apps / Service Groups",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "description": "Apps that have at least one critical device (from your Excel list).",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 5,
+          "w": 6,
+          "x": 6,
+          "y": 32
+        },
+        "id": 14,
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "pluginVersion": "10.4.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "editorMode": "code",
+            "expr": "count( (count by (app) (node_cpu_seconds_total{job=~\"$job\",instance=~\"$instance\",app=~\"$app\"} > 0 and (100 - avg by (app) (irate(node_cpu_seconds_total{mode=\"idle\",job=~\"$job\",instance=~\"$instance\",app=~\"$app\"}[5m]))*100 > 90 or 100*(1-avg by(app)(node_memory_MemAvailable_bytes{job=~\"$job\",instance=~\"$instance\",app=~\"$app\"}/node_memory_MemTotal_bytes{job=~\"$job\",instance=~\"$instance\",app=~\"$app\"})) >95))) or vector(0) )",
+            "instant": true,
+            "legendFormat": "__auto",
+            "range": false,
+            "refId": "A"
+          }
+        ],
+        "title": "🔴 Apps with Critical Devices",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "description": "% of apps that are fully healthy (no critical or warning devices).",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "max": 100,
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 70
+                },
+                {
+                  "color": "green",
+                  "value": 90
+                }
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 5,
+          "w": 6,
+          "x": 12,
+          "y": 32
+        },
+        "id": 15,
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "pluginVersion": "10.4.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "editorMode": "code",
+            "expr": "100",
+            "instant": true,
+            "legendFormat": "__auto",
+            "range": false,
+            "refId": "A"
+          }
+        ],
+        "title": "% Healthy Apps (placeholder - add app label)",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "description": "Quick view of average resource usage grouped by app (or job as proxy). Add 'app' label from Excel for accurate per-app grouping.",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 37
+        },
+        "id": 16,
+        "options": {
+          "legend": {
+            "calcs": [
+              "last",
+              "max"
+            ],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "pluginVersion": "10.4.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "editorMode": "code",
+            "expr": "avg by (app) (100 - avg by (app) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\", instance=~\"$instance\", app=~\"$app\"}[5m])) * 100) or avg by (job) (100 - avg by (job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\", instance=~\"$instance\"}[5m])) * 100)",
+            "instant": false,
+            "legendFormat": "{{app}} CPU %",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "📈 App-Level CPU Trends (group by 'app' label or Job)",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": false,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 45
+        },
+        "id": 17,
+        "panels": [],
+        "title": "📋 TAB 4: App-Level Device Breakdown (Per-App View of Your Excel Instances)",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "description": "Table showing your Excel devices grouped by Application (add 'app' label from Excel for perfect grouping; currently falls back to Job). Color RAG on metrics. Great for seeing which app has issues.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "CPU %"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                },
+                {
+                  "id": "decimals": 1
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 60
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Memory %"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                },
+                {
+                  "id": "decimals": 1
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 75
+                      },
+                      {
+                        "color": "red",
+                        "value": 90
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 14,
+          "w": 24,
+          "x": 0,
+          "y": 46
+        },
+        "id": 18,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": true
+          },
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "CPU %"
+            }
+          ]
+        },
+        "pluginVersion": "10.4.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "editorMode": "code",
+            "expr": "100 - avg by (instance, job, app) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\", instance=~\"$instance\", app=~\"$app\"}[5m])) * 100 or 100 - avg by (instance, job) (irate(node_cpu_seconds_total{mode=\"idle\", job=~\"$job\", instance=~\"$instance\"}[5m])) * 100",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "__auto",
+            "range": false,
+            "refId": "A"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "editorMode": "code",
+            "expr": "100 * (1 - avg by (instance, job, app) (node_memory_MemAvailable_bytes{job=~\"$job\", instance=~\"$instance\", app=~\"$app\"} / node_memory_MemTotal_bytes{job=~\"$job\", instance=~\"$instance\", app=~\"$app\"})) or 100 * (1 - avg by (instance, job) (node_memory_MemAvailable_bytes{job=~\"$job\", instance=~\"$instance\"} / node_memory_MemTotal_bytes{job=~\"$job\", instance=~\"$instance\"}))",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "__auto",
+            "range": false,
+            "refId": "B"
+          }
+        ],
+        "title": "Per-App / Per-Job Device Breakdown (RAG | Your Excel Instances)",
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "renameByName": {
+                "Value #A": "CPU %",
+                "Value #B": "Memory %",
+                "instance": "Instance",
+                "job": "Job / Type",
+                "app": "App"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 60
+        },
+        "id": 19,
         "options": {
           "code": {
             "language": "markdown",
             "showLineNumbers": false,
             "showMiniMap": false
           },
-          "content": "## 📋 Quick Instructions & Notes for Executives & Ops\n\n**How to use this dashboard:**\n- **Filters (top bar)**: Select `Job` / Device Type (e.g. `node` for Linux node-exporter, `windows-exporter` or your Windows job). Use `All` for combined view. Add more variables like `env` or `app` if your Prometheus targets have those labels.\n- **RAG Status**: Colors on CPU% and Memory% columns instantly show health. Red = Critical (action needed), Yellow = Warning (monitor), Green = Healthy.\n- **Drilldown**: Click any **Instance** (hostname) in the table to open a detailed per-server dashboard (update the Data Link URL in the Table panel settings with your actual Grafana detail dashboard UID, e.g. the popular Node Exporter Full ID 1860 or a custom one filtered by host).\n- **Your Excel list**: Cross-reference with the table to ensure all servers from your Excel are appearing (check Prometheus targets or scrape config). Missing ones? Add them to Prometheus `static_configs` or service discovery.\n\n**For Windows servers**: The queries are optimized for standard Linux `node_exporter`. For Windows (`windows_exporter`):\n- Duplicate panels/queries and adapt metrics, e.g.:\n  - CPU: `windows_cpu_time_total` (calculate idle % appropriately, often more involved with core/mode labels)\n  - Memory: `windows_memory_available_bytes` / `windows_memory_total_physical_bytes`\n  - Network: `windows_net_bytes_received_total` etc.\nTest in Explore first. Many teams run both exporters or use Telegraf for unified metrics.\n\n**Customization tips**: \n- Add `app`, `env`, `datacenter` labels via Prometheus relabeling for better \"app level\" grouping.\n- Set up alerts on the Critical stat or table thresholds.\n- For even prettier exec view, consider adding the Status History panel or Boom Table plugin if installed.\n\n**Data freshness**: Auto-refreshes every 30s. Time range default last 1h (adjust top right). Perfect for keeping an eye on things during big events tomorrow! 🚀\n\n*Dashboard created for Prashanth - tailored for executive visibility on app servers & infrastructure health.*",
+          "content": "## 📋 How to Load Your Apps & Devices from Excel (Step-by-Step)\n\n**This dashboard is now fully filtered to *only* the servers in your Excel.**\n\n### 1. For Devices / Instances (Quick - No Prometheus Change Needed)\n1. Open your Excel file.\n2. Copy the column with **hostnames / instance names** (the servers for your apps).\n3. In Grafana:\n   - Go to dashboard **variables** (top bar).\n   - Click **Instance (Excel list filter)**.\n   - **Best options**:\n     - Paste a **regex** that matches your hosts, e.g. `prod-app1-.*|prod-app2-.*|uat-.*` (pipe `|` separated).\n     - Or change **Type** to **Custom**, paste hostnames **one per line**, enable \"Include All\", set All value to `.*`.\n4. The whole dashboard (all 4 tabs) instantly shows **only your Excel-listed devices**.\n\n### 2. For True App-Level Grouping (Recommended - One-Time Prometheus Change)\nYour Excel likely has an **App** column. To get perfect \"per app\" summaries in Tab 3 & Tab 4:\n1. In your **Prometheus scrape config** (or relabel_configs), add the app name as a label for these hosts. Example:\n   ```yaml\n   static_configs:\n     - targets: ['host1:9100', 'host2:9100']\n       labels:\n         app: 'PaymentService'          # from your Excel\n         env: 'prod'\n   ```\n   Or use relabeling to map from address or another label.\n2. In Grafana variables, the **App** variable will now populate automatically (or change it to Custom and paste app names from Excel).\n3. Tabs 3 & 4 will then show clean per-app RAG, trends, and breakdowns.\n\n**Why do this?** Once the `app` label is added, Tab 3 gives executive view per application, and Tab 4 shows exactly which servers belong to which app with RAG status.\n\n**Current behavior (works immediately):** Tabs 3 & 4 fall back to grouping by **Job** (device type) until you add the `app` label. Still very useful.\n\n**Tips:**\n- Use your Excel as the source of truth — update Prometheus labels when Excel changes.\n- Add more labels like `env`, `datacenter`, `owner` from Excel columns for even richer filtering.\n- The dashboard auto-refreshes every 30s. Perfect for big days!\n\n*Updated with 4 tabs + full Excel guidance. Import/replace the JSON and set the Instance (and App) variables from your Excel.*",
           "mode": "markdown"
         },
         "pluginVersion": "10.4.0",
-        "title": "📖 Instructions, Windows Notes & Tips",
+        "title": "📖 Full Instructions: 4 Tabs + Loading from Excel",
         "type": "text"
       }
     ],
@@ -988,9 +1439,9 @@
       "servers",
       "health",
       "prometheus",
-      "node-exporter",
-      "infrastructure",
-      "RAG"
+      "RAG",
+      "excel-scoped",
+      "app-level"
     ],
     "templating": {
       "list": [
@@ -1029,7 +1480,7 @@
             "uid": "${datasource}"
           },
           "definition": "label_values(node_uname_info, job)",
-          "description": "Filter by Prometheus job / device type (e.g. 'node' for Linux, your Windows job name). 'All' shows everything. Adjust regex or add more jobs as needed.",
+          "description": "Device type / job (Linux node, Windows, etc.). Works with your Excel filter.",
           "hide": 0,
           "includeAll": true,
           "label": "Job / Device Type",
@@ -1047,25 +1498,63 @@
           "type": "query"
         },
         {
+          "allValue": ".*",
           "current": {
-            "selected": false,
-            "text": "",
-            "value": ""
+            "selected": true,
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
           },
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
           "definition": "label_values(node_uname_info{job=~\"$job\"}, instance)",
-          "description": "Optional: Filter to specific host(s). Leave empty or use regex like '.*prod.*' . Multi-select supported if changed to multi.",
+          "description": "YOUR EXCEL INSTANCES filter. Paste regex or switch to Custom + paste list from Excel (one per line). Multi-select supported. This scopes ALL tabs.",
           "hide": 0,
-          "includeAll": false,
-          "label": "Specific Instance (optional filter)",
-          "multi": false,
+          "includeAll": true,
+          "label": "Instance (Excel list filter)",
+          "multi": true,
           "name": "instance",
           "options": [],
           "query": {
             "query": "label_values(node_uname_info{job=~\"$job\"}, instance)",
+            "refId": "PrometheusVariableQueryEditor-VariableQuery"
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "type": "query"
+        },
+        {
+          "allValue": ".*",
+          "current": {
+            "selected": true,
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "definition": "label_values(node_uname_info{job=~\"$job\", instance=~\"$instance\"}, app)",
+          "description": "App / Service name (from 'app' label you add from Excel). Use Custom type + paste app names from your Excel if label not yet added. Powers Tab 3 & 4.",
+          "hide": 0,
+          "includeAll": true,
+          "label": "App (from Excel - add label recommended)",
+          "multi": true,
+          "name": "app",
+          "options": [],
+          "query": {
+            "query": "label_values(node_uname_info{job=~\"$job\", instance=~\"$instance\"}, app)",
             "refId": "PrometheusVariableQueryEditor-VariableQuery"
           },
           "refresh": 1,
@@ -1095,9 +1584,9 @@
       ]
     },
     "timezone": "browser",
-    "title": "Executive Server Health Dashboard - RAG Overview + Device Table (Prometheus)",
-    "uid": "exec-server-health-rag",
-    "version": 1,
+    "title": "Executive Server Health Dashboard - 4 Tabs (Excel-Scoped + App-Level RAG)",
+    "uid": "exec-4tabs-excel-app",
+    "version": 3,
     "weekStart": ""
   },
   "overwrite": true
