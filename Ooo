@@ -1,20 +1,25 @@
-// In your global styles or component styles (use ::ng-deep only if necessary)
-.mat-mdc-menu-content,          // Angular Material 15+ (MDC)
-.mat-menu-content {             // older versions
+/* Force horizontal layout */
+.mat-mdc-menu-content,          /* Angular Material 15+ (MDC-based) */
+.mat-menu-content {             /* Older versions */
   display: flex !important;
-  flex-direction: column !important;
+  flex-direction: row !important;
+  flex-wrap: wrap;              /* optional – allows wrapping */
+  padding: 4px 0 !important;
+  gap: 4px;                     /* spacing between items */
 }
 
+/* Make each item shrink to content width */
 .mat-mdc-menu-item,
 .mat-menu-item {
-  display: flex;
-  width: 100%;
+  min-width: auto !important;
+  width: auto !important;
+  height: 40px !important;      /* optional – adjust height */
+  line-height: 40px !important;
+  padding: 0 12px !important;
 }
 
-<button mat-button [matMenuTriggerFor]="menu">Menu</button>
-
-<mat-menu #menu="matMenu">
-  <button mat-menu-item>Item 1</button>
-  <button mat-menu-item>Item 2</button>
-  <button mat-menu-item>Item 3</button>
-</mat-menu>
+/* Optional: remove default vertical padding from the panel */
+.mat-mdc-menu-panel,
+.mat-menu-panel {
+  max-width: none !important;   /* allow the menu to grow wider */
+}
