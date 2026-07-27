@@ -1,24 +1,20 @@
-resources:
-  requests:
-    memory: "1Gi"      # ← keep exactly as-is (quota-safe)
-  limits:
-    memory: "4Gi"      # ← unchanged
+// In your global styles or component styles (use ::ng-deep only if necessary)
+.mat-mdc-menu-content,          // Angular Material 15+ (MDC)
+.mat-menu-content {             // older versions
+  display: flex !important;
+  flex-direction: column !important;
+}
 
-env:
-- name: JAVA_TOOL_OPTIONS
-  value: >-
-    -XX:+UseContainerSupport
-    -XX:InitialRAMPercentage=25.0
-    -XX:MaxRAMPercentage=75.0
-    -XX:MinRAMPercentage=20.0
-    -XX:MinHeapFreeRatio=20
-    -XX:MaxHeapFreeRatio=40
-    -XX:+UseG1GC
-    -XX:GCTimeRatio=4
-    -XX:+ShrinkHeapInSteps
+.mat-mdc-menu-item,
+.mat-menu-item {
+  display: flex;
+  width: 100%;
+}
 
+<button mat-button [matMenuTriggerFor]="menu">Menu</button>
 
-
-open JDK
-- name: JAVA_MAX_MEM_RATIO
-  value: "75"
+<mat-menu #menu="matMenu">
+  <button mat-menu-item>Item 1</button>
+  <button mat-menu-item>Item 2</button>
+  <button mat-menu-item>Item 3</button>
+</mat-menu>
